@@ -27,3 +27,10 @@
 - Nem toda reuniao tera notas taquigraficas publicadas.
 - A coleta deve preservar essa ausencia como log, nao como dado inventado.
 - Pautas, ementas e detalhes da reuniao nao substituem notas taquigraficas ou texto integral para analise textual.
+
+## Progresso, autosave e retomada
+
+- O script deve imprimir progresso minimo no stdout por particao, skip, falha e conclusao.
+- Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
+- `try/except` deve isolar falhas de reuniao, endpoint ou particao sem derrubar o fluxo inteiro.
+- Com `--resume`, o coletor deve pular particoes concluidas e registros ja presentes no JSONL do mesmo `run_id`.

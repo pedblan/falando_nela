@@ -68,8 +68,17 @@ subprocess.run([
     "--run-id", "prod-senado-plenario",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
+
+Em notebooks de orquestracao, use `check=False` para que uma falha registrada pelo coletor nao interrompa o restante do fluxo.
+
+## Resiliencia operacional
+
+- Imprimir progresso minimo no stdout para acompanhamento no Colab.
+- Gravar JSONL linha a linha, checkpoint e `manifest.autosave.json` durante a execucao.
+- Capturar falhas de pronunciamento ou particao com `try/except`, registrar log estruturado e continuar quando possivel.
+- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular pronunciamentos existentes.
 
 ## Fora do Escopo Atual
 

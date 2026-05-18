@@ -12,7 +12,7 @@ import httpx
 from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, format_senado_date, month_windows
 from coleta.common.http import OpenDataClient
-from coleta.common.io import CollectionRun, listify
+from coleta.common.io import CollectionRun, error_summary, listify
 
 SOURCE = "senado"
 DATASET = "plenario_discursos"
@@ -35,87 +35,121 @@ def collect() -> None:
     )
     windows = apply_sample_window(list(month_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
     processed_pronunciamentos = 0
+    status = "completed"
+    errors = 0
 
-    with OpenDataClient(BASE_URL) as client:
-        for partition, start, end in windows:
-            if runtime.sample_limit is not None and processed_pronunciamentos >= runtime.sample_limit:
-                break
-            if run.should_skip_partition(partition):
-                run.log("partition_skipped", partition=partition)
-                continue
-
-            endpoint = (
-                "dadosabertos/plenario/lista/discursos/"
-                f"{format_senado_date(start)}/{format_senado_date(end)}.json"
-            )
-            params = {"siglaCasa": SIGLA_CASA, "v": 4}
-            periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
-
-            run.log("partition_started", partition=partition, periodo=periodo)
-            result = client.get_json(endpoint, params=params)
-            run.write_record(
-                partition="metadata",
-                source_id=f"{SIGLA_CASA}:{format_senado_date(start)}:{format_senado_date(end)}",
-                request={"method": "GET", "path": endpoint, "params": params},
-                response=result.response_metadata,
-                periodo=periodo,
-                payload=result.data,
-                record_type="discursos_periodo_metadata",
-            )
-
-            pronunciamentos = extract_pronunciamentos(result.data)
-            for item in pronunciamentos:
+    try:
+        with OpenDataClient(BASE_URL) as client:
+            for partition, start, end in windows:
                 if runtime.sample_limit is not None and processed_pronunciamentos >= runtime.sample_limit:
-                    run.log(
-                        "sample_limit_reached",
-                        sample_limit=runtime.sample_limit,
-                        processed_pronunciamentos=processed_pronunciamentos,
-                    )
                     break
-
-                codigo = item["codigo_pronunciamento"]
-                if not codigo:
-                    run.log("pronunciamento_without_code", partition=partition, item=item)
+                if run.should_skip_partition(partition):
+                    run.log("partition_skipped", partition=partition)
                     continue
 
-                payload, text_request, text_response = fetch_pronunciamento_texto(client, item)
-                run.write_record(
-                    partition=partition,
-                    source_id=f"{SIGLA_CASA}:pronunciamento:{codigo}",
-                    request=text_request,
-                    response=text_response,
-                    periodo=periodo,
-                    payload=payload,
-                    record_type="pronunciamento_texto",
-                )
-                if should_enqueue_transcription(payload):
-                    run.write_record(
-                        partition="transcription_queue",
-                        source_id=f"{SIGLA_CASA}:pronunciamento:{codigo}",
-                        request=text_request,
-                        response=text_response,
-                        periodo=periodo,
-                        payload=payload,
-                        record_type="transcription_queue",
+                periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
+                try:
+                    endpoint = (
+                        "dadosabertos/plenario/lista/discursos/"
+                        f"{format_senado_date(start)}/{format_senado_date(end)}.json"
                     )
-                processed_pronunciamentos += 1
+                    params = {"siglaCasa": SIGLA_CASA, "v": 4}
 
-            run.mark_partition_complete(partition, periodo=periodo)
-            run.log(
-                "partition_completed",
-                partition=partition,
-                pronunciamentos_disponiveis=len(pronunciamentos),
-                pronunciamentos_processados=processed_pronunciamentos,
-            )
+                    run.log("partition_started", partition=partition, periodo=periodo)
+                    result = client.get_json(endpoint, params=params)
+                    run.write_record(
+                        partition="metadata",
+                        source_id=f"{SIGLA_CASA}:{format_senado_date(start)}:{format_senado_date(end)}",
+                        request={"method": "GET", "path": endpoint, "params": params},
+                        response=result.response_metadata,
+                        periodo=periodo,
+                        payload=result.data,
+                        record_type="discursos_periodo_metadata",
+                    )
 
-    run.write_manifest(
-        data_inicio=runtime.data_inicio.isoformat(),
-        data_fim=runtime.data_fim.isoformat(),
-        mode=runtime.mode,
-        sample=runtime.sample,
-        sample_limit=runtime.sample_limit,
-    )
-    print(run.manifest_path)
+                    pronunciamentos = extract_pronunciamentos(result.data)
+                    for item in pronunciamentos:
+                        if runtime.sample_limit is not None and processed_pronunciamentos >= runtime.sample_limit:
+                            run.log(
+                                "sample_limit_reached",
+                                sample_limit=runtime.sample_limit,
+                                processed_pronunciamentos=processed_pronunciamentos,
+                            )
+                            break
+
+                        codigo = item["codigo_pronunciamento"]
+                        if not codigo:
+                            run.log("pronunciamento_without_code", partition=partition, item=item)
+                            continue
+
+                        source_id = f"{SIGLA_CASA}:pronunciamento:{codigo}"
+                        if run.has_record(source_id=source_id, record_type="pronunciamento_texto"):
+                            run.log("record_resume_skipped", source_id=source_id, record_type="pronunciamento_texto")
+                            processed_pronunciamentos += 1
+                            continue
+
+                        try:
+                            payload, text_request, text_response = fetch_pronunciamento_texto(client, item)
+                        except Exception as exc:
+                            errors += 1
+                            status = "completed_with_errors"
+                            run.log(
+                                "pronunciamento_failed",
+                                partition=partition,
+                                codigo_pronunciamento=codigo,
+                                error=error_summary(exc),
+                            )
+                            continue
+
+                        run.write_record(
+                            partition=partition,
+                            source_id=source_id,
+                            request=text_request,
+                            response=text_response,
+                            periodo=periodo,
+                            payload=payload,
+                            record_type="pronunciamento_texto",
+                        )
+                        if should_enqueue_transcription(payload):
+                            run.write_record(
+                                partition="transcription_queue",
+                                source_id=source_id,
+                                request=text_request,
+                                response=text_response,
+                                periodo=periodo,
+                                payload=payload,
+                                record_type="transcription_queue",
+                            )
+                        processed_pronunciamentos += 1
+
+                    run.mark_partition_complete(partition, periodo=periodo)
+                    run.log(
+                        "partition_completed",
+                        partition=partition,
+                        pronunciamentos_disponiveis=len(pronunciamentos),
+                        pronunciamentos_processados=processed_pronunciamentos,
+                    )
+                except Exception as exc:
+                    errors += 1
+                    status = "completed_with_errors"
+                    run.mark_partition_failed(partition, periodo=periodo, error=error_summary(exc, include_traceback=True))
+                    run.log("partition_failed", partition=partition, error=error_summary(exc))
+                    continue
+    except Exception as exc:
+        errors += 1
+        status = "failed"
+        run.log("run_failed", error=error_summary(exc, include_traceback=True))
+    finally:
+        run.write_manifest(
+            data_inicio=runtime.data_inicio.isoformat(),
+            data_fim=runtime.data_fim.isoformat(),
+            mode=runtime.mode,
+            sample=runtime.sample,
+            sample_limit=runtime.sample_limit,
+            status=status,
+            errors=errors,
+        )
+        print(run.manifest_path)
 
 
 def extract_pronunciamentos(payload: Any) -> list[dict[str, Any]]:

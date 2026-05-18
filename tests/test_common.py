@@ -166,19 +166,85 @@ def test_collection_run_writes_record_checkpoint_and_manifest(tmp_path) -> None:
     raw_path = tmp_path / "raw" / "fonte" / "dataset" / "ano=2026" / "mes=05" / "run-test.jsonl"
     checkpoint_path = tmp_path / "checkpoints" / "fonte" / "dataset.json"
     manifest_path = tmp_path / "manifests" / "run-test.json"
+    autosave_path = tmp_path / "manifests" / "run-test.autosave.json"
 
     assert raw_path.exists()
     assert checkpoint_path.exists()
     assert manifest_path.exists()
+    assert autosave_path.exists()
 
     record = json.loads(raw_path.read_text(encoding="utf-8"))
     checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    autosave = json.loads(autosave_path.read_text(encoding="utf-8"))
 
     assert record["checksum"]
     assert checkpoint["completed_partitions"]["2026-05"]["records"] == 1
     assert manifest["record_counts"]["response"] == 1
+    assert autosave["run_id"] == "run-test"
     assert run.should_skip_partition("2026-05")
+
+
+def test_collection_run_resume_reads_existing_records_and_skips_duplicates(tmp_path) -> None:
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-resume",
+        resume=False,
+    )
+
+    first_write = run.write_record(
+        partition="2026-05",
+        source_id="fonte:1",
+        request={"method": "GET", "path": "/x", "params": {}},
+        response={"status_code": 200, "url": "https://example.test/x", "headers": {}},
+        periodo={"data_inicio": "2026-05-01", "data_fim": "2026-05-18"},
+        payload={"dados": [1]},
+        record_type="response",
+    )
+
+    resumed = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-resume",
+        resume=True,
+    )
+    second_write = resumed.write_record(
+        partition="2026-05",
+        source_id="fonte:1",
+        request={"method": "GET", "path": "/x", "params": {}},
+        response={"status_code": 200, "url": "https://example.test/x", "headers": {}},
+        periodo={"data_inicio": "2026-05-01", "data_fim": "2026-05-18"},
+        payload={"dados": [1]},
+        record_type="response",
+    )
+
+    raw_path = tmp_path / "raw" / "fonte" / "dataset" / "ano=2026" / "mes=05" / "run-resume.jsonl"
+
+    assert first_write is True
+    assert resumed.has_record(source_id="fonte:1", record_type="response")
+    assert second_write is False
+    assert len(raw_path.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_collection_run_marks_failed_partition(tmp_path) -> None:
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-failed",
+        resume=True,
+    )
+
+    run.mark_partition_failed("2026-05", error={"type": "RuntimeError", "message": "falha"})
+
+    checkpoint_path = tmp_path / "checkpoints" / "fonte" / "dataset.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+
+    assert "2026-05" in checkpoint["failed_partitions"]
+    assert not run.should_skip_partition("2026-05")
 
 
 def test_collection_run_writes_metadata_partition_outside_monthly_corpus(tmp_path) -> None:

@@ -28,3 +28,10 @@
 - Esta tarefa coleta somente eventos, participantes, metadados e URLs oficiais disponiveis na API.
 - Se texto integral/notas da reuniao passarem a estar disponiveis por fonte oficial, eles devem ser transferidos antes de qualquer fallback por video.
 - Ausencia de transcricao nao deve ser preenchida por scraping nesta fase; deve virar candidato documentado para transcricao futura.
+
+## Progresso, autosave e retomada
+
+- O script deve imprimir progresso minimo no stdout por particao, skip, falha e conclusao.
+- Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
+- `try/except` deve isolar falhas de evento ou particao sem derrubar o fluxo inteiro.
+- Com `--resume`, o coletor deve pular particoes concluidas e registros ja presentes no JSONL do mesmo `run_id`.

@@ -28,3 +28,10 @@
 - A API do Senado limita rotinas com mais de 10 requisicoes por segundo.
 - Falhas `429`, `500`, `502`, `503` e `504` devem entrar na politica de retry.
 - A lista mensal nao basta para analise textual; ela e metadado para localizar o texto integral do discurso ou da sessao.
+
+## Progresso, autosave e retomada
+
+- O script deve imprimir progresso minimo no stdout por particao, skip, falha e conclusao.
+- Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
+- `try/except` deve isolar falhas de particao sem derrubar o fluxo inteiro.
+- Com `--resume`, o coletor deve pular particoes concluidas e registros ja presentes no JSONL do mesmo `run_id`.

@@ -14,7 +14,7 @@ from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, month_windows
 from coleta.common.documents import DocumentTextResult, download_and_extract_document
 from coleta.common.http import OpenDataClient, iter_camara_pages
-from coleta.common.io import CollectionRun
+from coleta.common.io import CollectionRun, error_summary
 
 SOURCE = "camara"
 DATASET = "pareceres_pec"
@@ -36,74 +36,107 @@ def collect() -> None:
     )
     windows = apply_sample_window(list(month_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
     processed_pareceres = 0
+    status = "completed"
+    errors = 0
 
-    with OpenDataClient(BASE_URL) as client:
-        for partition, start, end in windows:
-            if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
-                break
-            if run.should_skip_partition(partition):
-                run.log("partition_skipped", partition=partition)
-                continue
-
-            periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
-            run.log("partition_started", partition=partition, periodo=periodo)
-            proposicoes = _collect_pec_pages(client, run, partition, periodo, sample=runtime.sample)
-            pareceres_na_particao = 0
-
-            for proposicao in proposicoes:
+    try:
+        with OpenDataClient(BASE_URL) as client:
+            for partition, start, end in windows:
                 if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
                     break
-                proposicao_id = proposicao.get("id")
-                if proposicao_id is None:
+                if run.should_skip_partition(partition):
+                    run.log("partition_skipped", partition=partition)
                     continue
-                detalhe = _collect_proposicao_detail(client, run, partition, periodo, int(proposicao_id))
-                tramitacoes = _collect_tramitacoes(client, run, partition, periodo, int(proposicao_id))
-                pareceres = [item for item in tramitacoes if is_parecer_tramitacao(item)]
 
-                for tramitacao_index, tramitacao in enumerate(pareceres, start=1):
-                    if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
-                        break
-                    url_documento = tramitacao.get("url") or tramitacao.get("urlDocumento")
-                    if not isinstance(url_documento, str) or not url_documento:
-                        run.log("parecer_without_document_url", proposicao_id=proposicao_id, tramitacao=tramitacao)
-                        continue
-                    document_text = download_and_extract_document(client, url_documento)
-                    payload = build_parecer_payload(proposicao, detalhe, tramitacao, document_text)
-                    run.write_record(
-                        partition=partition,
-                        source_id=build_source_id(proposicao, tramitacao, tramitacao_index),
-                        request=document_text.request,
-                        response=document_text.response,
+                periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
+                try:
+                    run.log("partition_started", partition=partition, periodo=periodo)
+                    proposicoes = _collect_pec_pages(client, run, partition, periodo, sample=runtime.sample)
+                    pareceres_na_particao = 0
+
+                    for proposicao in proposicoes:
+                        if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
+                            break
+                        proposicao_id = proposicao.get("id")
+                        if proposicao_id is None:
+                            continue
+                        try:
+                            detalhe = _collect_proposicao_detail(client, run, partition, periodo, int(proposicao_id))
+                            tramitacoes = _collect_tramitacoes(client, run, partition, periodo, int(proposicao_id))
+                        except Exception as exc:
+                            errors += 1
+                            status = "completed_with_errors"
+                            run.log("proposicao_failed", proposicao_id=proposicao_id, error=error_summary(exc))
+                            continue
+                        pareceres = [item for item in tramitacoes if is_parecer_tramitacao(item)]
+
+                        for tramitacao_index, tramitacao in enumerate(pareceres, start=1):
+                            if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
+                                break
+                            url_documento = tramitacao.get("url") or tramitacao.get("urlDocumento")
+                            if not isinstance(url_documento, str) or not url_documento:
+                                run.log("parecer_without_document_url", proposicao_id=proposicao_id, tramitacao=tramitacao)
+                                continue
+                            source_id = build_source_id(proposicao, tramitacao, tramitacao_index)
+                            if run.has_record(source_id=source_id, record_type="parecer_pec_texto"):
+                                run.log("record_resume_skipped", source_id=source_id, record_type="parecer_pec_texto")
+                                processed_pareceres += 1
+                                continue
+                            try:
+                                document_text = download_and_extract_document(client, url_documento)
+                                payload = build_parecer_payload(proposicao, detalhe, tramitacao, document_text)
+                            except Exception as exc:
+                                errors += 1
+                                status = "completed_with_errors"
+                                run.log("parecer_failed", source_id=source_id, error=error_summary(exc))
+                                continue
+                            run.write_record(
+                                partition=partition,
+                                source_id=source_id,
+                                request=document_text.request,
+                                response=document_text.response,
+                                periodo=periodo,
+                                payload=payload,
+                                record_type="parecer_pec_texto",
+                            )
+                            processed_pareceres += 1
+                            pareceres_na_particao += 1
+
+                    run.mark_partition_complete(
+                        partition,
                         periodo=periodo,
-                        payload=payload,
-                        record_type="parecer_pec_texto",
+                        pecs=len(proposicoes),
+                        pareceres_processados=pareceres_na_particao,
                     )
-                    processed_pareceres += 1
-                    pareceres_na_particao += 1
-
-            run.mark_partition_complete(
-                partition,
-                periodo=periodo,
-                pecs=len(proposicoes),
-                pareceres_processados=pareceres_na_particao,
-            )
-            run.log(
-                "partition_completed",
-                partition=partition,
-                pecs=len(proposicoes),
-                pareceres_processados=pareceres_na_particao,
-            )
-
-    run.write_manifest(
-        data_inicio=runtime.data_inicio.isoformat(),
-        data_fim=runtime.data_fim.isoformat(),
-        mode=runtime.mode,
-        sample=runtime.sample,
-        sample_limit=runtime.sample_limit,
-        orgaos_ccj=sorted(ORGAOS_CCJ),
-        orgaos_plenario=sorted(ORGAOS_PLENARIO),
-    )
-    print(run.manifest_path)
+                    run.log(
+                        "partition_completed",
+                        partition=partition,
+                        pecs=len(proposicoes),
+                        pareceres_processados=pareceres_na_particao,
+                    )
+                except Exception as exc:
+                    errors += 1
+                    status = "completed_with_errors"
+                    run.mark_partition_failed(partition, periodo=periodo, error=error_summary(exc, include_traceback=True))
+                    run.log("partition_failed", partition=partition, error=error_summary(exc))
+                    continue
+    except Exception as exc:
+        errors += 1
+        status = "failed"
+        run.log("run_failed", error=error_summary(exc, include_traceback=True))
+    finally:
+        run.write_manifest(
+            data_inicio=runtime.data_inicio.isoformat(),
+            data_fim=runtime.data_fim.isoformat(),
+            mode=runtime.mode,
+            sample=runtime.sample,
+            sample_limit=runtime.sample_limit,
+            orgaos_ccj=sorted(ORGAOS_CCJ),
+            orgaos_plenario=sorted(ORGAOS_PLENARIO),
+            status=status,
+            errors=errors,
+        )
+        print(run.manifest_path)
 
 
 def _collect_pec_pages(

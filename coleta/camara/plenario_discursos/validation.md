@@ -20,7 +20,7 @@ subprocess.run([
     "--run-id", "prod-camara-plenario",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
 
 ## Criterios
@@ -34,3 +34,10 @@ subprocess.run([
 - Registros preservam id do deputado, periodo, request, response, payload e checksum.
 - Quando `transcricao` estiver presente, ela e o texto prioritario para analise; `sumario` e `keywords` sao apenas metadados.
 - Uma segunda execucao com `--resume` pula particoes concluidas.
+
+## Validacao de resiliencia
+
+- O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
+- O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
+- Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros ja gravados.

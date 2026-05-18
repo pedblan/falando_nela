@@ -17,6 +17,10 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
 - `prod`: usa `--no-sample` por default e exige destino externo via `--output-dir` ou `FALANDO_NELA_DATA_ROOT`.
 - Em `prod`, o coletor recusa diretorios dentro do repositorio para evitar gravar uma coleta completa no Git local.
 - Precedencia do destino: `--output-dir`, depois `FALANDO_NELA_DATA_ROOT`, depois `data/dev` apenas em `dev`.
+- Progresso: os scripts imprimem eventos simples no stdout (`partition_started`, `partition_completed`, falhas e skips), alem de gravarem o log JSONL.
+- Autosave: registros JSONL sao gravados linha a linha; checkpoints e `manifests/{run_id}.autosave.json` sao atualizados durante a execucao.
+- Retomada: com `--resume`, o coletor pula particoes concluidas e tambem le JSONLs existentes do mesmo `run_id` para nao baixar novamente registros ja gravados.
+- Falhas: erros de item ou particao devem ser capturados, registrados no log/checkpoint e nao devem impedir a continuacao das demais particoes quando houver caminho seguro.
 
 No Colab, o destino padrao recomendado e:
 
@@ -32,6 +36,7 @@ export FALANDO_NELA_DATA_ROOT=/content/drive/MyDrive/falando_nela/data
 - `data/checkpoints/{portal}/{dataset}.json`: particoes concluidas.
 - `data/logs/{run_id}.jsonl`: log estruturado da execucao.
 - `data/manifests/{run_id}.json`: resumo auditavel da execucao.
+- `data/manifests/{run_id}.autosave.json`: resumo parcial sobrescrito durante a execucao para inspecao em caso de interrupcao.
 - `data/schemas/`: schemas versionaveis.
 - `data/samples/`: amostras pequenas versionaveis quando necessario.
 
@@ -47,6 +52,8 @@ Cada linha JSONL preserva:
 - `response` com URL final, status e cabecalhos relevantes.
 - `checksum` calculado sobre o payload.
 - `payload` com a resposta da fonte com minima transformacao.
+
+O `source_id` combinado com `record_type` e usado na retomada fina por `run_id`. Ao repetir uma execucao interrompida com o mesmo `--run-id --resume`, registros ja presentes no JSONL sao reconhecidos e pulados.
 
 ## Unidade textual
 
@@ -129,6 +136,8 @@ Todos os scripts aceitam:
 
 O notebook `notebooks/coleta/coleta_template.ipynb` monta o Google Drive, define `FALANDO_NELA_DATA_ROOT`, instala dependencias e executa todos os coletores em `--mode prod --resume`.
 
+Os notebooks de coleta nao devem usar `check=True` ao chamar coletores. Um coletor que falhe deve imprimir stdout/stderr, registrar o resultado e permitir que o fluxo siga para o proximo modulo ou para a inspecao dos logs.
+
 Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_senado_plenario.ipynb`. A primeira celula executavel desse notebook monta o Drive antes de clonar o repositorio ou carregar qualquer codigo do projeto.
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
@@ -169,7 +178,7 @@ subprocess.run([
     "--run-id", "prod-senado-plenario",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
 
 Exemplo de celula para os pareceres de PEC:
@@ -188,5 +197,5 @@ for module, run_id in [
         "--run-id", run_id,
         "--data-inicio", "2011-05-18",
         "--data-fim", "2026-05-18",
-    ], check=True)
+    ], check=False)
 ```

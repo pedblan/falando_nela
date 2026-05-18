@@ -12,7 +12,7 @@ import httpx
 from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, format_senado_date, month_windows
 from coleta.common.http import OpenDataClient
-from coleta.common.io import CollectionRun, listify
+from coleta.common.io import CollectionRun, error_summary, listify
 
 SOURCE = "senado"
 DATASET = "ccj_notas"
@@ -32,51 +32,73 @@ def collect() -> None:
         resume=runtime.resume,
     )
     windows = apply_sample_window(list(month_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
+    status = "completed"
+    errors = 0
 
-    with OpenDataClient(BASE_URL) as client:
-        for partition, start, end in windows:
-            if run.should_skip_partition(partition):
-                run.log("partition_skipped", partition=partition)
-                continue
-
-            periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
-            endpoint = (
-                "dadosabertos/comissao/agenda/"
-                f"{format_senado_date(start)}/{format_senado_date(end)}.json"
-            )
-            params = {"v": 2}
-
-            run.log("partition_started", partition=partition, periodo=periodo)
-            agenda = client.get_json(endpoint, params=params)
-            run.write_record(
-                partition="metadata",
-                source_id=f"agenda:{format_senado_date(start)}:{format_senado_date(end)}",
-                request={"method": "GET", "path": endpoint, "params": params},
-                response=agenda.response_metadata,
-                periodo=periodo,
-                payload=agenda.data,
-                record_type="agenda_periodo",
-            )
-
-            ccj_reunioes = _ccj_reunioes(agenda.data)
-            for reuniao in ccj_reunioes:
-                codigo = _codigo_reuniao(reuniao)
-                if not codigo:
-                    run.log("meeting_without_code", partition=partition, reuniao=reuniao)
+    try:
+        with OpenDataClient(BASE_URL) as client:
+            for partition, start, end in windows:
+                if run.should_skip_partition(partition):
+                    run.log("partition_skipped", partition=partition)
                     continue
-                _collect_reuniao(client, run, partition, periodo, codigo)
 
-            run.mark_partition_complete(partition, periodo=periodo, reunioes_ccj=len(ccj_reunioes))
-            run.log("partition_completed", partition=partition, reunioes_ccj=len(ccj_reunioes))
+                periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
+                try:
+                    endpoint = (
+                        "dadosabertos/comissao/agenda/"
+                        f"{format_senado_date(start)}/{format_senado_date(end)}.json"
+                    )
+                    params = {"v": 2}
 
-    run.write_manifest(
-        data_inicio=runtime.data_inicio.isoformat(),
-        data_fim=runtime.data_fim.isoformat(),
-        mode=runtime.mode,
-        sample=runtime.sample,
-        ccj_codigo=CCJ_CODIGO,
-    )
-    print(run.manifest_path)
+                    run.log("partition_started", partition=partition, periodo=periodo)
+                    agenda = client.get_json(endpoint, params=params)
+                    run.write_record(
+                        partition="metadata",
+                        source_id=f"agenda:{format_senado_date(start)}:{format_senado_date(end)}",
+                        request={"method": "GET", "path": endpoint, "params": params},
+                        response=agenda.response_metadata,
+                        periodo=periodo,
+                        payload=agenda.data,
+                        record_type="agenda_periodo",
+                    )
+
+                    ccj_reunioes = _ccj_reunioes(agenda.data)
+                    for reuniao in ccj_reunioes:
+                        codigo = _codigo_reuniao(reuniao)
+                        if not codigo:
+                            run.log("meeting_without_code", partition=partition, reuniao=reuniao)
+                            continue
+                        try:
+                            _collect_reuniao(client, run, partition, periodo, codigo)
+                        except Exception as exc:
+                            errors += 1
+                            status = "completed_with_errors"
+                            run.log("meeting_failed", partition=partition, codigo_reuniao=codigo, error=error_summary(exc))
+                            continue
+
+                    run.mark_partition_complete(partition, periodo=periodo, reunioes_ccj=len(ccj_reunioes))
+                    run.log("partition_completed", partition=partition, reunioes_ccj=len(ccj_reunioes))
+                except Exception as exc:
+                    errors += 1
+                    status = "completed_with_errors"
+                    run.mark_partition_failed(partition, periodo=periodo, error=error_summary(exc, include_traceback=True))
+                    run.log("partition_failed", partition=partition, error=error_summary(exc))
+                    continue
+    except Exception as exc:
+        errors += 1
+        status = "failed"
+        run.log("run_failed", error=error_summary(exc, include_traceback=True))
+    finally:
+        run.write_manifest(
+            data_inicio=runtime.data_inicio.isoformat(),
+            data_fim=runtime.data_fim.isoformat(),
+            mode=runtime.mode,
+            sample=runtime.sample,
+            ccj_codigo=CCJ_CODIGO,
+            status=status,
+            errors=errors,
+        )
+        print(run.manifest_path)
 
 
 def _collect_reuniao(
@@ -93,6 +115,10 @@ def _collect_reuniao(
         ("reuniao_detalhe", detail_endpoint, {"v": 2}),
         ("notas_taquigraficas", notes_endpoint, {"v": 1}),
     ]:
+        source_id = f"reuniao:{codigo}:{record_type}"
+        if run.has_record(source_id=source_id, record_type=record_type):
+            run.log("record_resume_skipped", source_id=source_id, record_type=record_type)
+            continue
         try:
             result = client.get_json(endpoint, params=params)
         except httpx.HTTPStatusError as exc:
@@ -107,7 +133,7 @@ def _collect_reuniao(
 
         run.write_record(
             partition=partition if record_type == "notas_taquigraficas" else "metadata",
-            source_id=f"reuniao:{codigo}:{record_type}",
+            source_id=source_id,
             request={"method": "GET", "path": endpoint, "params": params},
             response=result.response_metadata,
             periodo=periodo,

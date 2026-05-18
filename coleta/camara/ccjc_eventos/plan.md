@@ -31,3 +31,10 @@
 
 - `dev`: primeira particao mensal e ate tres eventos por default, gravada em `data/dev`.
 - `prod`: coleta completa por default, gravada em diretorio externo como Google Drive via `FALANDO_NELA_DATA_ROOT`.
+
+## Resiliencia operacional
+
+- Imprimir progresso minimo no stdout para acompanhamento no Colab.
+- Gravar JSONL linha a linha, checkpoint e `manifest.autosave.json` durante a execucao.
+- Capturar falhas de evento/particao com `try/except`, registrar log estruturado e continuar quando possivel.
+- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular registros existentes.

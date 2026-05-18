@@ -35,7 +35,7 @@ subprocess.run([
     "--data-inicio", "2011-05-18",
     "--data-fim", "2011-05-31",
     "--sample-limit", "10",
-], check=True)
+], check=False)
 ```
 
 Depois da validacao curta, a coleta completa pode remover `--sample-limit`:
@@ -50,7 +50,7 @@ subprocess.run([
     "--run-id", "prod-senado-plenario",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
 
 ## Criterios de Aceite
@@ -114,3 +114,10 @@ PY
 - Registro textual sem `CodigoPronunciamento`.
 - Registro textual com apenas `Resumo` quando o texto integral oficial esta disponivel.
 - Execucao `prod` gravando dentro do repositorio local.
+
+## Validacao de resiliencia
+
+- O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
+- O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
+- Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular pronunciamentos ja gravados, sem baixar novamente textos integrais salvos.

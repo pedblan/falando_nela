@@ -58,7 +58,7 @@ subprocess.run([
     "--run-id", "prod-camara-pareceres-pec",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
 
 Para smoke test no Colab ou local:
@@ -71,5 +71,12 @@ subprocess.run([
     "--mode", "dev",
     "--sample-limit", "2",
     "--run-id", "smoke-camara-pareceres-pec",
-], check=True)
+], check=False)
 ```
+
+## Resiliencia operacional
+
+- Imprimir progresso minimo no stdout para acompanhamento no Colab.
+- Gravar JSONL linha a linha, checkpoint e `manifest.autosave.json` durante a execucao.
+- Capturar falhas de proposicao, tramitacao, documento ou particao com `try/except`, registrar log estruturado e continuar quando possivel.
+- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular registros existentes.

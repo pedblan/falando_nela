@@ -55,3 +55,10 @@ drive.mount("/content/drive")
 os.environ["FALANDO_NELA_DATA_ROOT"] = "/content/drive/MyDrive/falando_nela/data"
 Path(os.environ["FALANDO_NELA_DATA_ROOT"]).mkdir(parents=True, exist_ok=True)
 ```
+
+## Progresso, autosave e retomada
+
+- O script deve imprimir progresso minimo no stdout por particao, skip, falha e conclusao.
+- Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
+- `try/except` deve isolar falhas de proposicao, tramitacao, documento ou particao sem derrubar o fluxo inteiro.
+- Com `--resume`, o coletor deve pular particoes concluidas e registros ja presentes no JSONL do mesmo `run_id`.

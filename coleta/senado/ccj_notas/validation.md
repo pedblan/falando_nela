@@ -20,7 +20,7 @@ subprocess.run([
     "--run-id", "prod-senado-ccj",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
 
 ## Criterios
@@ -33,3 +33,10 @@ subprocess.run([
 - Para analise textual, `notas_taquigraficas` ou texto integral da reuniao tem prioridade sobre agenda, pauta e detalhe.
 - Falhas de detalhe ou notas aparecem em log estruturado.
 - O checkpoint so marca a particao apos processar a agenda e as reunioes encontradas.
+
+## Validacao de resiliencia
+
+- O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
+- O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
+- Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros ja gravados.

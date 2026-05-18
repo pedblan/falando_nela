@@ -20,7 +20,7 @@ subprocess.run([
     "--run-id", "prod-camara-ccjc",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
-], check=True)
+], check=False)
 ```
 
 ## Criterios
@@ -34,3 +34,10 @@ subprocess.run([
 - Registros preservam periodo, request, response, payload e checksum.
 - Texto integral/notas da reuniao, quando existirem em fonte oficial, tem prioridade sobre metadados de evento.
 - Lacunas de transcricao de reuniao ficam documentadas na spec e nao quebram a coleta.
+
+## Validacao de resiliencia
+
+- O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
+- O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
+- Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros ja gravados.

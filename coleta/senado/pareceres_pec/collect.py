@@ -14,7 +14,7 @@ from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, month_windows
 from coleta.common.documents import DocumentTextResult, download_and_extract_document
 from coleta.common.http import OpenDataClient
-from coleta.common.io import CollectionRun
+from coleta.common.io import CollectionRun, error_summary
 
 SOURCE = "senado"
 DATASET = "pareceres_pec"
@@ -36,83 +36,116 @@ def collect() -> None:
     )
     windows = apply_sample_window(list(month_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
     processed_pareceres = 0
+    status = "completed"
+    errors = 0
 
-    with OpenDataClient(BASE_URL) as client:
-        for partition, start, end in windows:
-            if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
-                break
-            if run.should_skip_partition(partition):
-                run.log("partition_skipped", partition=partition)
-                continue
-
-            periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
-            params = {
-                "sigla": "PEC",
-                "dataInicioApresentacao": periodo["data_inicio"],
-                "dataFimApresentacao": periodo["data_fim"],
-                "v": 1,
-            }
-            run.log("partition_started", partition=partition, periodo=periodo)
-            processos_result = client.get_json(PROCESSO_ENDPOINT, params=params)
-            run.write_record(
-                partition="metadata",
-                source_id=f"senado:pec:processos:{partition}",
-                request={"method": "GET", "path": PROCESSO_ENDPOINT, "params": params},
-                response=processos_result.response_metadata,
-                periodo=periodo,
-                payload=processos_result.data,
-                record_type="pec_processos_metadata",
-            )
-
-            processos = extract_processos(processos_result.data)
-            pareceres_na_particao = 0
-            for processo in processos:
+    try:
+        with OpenDataClient(BASE_URL) as client:
+            for partition, start, end in windows:
                 if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
                     break
-                pareceres = _collect_documentos_processo(client, run, partition, periodo, processo)
-                for documento in pareceres:
-                    if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
-                        break
-                    url_documento = documento.get("urlDocumento")
-                    if not isinstance(url_documento, str) or not url_documento:
-                        run.log("parecer_without_document_url", processo=processo.get("id"), documento=documento)
-                        continue
-                    document_text = download_and_extract_document(client, url_documento)
-                    payload = build_parecer_payload(processo, documento, document_text)
+                if run.should_skip_partition(partition):
+                    run.log("partition_skipped", partition=partition)
+                    continue
+
+                periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
+                try:
+                    params = {
+                        "sigla": "PEC",
+                        "dataInicioApresentacao": periodo["data_inicio"],
+                        "dataFimApresentacao": periodo["data_fim"],
+                        "v": 1,
+                    }
+                    run.log("partition_started", partition=partition, periodo=periodo)
+                    processos_result = client.get_json(PROCESSO_ENDPOINT, params=params)
                     run.write_record(
-                        partition=partition,
-                        source_id=build_source_id(processo, documento),
-                        request=document_text.request,
-                        response=document_text.response,
+                        partition="metadata",
+                        source_id=f"senado:pec:processos:{partition}",
+                        request={"method": "GET", "path": PROCESSO_ENDPOINT, "params": params},
+                        response=processos_result.response_metadata,
                         periodo=periodo,
-                        payload=payload,
-                        record_type="parecer_pec_texto",
+                        payload=processos_result.data,
+                        record_type="pec_processos_metadata",
                     )
-                    processed_pareceres += 1
-                    pareceres_na_particao += 1
 
-            run.mark_partition_complete(
-                partition,
-                periodo=periodo,
-                processos=len(processos),
-                pareceres_processados=pareceres_na_particao,
-            )
-            run.log(
-                "partition_completed",
-                partition=partition,
-                processos=len(processos),
-                pareceres_processados=pareceres_na_particao,
-            )
+                    processos = extract_processos(processos_result.data)
+                    pareceres_na_particao = 0
+                    for processo in processos:
+                        if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
+                            break
+                        try:
+                            pareceres = _collect_documentos_processo(client, run, partition, periodo, processo)
+                        except Exception as exc:
+                            errors += 1
+                            status = "completed_with_errors"
+                            run.log("processo_failed", processo_id=processo.get("id"), error=error_summary(exc))
+                            continue
+                        for documento in pareceres:
+                            if runtime.sample_limit is not None and processed_pareceres >= runtime.sample_limit:
+                                break
+                            url_documento = documento.get("urlDocumento")
+                            if not isinstance(url_documento, str) or not url_documento:
+                                run.log("parecer_without_document_url", processo=processo.get("id"), documento=documento)
+                                continue
+                            source_id = build_source_id(processo, documento)
+                            if run.has_record(source_id=source_id, record_type="parecer_pec_texto"):
+                                run.log("record_resume_skipped", source_id=source_id, record_type="parecer_pec_texto")
+                                processed_pareceres += 1
+                                continue
+                            try:
+                                document_text = download_and_extract_document(client, url_documento)
+                                payload = build_parecer_payload(processo, documento, document_text)
+                            except Exception as exc:
+                                errors += 1
+                                status = "completed_with_errors"
+                                run.log("parecer_failed", source_id=source_id, error=error_summary(exc))
+                                continue
+                            run.write_record(
+                                partition=partition,
+                                source_id=source_id,
+                                request=document_text.request,
+                                response=document_text.response,
+                                periodo=periodo,
+                                payload=payload,
+                                record_type="parecer_pec_texto",
+                            )
+                            processed_pareceres += 1
+                            pareceres_na_particao += 1
 
-    run.write_manifest(
-        data_inicio=runtime.data_inicio.isoformat(),
-        data_fim=runtime.data_fim.isoformat(),
-        mode=runtime.mode,
-        sample=runtime.sample,
-        sample_limit=runtime.sample_limit,
-        tipos_documento_parecer=sorted(TIPOS_DOCUMENTO_PARECER),
-    )
-    print(run.manifest_path)
+                    run.mark_partition_complete(
+                        partition,
+                        periodo=periodo,
+                        processos=len(processos),
+                        pareceres_processados=pareceres_na_particao,
+                    )
+                    run.log(
+                        "partition_completed",
+                        partition=partition,
+                        processos=len(processos),
+                        pareceres_processados=pareceres_na_particao,
+                    )
+                except Exception as exc:
+                    errors += 1
+                    status = "completed_with_errors"
+                    run.mark_partition_failed(partition, periodo=periodo, error=error_summary(exc, include_traceback=True))
+                    run.log("partition_failed", partition=partition, error=error_summary(exc))
+                    continue
+    except Exception as exc:
+        errors += 1
+        status = "failed"
+        run.log("run_failed", error=error_summary(exc, include_traceback=True))
+    finally:
+        run.write_manifest(
+            data_inicio=runtime.data_inicio.isoformat(),
+            data_fim=runtime.data_fim.isoformat(),
+            mode=runtime.mode,
+            sample=runtime.sample,
+            sample_limit=runtime.sample_limit,
+            tipos_documento_parecer=sorted(TIPOS_DOCUMENTO_PARECER),
+            status=status,
+            errors=errors,
+        )
+        print(run.manifest_path)
 
 
 def _collect_documentos_processo(

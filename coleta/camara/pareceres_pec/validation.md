@@ -43,7 +43,7 @@ subprocess.run([
     "--sample-limit", "2",
     "--resume",
     "--run-id", run_id,
-], check=True)
+], check=False)
 
 manifest = Path(os.environ["FALANDO_NELA_DATA_ROOT"]) / "manifests" / f"{run_id}.json"
 print(json.dumps(json.loads(manifest.read_text()), indent=2, ensure_ascii=False))
@@ -54,3 +54,10 @@ print(json.dumps(json.loads(manifest.read_text()), indent=2, ensure_ascii=False)
 - PDFs digitalizados podem nao produzir texto com `pypdf`; nesses casos, manter `forma=documento` e planejar OCR em etapa futura.
 - A API pode registrar pareceres em tramitacoes antigas com links HTML intermediarios; o coletor segue um meta-refresh, mas nao faz scraping fora de URLs oficiais.
 - O coletor nao decide qual parecer e final ou substitutivo; essa decisao deve ficar para processamento posterior.
+
+## Validacao de resiliencia
+
+- O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
+- O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
+- Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros ja gravados.
