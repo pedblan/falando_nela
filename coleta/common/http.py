@@ -65,6 +65,9 @@ class OpenDataClient:
     def get_text(self, path_or_url: str, *, params: dict[str, Any] | None = None) -> HttpResult:
         return self._get(path_or_url, params=params, accept="text/plain", response_type="text")
 
+    def get_bytes(self, path_or_url: str, *, params: dict[str, Any] | None = None) -> HttpResult:
+        return self._get(path_or_url, params=params, accept="*/*", response_type="bytes")
+
     def _get(
         self,
         path_or_url: str,
@@ -119,9 +122,21 @@ class OpenDataClient:
         headers = {
             key: value
             for key, value in response.headers.items()
-            if key.lower() in {"content-type", "date", "link", "retry-after", "x-total-count"}
+            if key.lower()
+            in {
+                "content-disposition",
+                "content-length",
+                "content-type",
+                "date",
+                "link",
+                "location",
+                "retry-after",
+                "x-total-count",
+            }
         }
-        if response_type == "text":
+        if response_type == "bytes":
+            data = response.content
+        elif response_type == "text":
             data = response.text if response.content else ""
         else:
             data = response.json() if response.content else None

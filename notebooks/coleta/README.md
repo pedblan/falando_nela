@@ -11,5 +11,5 @@ Convencoes:
 
 Arquivos atuais:
 
-- `coleta_template.ipynb`: template geral para rodar todos os coletores.
+- `coleta_template.ipynb`: template geral para rodar todos os coletores, incluindo pareceres de PEC.
 - `coleta_senado_plenario.ipynb`: fluxo especifico para validar e rodar a coleta do Plenario do Senado.

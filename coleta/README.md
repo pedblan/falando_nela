@@ -61,6 +61,8 @@ Ordem de prioridade para formar corpus textual:
 
 Metadados, resumos, indexacao, pautas e listas de eventos sao contexto e rastreabilidade; nao sao corpus analitico principal quando houver texto integral disponivel.
 
+Para PECs, a unidade analitica prioritaria neste momento e o parecer, nao o texto-base da PEC. Como uma PEC pode ter varios pareceres e versoes documentais, cada parecer/documento oficial deve ser preservado em registro proprio.
+
 Quando uma fonte exigir duas etapas, a primeira etapa localiza os itens e grava a resposta bruta em `metadata/`; a segunda etapa baixa o texto integral e grava somente o registro textual consolidado na particao mensal. Esse desenho evita inflar os arquivos de corpus com listas completas de metadados.
 
 Campos textuais esperados quando aplicavel:
@@ -77,13 +79,17 @@ Os metadados brutos da fonte podem conter campos como `metadata.pronunciamento.T
 
 Registros em `transcription_queue` nao devem ser usados como texto analitico ate passarem por uma etapa futura de transcricao documentada.
 
+Para pareceres em PDF/HTML, `forma=documento` pode aparecer quando o arquivo oficial foi localizado, mas a extracao textual ainda nao produziu texto. Esses casos devem ser tratados em etapa futura de OCR ou revisao documental, sem substituir silenciosamente documentos ja extraidos.
+
 ## Tarefas
 
 - `senado/plenario_discursos`: discursos do Plenario do Senado (`siglaCasa=SF`).
 - `senado/congresso_discursos`: discursos do Plenario do Congresso (`siglaCasa=CN`).
 - `senado/ccj_notas`: agenda, detalhes e notas taquigraficas da CCJ do Senado.
+- `senado/pareceres_pec`: pareceres e relatorios de PEC no Plenario e na CCJ do Senado.
 - `camara/plenario_discursos`: discursos por deputado na API da Camara.
 - `camara/ccjc_eventos`: eventos, participantes e metadados da CCJC da Camara.
+- `camara/pareceres_pec`: pareceres de PEC no Plenario, CCJC e historica CCJR da Camara.
 
 ## Execucao
 
@@ -97,6 +103,13 @@ Exemplo de producao no Colab, depois de montar o Drive:
 
 ```bash
 python -m coleta.senado.plenario_discursos.collect --mode prod --resume --run-id prod-senado-sf
+```
+
+Exemplos para pareceres de PEC:
+
+```bash
+python -m coleta.senado.pareceres_pec.collect --mode dev --sample-limit 2 --run-id smoke-senado-pareceres-pec
+python -m coleta.camara.pareceres_pec.collect --mode dev --sample-limit 2 --run-id smoke-camara-pareceres-pec
 ```
 
 Todos os scripts aceitam:
@@ -157,4 +170,23 @@ subprocess.run([
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
 ], check=True)
+```
+
+Exemplo de celula para os pareceres de PEC:
+
+```python
+import subprocess
+
+for module, run_id in [
+    ("coleta.senado.pareceres_pec.collect", "prod-senado-pareceres-pec"),
+    ("coleta.camara.pareceres_pec.collect", "prod-camara-pareceres-pec"),
+]:
+    subprocess.run([
+        "python", "-m", module,
+        "--mode", "prod",
+        "--resume",
+        "--run-id", run_id,
+        "--data-inicio", "2011-05-18",
+        "--data-fim", "2026-05-18",
+    ], check=True)
 ```
