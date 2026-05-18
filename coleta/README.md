@@ -120,6 +120,8 @@ Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_sena
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 
+Se o repositorio estiver privado, crie no Colab um Secret chamado `GITHUB_TOKEN` antes da celula de clone. Use um token do GitHub com permissao de leitura do repositorio; os notebooks usam esse segredo apenas para autenticar `git clone`/`git pull`.
+
 Celula base para usar no Colab:
 
 ```python

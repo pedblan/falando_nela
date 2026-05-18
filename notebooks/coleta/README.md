@@ -6,6 +6,7 @@ Convencoes:
 
 - A primeira celula executavel deve montar o Google Drive quando o notebook depender de `FALANDO_NELA_DATA_ROOT`.
 - O clone/pull do repositorio e a instalacao de dependencias devem vir depois da montagem do Drive.
+- Se o repositorio estiver privado, o notebook deve ler um Secret do Colab chamado `GITHUB_TOKEN` para clonar o codigo.
 - Estes notebooks nao sao cadernos analiticos de artigo; eles existem para orquestrar coletas e validacoes.
 - Cadernos de artigos devem ficar em outras subpastas de `notebooks/`, separadas por tema ou artigo.
 
