@@ -18,6 +18,7 @@ O cliente HTTP padrao para o modulo de coleta sera `httpx`, tanto nos prototipos
 Quando implementado, o modulo de coleta deve prever:
 
 - Parametros explicitos de fonte, periodo e escopo.
+- Transferencia prioritaria de texto integral de discurso, sessao ou reuniao, quando a fonte oficial disponibilizar esse conteudo.
 - Paginacao nos endpoints que exigirem.
 - Retries para falhas temporarias.
 - Checkpoints para permitir retomada sem duplicar trabalho.
@@ -29,6 +30,12 @@ O armazenamento sera definido por camadas:
 
 - `raw`: respostas ou registros preservados com o minimo de transformacao possivel.
 - `processed`: dados normalizados para analise, unificacao de fontes e criacao de cadernos.
+
+Dentro de `raw`, o corpus textual e os metadados de descoberta devem ficar separados:
+
+- `raw/{portal}/{dataset}/ano=YYYY/mes=MM/`: registros textuais consolidados, como pronunciamentos com texto integral.
+- `raw/{portal}/{dataset}/metadata/`: listas, paginas de busca, pautas e outros payloads auxiliares usados para localizar os itens textuais.
+- `raw/{portal}/{dataset}/transcription_queue/`: itens sem texto oficial e candidatos a transcricao futura.
 
 Os formatos preferenciais serao escolhidos conforme volume e estabilidade dos dados:
 

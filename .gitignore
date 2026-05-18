@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+.venv/
+.idea/
+
+data/*
+!data/.gitkeep
+!data/schemas/
+!data/schemas/**
+!data/samples/
+!data/samples/**

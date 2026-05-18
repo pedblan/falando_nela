@@ -21,5 +21,7 @@ A janela inicial de coleta cobre os ultimos quinze anos, usando como baseline o 
 - Rastreabilidade: cada dado coletado deve preservar referencia a fonte, data, identificadores disponiveis e metodo de obtencao.
 - Reprodutibilidade: coletas e analises devem poder ser refeitas a partir de parametros, scripts e ambientes documentados.
 - Separacao entre coleta e analise: o modulo de coleta deve produzir dados organizados para consumo posterior por cadernos analiticos.
+- Prioridade textual: sempre que disponivel, a coleta deve transferir o texto integral dos discursos, debates, sessoes ou reunioes, deixando metadados e resumos como contexto, nao como corpus analitico principal.
+- Separacao entre metadados e corpus: respostas de lista, descoberta e contexto devem ser preservadas em area propria de `metadata`, sem inflar os arquivos mensais de registros textuais.
 - Versionamento por specs: mudancas relevantes de escopo, metodo, dados e tecnologia devem ser registradas em especificacoes antes da implementacao.
 - Execucao adequada ao ambiente: testes locais devem ser leves e usar apenas uma parcela estratificada dos dados; coletas longas devem ser preparadas para execucao confiavel no Google Colab.
