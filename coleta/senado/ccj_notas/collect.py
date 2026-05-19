@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unicodedata
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ COMMITTEE_NOTES_ENDPOINT = "dadosabertos/comissao/reuniao/notas/{codigo}.json"
 NOTES_ENDPOINT = "dadosabertos/taquigrafia/notas/reuniao/{codigo}.json"
 NOTES_PUBLIC_URL = "https://www25.senado.leg.br/web/atividade/notas-taquigraficas/-/notas/r/{codigo}"
 NOTES_NOT_FOUND_MESSAGE = "reuniao nao encontrada ou texto nao produzido pelo senado federal."
+COMPLEMENT_TEXT_PROBE_END = date(2024, 12, 31)
 
 
 def collect() -> None:
@@ -148,6 +150,15 @@ def _collect_reuniao(
     notes_endpoint = NOTES_ENDPOINT.format(codigo=codigo)
     detail_payload: dict[str, Any] | None = None
 
+    notes_status_source_id = f"reuniao:{codigo}:notas_taquigraficas_status"
+    if run.has_record(source_id=notes_status_source_id, record_type="notas_taquigraficas_status"):
+        run.log(
+            "record_resume_skipped",
+            source_id=notes_status_source_id,
+            record_type="notas_taquigraficas_status",
+        )
+        return
+
     detail_source_id = f"reuniao:{codigo}:reuniao_detalhe"
     if run.has_record(source_id=detail_source_id, record_type="reuniao_detalhe"):
         run.log("record_resume_skipped", source_id=detail_source_id, record_type="reuniao_detalhe")
@@ -194,6 +205,18 @@ def _collect_reuniao(
         html_result = fetch_notas_html(client, codigo, url=None)
         notes_attempts.append(html_result["attempt"])
         if html_result["texto_status"] != "disponivel":
+            write_notes_status(
+                run,
+                codigo,
+                reuniao,
+                detail_payload=detail_payload,
+                periodo=periodo,
+                request=html_result["request"],
+                response=html_result["response"],
+                texto_status="ausente",
+                motivo="metadado_notas_indisponivel_html_sem_texto",
+                tentativas=notes_attempts,
+            )
             run.log(
                 "meeting_notes_absent",
                 codigo_reuniao=codigo,
@@ -227,14 +250,35 @@ def _collect_reuniao(
         if has_text_record:
             run.log("record_resume_skipped", source_id=notes_source_id, record_type="notas_taquigraficas")
             return
+        indicator_has_notes = has_notas_taquigraficas(committee_notes.data)
+        probe_when_indicator_is_no = (
+            not indicator_has_notes
+            and should_probe_text_when_indicator_is_no(
+                reuniao,
+                detail_payload=detail_payload,
+                periodo=periodo,
+            )
+        )
         notes_attempts.append(
             {
                 "metodo_obtencao": "api_comissao_reuniao_notas",
-                "texto_status": "descoberto" if has_notas_taquigraficas(committee_notes.data) else "ausente",
+                "texto_status": "descoberto" if indicator_has_notes else "ausente",
                 "response": committee_notes.response_metadata,
             }
         )
-        if not has_notas_taquigraficas(committee_notes.data):
+        if not indicator_has_notes and not probe_when_indicator_is_no:
+            write_notes_status(
+                run,
+                codigo,
+                reuniao,
+                detail_payload=detail_payload,
+                periodo=periodo,
+                request={"method": "GET", "path": committee_notes_endpoint, "params": {"v": 1}},
+                response=committee_notes.response_metadata,
+                texto_status="ausente",
+                motivo="indicador_notas_taquigraficas_N",
+                tentativas=notes_attempts,
+            )
             run.log(
                 "meeting_notes_absent",
                 codigo_reuniao=codigo,
@@ -244,12 +288,17 @@ def _collect_reuniao(
             return
 
         notes_endpoint = NOTES_ENDPOINT.format(codigo=codigo)
+        api_metodo_obtencao = (
+            "api_taquigrafia_notas_reuniao"
+            if indicator_has_notes
+            else "api_taquigrafia_notas_reuniao_forcado"
+        )
         try:
             notes = client.get_json(notes_endpoint, params={"v": 1})
         except httpx.HTTPStatusError as exc:
             notes_attempts.append(
                 {
-                    "metodo_obtencao": "api_taquigrafia_notas_reuniao",
+                    "metodo_obtencao": api_metodo_obtencao,
                     "texto_status": "erro",
                     "response": payload_response(exc),
                 }
@@ -257,6 +306,18 @@ def _collect_reuniao(
             html_result = fetch_notas_html(client, codigo, url=public_notes_url(committee_notes.data))
             notes_attempts.append(html_result["attempt"])
             if html_result["texto_status"] != "disponivel":
+                write_notes_status(
+                    run,
+                    codigo,
+                    reuniao,
+                    detail_payload=detail_payload,
+                    periodo=periodo,
+                    request=html_result["request"],
+                    response=html_result["response"],
+                    texto_status="ausente",
+                    motivo="api_textual_erro_html_sem_texto",
+                    tentativas=notes_attempts,
+                )
                 run.log(
                     "meeting_notes_absent",
                     codigo_reuniao=codigo,
@@ -271,18 +332,50 @@ def _collect_reuniao(
             metodo_obtencao = "pagina_notas_reuniao_html"
             texto_override = html_result["texto"]
         else:
+            texto_api = extract_texto_notas(notes.data)
+            texto_status = "disponivel" if texto_api else "ausente"
             notes_attempts.append(
                 {
-                    "metodo_obtencao": "api_taquigrafia_notas_reuniao",
-                    "texto_status": "disponivel",
+                    "metodo_obtencao": api_metodo_obtencao,
+                    "texto_status": texto_status,
                     "response": notes.response_metadata,
                 }
             )
-            notes_data = notes.data
-            notes_request = {"method": "GET", "path": notes_endpoint, "params": {"v": 1}}
-            notes_response = notes.response_metadata
-            metodo_obtencao = "api_taquigrafia_notas_reuniao"
-            texto_override = None
+            if texto_status != "disponivel":
+                html_result = fetch_notas_html(client, codigo, url=public_notes_url(committee_notes.data))
+                notes_attempts.append(html_result["attempt"])
+                if html_result["texto_status"] != "disponivel":
+                    write_notes_status(
+                        run,
+                        codigo,
+                        reuniao,
+                        detail_payload=detail_payload,
+                        periodo=periodo,
+                        request=html_result["request"],
+                        response=html_result["response"],
+                        texto_status="ausente",
+                        motivo="api_textual_sem_texto",
+                        tentativas=notes_attempts,
+                    )
+                    run.log(
+                        "meeting_notes_absent",
+                        codigo_reuniao=codigo,
+                        api_status_code=notes.status_code,
+                        html_status_code=html_result["response"].get("status_code"),
+                        motivo="api_textual_sem_texto",
+                    )
+                    return
+                notes_data = html_result["payload"]
+                notes_request = html_result["request"]
+                notes_response = html_result["response"]
+                metodo_obtencao = "pagina_notas_reuniao_html"
+                texto_override = html_result["texto"]
+            else:
+                notes_data = notes.data
+                notes_request = {"method": "GET", "path": notes_endpoint, "params": {"v": 1}}
+                notes_response = notes.response_metadata
+                metodo_obtencao = api_metodo_obtencao
+                texto_override = texto_api
 
     payload = build_notas_payload(
         codigo,
@@ -339,6 +432,65 @@ def build_notas_payload(
     if tentativas:
         payload["tentativas_texto"] = tentativas
     return payload
+
+
+def write_notes_status(
+    run: CollectionRun,
+    codigo: str,
+    reuniao: dict[str, Any],
+    *,
+    detail_payload: dict[str, Any] | None,
+    periodo: dict[str, str],
+    request: dict[str, Any],
+    response: dict[str, Any],
+    texto_status: str,
+    motivo: str,
+    tentativas: list[dict[str, Any]],
+) -> None:
+    source_id = f"reuniao:{codigo}:notas_taquigraficas_status"
+    if run.has_record(source_id=source_id, record_type="notas_taquigraficas_status"):
+        run.log("record_resume_skipped", source_id=source_id, record_type="notas_taquigraficas_status")
+        return
+    run.write_record(
+        partition="metadata",
+        source_id=source_id,
+        request=request,
+        response=response,
+        periodo=periodo,
+        payload=build_notes_status_payload(
+            codigo,
+            reuniao,
+            detail_payload=detail_payload,
+            texto_status=texto_status,
+            motivo=motivo,
+            tentativas=tentativas,
+        ),
+        record_type="notas_taquigraficas_status",
+    )
+
+
+def build_notes_status_payload(
+    codigo: str,
+    reuniao: dict[str, Any],
+    *,
+    detail_payload: dict[str, Any] | None,
+    texto_status: str,
+    motivo: str,
+    tentativas: list[dict[str, Any]],
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"agenda": reuniao}
+    detalhe = extract_reuniao_detalhe(detail_payload)
+    if detalhe:
+        metadata["detalhe"] = detalhe
+    return {
+        "CodigoReuniao": codigo,
+        "codigo_reuniao": codigo,
+        "texto_status": texto_status,
+        "motivo": motivo,
+        "metadata": metadata,
+        "fontes": build_fontes_reuniao(codigo, {}),
+        "tentativas_texto": tentativas,
+    }
 
 
 def fetch_notas_html(client: OpenDataClient, codigo: str, *, url: str | None) -> dict[str, Any]:
@@ -420,6 +572,67 @@ def has_notas_taquigraficas(payload: Any) -> bool:
     source = notas if isinstance(notas, dict) else payload
     indicador = _first(source, "IndicadorNotasTaquigraficas", "indicadorNotasTaquigraficas")
     return isinstance(indicador, str) and indicador.strip().upper() == "S"
+
+
+def should_probe_text_when_indicator_is_no(
+    reuniao: dict[str, Any],
+    *,
+    detail_payload: dict[str, Any] | None,
+    periodo: dict[str, str],
+) -> bool:
+    meeting_date = meeting_date_for_text_probe(reuniao, detail_payload=detail_payload, periodo=periodo)
+    return meeting_date is not None and meeting_date <= COMPLEMENT_TEXT_PROBE_END
+
+
+def meeting_date_for_text_probe(
+    reuniao: dict[str, Any],
+    *,
+    detail_payload: dict[str, Any] | None,
+    periodo: dict[str, str],
+) -> date | None:
+    detalhe = extract_reuniao_detalhe(detail_payload)
+    candidates: list[Any] = []
+    for source in [detalhe, reuniao, periodo]:
+        if isinstance(source, dict):
+            candidates.extend(
+                [
+                    _first(source, "dataInicio", "DataInicio", "dataHoraInicio", "DataHoraInicio"),
+                    _first(source, "data", "Data", "dataReuniao", "DataReuniao"),
+                    _first(source, "data_fim", "dataFim", "DataFim"),
+                ]
+            )
+
+    for value in candidates:
+        parsed = parse_date_value(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def parse_date_value(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if not text:
+        return None
+    if len(text) >= 10:
+        try:
+            return date.fromisoformat(text[:10])
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(text[:10], "%d/%m/%Y").date()
+    except ValueError:
+        return None
 
 
 def public_notes_url(payload: Any) -> str | None:

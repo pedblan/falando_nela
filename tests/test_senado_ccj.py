@@ -267,7 +267,9 @@ def test_collect_reuniao_falls_back_to_public_html_notes(tmp_path: Path) -> None
     ]
 
 
-def test_collect_reuniao_stores_notes_metadata_and_skips_text_when_indicator_is_no(tmp_path: Path) -> None:
+def test_collect_reuniao_stores_metadata_without_corpus_when_indicator_is_no_and_sources_fail(
+    tmp_path: Path,
+) -> None:
     reuniao = {
         "codigo": "243",
         "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"},
@@ -315,9 +317,289 @@ def test_collect_reuniao_stores_notes_metadata_and_skips_text_when_indicator_is_
     assert [record["record_type"] for record in metadata_records] == [
         "reuniao_detalhe",
         "notas_taquigraficas_metadata",
+        "notas_taquigraficas_status",
     ]
     assert metadata_records[1]["payload"]["NotasTaquigraficasReuniao"]["IndicadorNotasTaquigraficas"] == "N"
+    assert metadata_records[2]["payload"]["motivo"] == "api_textual_erro_html_sem_texto"
+    assert [item["metodo_obtencao"] for item in metadata_records[2]["payload"]["tentativas_texto"]] == [
+        "api_comissao_reuniao_notas",
+        "api_taquigrafia_notas_reuniao_forcado",
+        "pagina_notas_reuniao_html",
+    ]
     assert not corpus_path.exists()
+
+
+def test_collect_reuniao_forces_text_api_until_2024_when_indicator_is_no(tmp_path: Path) -> None:
+    reuniao = {
+        "codigo": "11176",
+        "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"},
+        "dataInicio": "2023-03-29T10:00:00",
+    }
+    detalhe = {
+        "DetalheReuniao": {
+            "reuniao": {
+                "codigo": "11176",
+                "titulo": "3a Reuniao Extraordinaria",
+                "dataInicio": "2023-03-29T10:00:00.000",
+            }
+        }
+    }
+    notas_metadata = {
+        "NotasTaquigraficasReuniao": {
+            "CodigoReuniao": "11176",
+            "IndicadorNotasTaquigraficas": "N",
+        }
+    }
+    notas = {
+        "notasTaquigraficas": {
+            "quartos": [
+                {"sequencia": "1", "texto": "Texto recuperado apesar do indicador N."},
+            ]
+        }
+    }
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        if request.url.path == "/dadosabertos/comissao/reuniao/11176.json":
+            return httpx.Response(200, json=detalhe)
+        if request.url.path == "/dadosabertos/comissao/reuniao/notas/11176.json":
+            return httpx.Response(200, json=notas_metadata)
+        if request.url.path == "/dadosabertos/taquigrafia/notas/reuniao/11176.json":
+            return httpx.Response(200, json=notas)
+        return httpx.Response(404)
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-forced",
+        resume=False,
+    )
+
+    _collect_reuniao(
+        client,
+        run,
+        "2023-03",
+        {"data_inicio": "2023-03-29", "data_fim": "2023-03-29"},
+        "11176",
+        reuniao,
+    )
+
+    corpus_path = tmp_path / "raw" / "senado" / "ccj_notas" / "ano=2023" / "mes=03" / "run-ccj-forced.jsonl"
+    corpus_record = json.loads(corpus_path.read_text(encoding="utf-8"))
+
+    assert corpus_record["record_type"] == "notas_taquigraficas"
+    assert corpus_record["source_id"] == "reuniao:11176:notas_taquigraficas"
+    assert corpus_record["payload"]["TextoIntegral"] == "Texto recuperado apesar do indicador N."
+    assert corpus_record["payload"]["metodo_obtencao"] == "api_taquigrafia_notas_reuniao_forcado"
+    assert [item["metodo_obtencao"] for item in corpus_record["payload"]["tentativas_texto"]] == [
+        "api_comissao_reuniao_notas",
+        "api_taquigrafia_notas_reuniao_forcado",
+    ]
+    assert "/dadosabertos/taquigrafia/notas/reuniao/11176.json" in requested_paths
+    assert "/web/atividade/notas-taquigraficas/-/notas/r/11176" not in requested_paths
+
+
+def test_collect_reuniao_uses_html_when_forced_text_api_has_no_text(tmp_path: Path) -> None:
+    reuniao = {
+        "codigo": "11177",
+        "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"},
+        "dataInicio": "2023-03-29T14:00:00",
+    }
+    detalhe = {
+        "DetalheReuniao": {
+            "reuniao": {
+                "codigo": "11177",
+                "titulo": "4a Reuniao Extraordinaria",
+                "dataInicio": "2023-03-29T14:00:00.000",
+            }
+        }
+    }
+    notas_metadata = {
+        "NotasTaquigraficasReuniao": {
+            "CodigoReuniao": "11177",
+            "IndicadorNotasTaquigraficas": "N",
+        }
+    }
+    notas_vazias = {"notasTaquigraficas": {"quartos": [{"sequencia": "1", "texto": ""}]}}
+    html = """
+    <html><body>
+      <h1>Notas Taquigraficas</h1>
+      <p>Horario</p>
+      <p>Texto com revisao</p>
+      <p>10:35</p>
+      <p>R</p>
+      <p>O SR. PRESIDENTE - Texto recuperado pela pagina publica.</p>
+    </body></html>
+    """.encode()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/dadosabertos/comissao/reuniao/11177.json":
+            return httpx.Response(200, json=detalhe)
+        if request.url.path == "/dadosabertos/comissao/reuniao/notas/11177.json":
+            return httpx.Response(200, json=notas_metadata)
+        if request.url.path == "/dadosabertos/taquigrafia/notas/reuniao/11177.json":
+            return httpx.Response(200, json=notas_vazias)
+        if request.url.path == "/web/atividade/notas-taquigraficas/-/notas/r/11177":
+            return httpx.Response(200, content=html, headers={"Content-Type": "text/html"})
+        return httpx.Response(404)
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-forced-html",
+        resume=False,
+    )
+
+    _collect_reuniao(
+        client,
+        run,
+        "2023-03",
+        {"data_inicio": "2023-03-29", "data_fim": "2023-03-29"},
+        "11177",
+        reuniao,
+    )
+
+    corpus_path = (
+        tmp_path / "raw" / "senado" / "ccj_notas" / "ano=2023" / "mes=03" / "run-ccj-forced-html.jsonl"
+    )
+    corpus_record = json.loads(corpus_path.read_text(encoding="utf-8"))
+
+    assert corpus_record["payload"]["metodo_obtencao"] == "pagina_notas_reuniao_html"
+    assert corpus_record["payload"]["TextoIntegral"] == (
+        "10:35\nR\nO SR. PRESIDENTE - Texto recuperado pela pagina publica."
+    )
+    assert [item["texto_status"] for item in corpus_record["payload"]["tentativas_texto"]] == [
+        "ausente",
+        "ausente",
+        "disponivel",
+    ]
+    assert [item["metodo_obtencao"] for item in corpus_record["payload"]["tentativas_texto"]] == [
+        "api_comissao_reuniao_notas",
+        "api_taquigrafia_notas_reuniao_forcado",
+        "pagina_notas_reuniao_html",
+    ]
+
+
+def test_collect_reuniao_does_not_force_text_api_after_2024_when_indicator_is_no(tmp_path: Path) -> None:
+    reuniao = {
+        "codigo": "15000",
+        "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"},
+        "dataInicio": "2025-03-01T10:00:00",
+    }
+    detalhe = {
+        "DetalheReuniao": {
+            "reuniao": {
+                "codigo": "15000",
+                "dataInicio": "2025-03-01T10:00:00.000",
+            }
+        }
+    }
+    notas_metadata = {
+        "NotasTaquigraficasReuniao": {
+            "CodigoReuniao": "15000",
+            "IndicadorNotasTaquigraficas": "N",
+        }
+    }
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        if request.url.path == "/dadosabertos/comissao/reuniao/15000.json":
+            return httpx.Response(200, json=detalhe)
+        if request.url.path == "/dadosabertos/comissao/reuniao/notas/15000.json":
+            return httpx.Response(200, json=notas_metadata)
+        return httpx.Response(500)
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-no-probe-after-2024",
+        resume=False,
+    )
+
+    _collect_reuniao(
+        client,
+        run,
+        "2025-03",
+        {"data_inicio": "2025-03-01", "data_fim": "2025-03-31"},
+        "15000",
+        reuniao,
+    )
+
+    corpus_path = (
+        tmp_path
+        / "raw"
+        / "senado"
+        / "ccj_notas"
+        / "ano=2025"
+        / "mes=03"
+        / "run-ccj-no-probe-after-2024.jsonl"
+    )
+    metadata_path = (
+        tmp_path / "raw" / "senado" / "ccj_notas" / "metadata" / "run-ccj-no-probe-after-2024.jsonl"
+    )
+    metadata_records = [json.loads(line) for line in metadata_path.read_text(encoding="utf-8").splitlines()]
+
+    assert "/dadosabertos/taquigrafia/notas/reuniao/15000.json" not in requested_paths
+    assert "/web/atividade/notas-taquigraficas/-/notas/r/15000" not in requested_paths
+    assert metadata_records[-1]["record_type"] == "notas_taquigraficas_status"
+    assert metadata_records[-1]["payload"]["motivo"] == "indicador_notas_taquigraficas_N"
+    assert not corpus_path.exists()
+
+
+def test_resume_skips_existing_notes_status_without_requests(tmp_path: Path) -> None:
+    seed = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-status-resume",
+        resume=False,
+    )
+    seed.write_record(
+        partition="metadata",
+        source_id="reuniao:15000:notas_taquigraficas_status",
+        request={"method": "GET", "path": "/old", "params": {}},
+        response={"status_code": 200, "url": "https://example.test/old", "headers": {}},
+        periodo={"data_inicio": "2025-03-01", "data_fim": "2025-03-31"},
+        payload={"CodigoReuniao": "15000", "texto_status": "ausente"},
+        record_type="notas_taquigraficas_status",
+    )
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        return httpx.Response(500)
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    resumed = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-status-resume",
+        resume=True,
+    )
+
+    _collect_reuniao(
+        client,
+        resumed,
+        "2025-03",
+        {"data_inicio": "2025-03-01", "data_fim": "2025-03-31"},
+        "15000",
+        {"codigo": "15000", "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"}},
+    )
+
+    assert requested_paths == []
 
 
 def test_resume_still_writes_notes_metadata_when_text_record_already_exists(tmp_path: Path) -> None:
