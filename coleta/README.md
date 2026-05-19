@@ -8,7 +8,7 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
 - Cliente HTTP: `httpx`, com `Accept: application/json`, retries e respeito a `Retry-After`.
 - Execucao local: usar `--mode dev`, que grava em `data/dev` e usa amostra por default.
 - Execucao de producao: usar `--mode prod`, preferencialmente no Google Colab com Drive montado.
-- Retomada: usar `--resume` para pular particoes ja concluidas no checkpoint.
+- Retomada: usar `--resume` para pular particoes ja concluidas pelo mesmo `run_id`.
 - Dados completos: ficam fora do Git, em uma pasta externa como Google Drive.
 
 ## Modos de execucao
@@ -19,8 +19,16 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
 - Precedencia do destino: `--output-dir`, depois `FALANDO_NELA_DATA_ROOT`, depois `data/dev` apenas em `dev`.
 - Progresso: os scripts imprimem eventos simples no stdout (`partition_started`, `partition_completed`, falhas e skips), alem de gravarem o log JSONL.
 - Autosave: registros JSONL sao gravados linha a linha; checkpoints e `manifests/{run_id}.autosave.json` sao atualizados durante a execucao.
-- Retomada: com `--resume`, o coletor pula particoes concluidas e tambem le JSONLs existentes do mesmo `run_id` para nao baixar novamente registros ja gravados.
+- Retomada: com `--resume`, o coletor pula particoes concluidas pelo mesmo `run_id` e tambem le JSONLs existentes do mesmo `run_id` para nao baixar novamente registros ja gravados.
 - Falhas: erros de item ou particao devem ser capturados, registrados no log/checkpoint e nao devem impedir a continuacao das demais particoes quando houver caminho seguro.
+
+## Concorrencia operacional
+
+- Coletores de datasets diferentes podem rodar ao mesmo tempo contra o mesmo `FALANDO_NELA_DATA_ROOT`, desde que usem `run_id`s distintos.
+- O trio `plenario_discursos` da Camara, `ccj_notas` do Senado e `ccjc_eventos` da Camara usa caminhos de `raw/` e checkpoints diferentes, portanto pode rodar em paralelo.
+- `data/logs/{run_id}.jsonl` e `data/manifests/{run_id}.json` sao globais por `run_id`; por isso, nao reutilize o mesmo `run_id` em dois notebooks ativos.
+- Nao rode duas instancias do mesmo dataset com o mesmo `run_id` ao mesmo tempo. Se uma execucao cair, retome depois com o mesmo `--run-id --resume`.
+- Se varios notebooks usarem o mesmo Google Drive montado, espere mais variacao de latencia, mas nao deve haver colisao de arquivos quando `source`, `dataset` e `run_id` forem distintos.
 
 No Colab, o destino padrao recomendado e:
 
@@ -33,7 +41,7 @@ export FALANDO_NELA_DATA_ROOT=/content/drive/MyDrive/falando_nela/data
 - `data/raw/{portal}/{dataset}/ano=YYYY/mes=MM/{run_id}.jsonl`: registros textuais envelopados, isto e, o corpus bruto para analise futura.
 - `data/raw/{portal}/{dataset}/metadata/{run_id}.jsonl`: paginas/listas de metadados, respostas de descoberta, pautas e contexto auxiliar.
 - `data/raw/{portal}/{dataset}/transcription_queue/{run_id}.jsonl`: casos sem texto oficial e candidatos a transcricao futura.
-- `data/checkpoints/{portal}/{dataset}.json`: particoes concluidas.
+- `data/checkpoints/{portal}/{dataset}.json`: particoes concluidas, com escopo de retomada por `run_id`.
 - `data/logs/{run_id}.jsonl`: log estruturado da execucao.
 - `data/manifests/{run_id}.json`: resumo auditavel da execucao.
 - `data/manifests/{run_id}.autosave.json`: resumo parcial sobrescrito durante a execucao para inspecao em caso de interrupcao.

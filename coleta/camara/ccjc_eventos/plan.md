@@ -27,7 +27,7 @@
 
 - `data/raw/camara/ccjc_eventos/metadata/{run_id}.jsonl`: eventos, detalhes, participantes, status Escriba e HTML bruto disponivel.
 - `data/raw/camara/ccjc_eventos/ano=YYYY/mes=MM/{run_id}.jsonl`: notas taquigraficas parseadas do Escriba.
-- `data/checkpoints/camara/ccjc_eventos.json`.
+- `data/checkpoints/camara/ccjc_eventos.json`, com retomada por `run_id`.
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
 
@@ -41,4 +41,5 @@
 - Imprimir progresso minimo no stdout para acompanhamento no Colab.
 - Gravar JSONL linha a linha, checkpoint e `manifest.autosave.json` durante a execucao.
 - Capturar falhas de evento/particao com `try/except`, registrar log estruturado e continuar quando possivel.
-- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular API, status Escriba, HTML bruto e corpus existentes.
+- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular particoes, API, status Escriba, HTML bruto e corpus existentes desse `run_id`.
+- Pode rodar em paralelo com os coletores `camara/plenario_discursos` e `senado/ccj_notas` se cada execucao tiver `run_id` distinto.

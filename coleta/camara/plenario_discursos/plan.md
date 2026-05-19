@@ -20,7 +20,7 @@
 
 - `data/raw/camara/plenario_discursos/metadata/{run_id}.jsonl`.
 - `data/raw/camara/plenario_discursos/ano=YYYY/mes=MM/{run_id}.jsonl`.
-- `data/checkpoints/camara/plenario_discursos.json`.
+- `data/checkpoints/camara/plenario_discursos.json`, com retomada por `run_id`.
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
 
@@ -34,4 +34,5 @@
 - Imprimir progresso minimo no stdout para acompanhamento no Colab.
 - Gravar JSONL linha a linha, checkpoint e `manifest.autosave.json` durante a execucao.
 - Capturar falhas de deputado/particao com `try/except`, registrar log estruturado e continuar quando possivel.
-- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular registros existentes.
+- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular particoes/registros existentes desse `run_id`.
+- Pode rodar em paralelo com os coletores `senado/ccj_notas` e `camara/ccjc_eventos` se cada execucao tiver `run_id` distinto.

@@ -35,11 +35,12 @@ subprocess.run([
 - Paginacao segue links `rel=next`.
 - Registros preservam id do deputado, periodo, request, response, payload e checksum.
 - Quando `transcricao` estiver presente, ela e o texto prioritario para analise; `sumario` e `keywords` sao apenas metadados.
-- Uma segunda execucao com `--resume` pula particoes concluidas.
+- Uma segunda execucao com o mesmo `--run-id --resume` pula particoes concluidas desse `run_id`.
+- Pode rodar em paralelo com a complementacao `senado/ccj_notas` e com `camara/ccjc_eventos` quando os `run_id`s forem distintos.
 
 ## Validacao de resiliencia
 
 - O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
 - O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
-- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros ja gravados.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular particoes/registros ja gravados desse `run_id`, sem pular particoes concluidas por outro `run_id`.

@@ -7,7 +7,7 @@
 - `--output-dir`: raiz de dados; tem prioridade sobre `FALANDO_NELA_DATA_ROOT`.
 - `--sample` / `--no-sample`: sobrescreve o default do modo.
 - `--sample-limit`: limita a quantidade de reunioes CCJ processadas; default `5` em `dev` e sem limite em `prod`.
-- `--resume`: pula particoes concluidas no checkpoint.
+- `--resume`: pula particoes concluidas no checkpoint para o mesmo `run_id`.
 - `--run-id`: identificador da execucao.
 
 ## Separacao de dados
@@ -44,9 +44,15 @@
 - Pautas, ementas e detalhes da reuniao nao substituem notas taquigraficas ou texto integral para analise textual.
 - O backfill nao deve apagar nem sobrescrever registros de runs anteriores; a consolidacao posterior deve escolher a melhor cobertura por `codigo_reuniao`.
 
+## Concorrencia operacional
+
+- A complementacao pode rodar em paralelo com `camara/plenario_discursos` e `camara/ccjc_eventos`, pois usa `raw/senado/ccj_notas/` e checkpoint proprio.
+- O `run_id` deve ser distinto dos outros notebooks ativos, porque logs e manifests sao indexados por `run_id`.
+- Nao rode duas instancias de `senado/ccj_notas` com o mesmo `run_id` ao mesmo tempo.
+
 ## Progresso, autosave e retomada
 
 - O script deve imprimir progresso minimo no stdout por particao, skip, falha e conclusao.
 - Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
 - `try/except` deve isolar falhas de reuniao, endpoint ou particao sem derrubar o fluxo inteiro.
-- Com `--resume`, o coletor deve pular particoes concluidas e registros ja presentes no JSONL do mesmo `run_id`.
+- Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo `run_id` e registros ja presentes no JSONL do mesmo `run_id`.

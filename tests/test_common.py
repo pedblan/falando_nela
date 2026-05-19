@@ -179,10 +179,144 @@ def test_collection_run_writes_record_checkpoint_and_manifest(tmp_path) -> None:
     autosave = json.loads(autosave_path.read_text(encoding="utf-8"))
 
     assert record["checksum"]
+    assert checkpoint["completed_partitions"]["2026-05"]["run_id"] == "run-test"
     assert checkpoint["completed_partitions"]["2026-05"]["records"] == 1
+    assert checkpoint["runs"]["run-test"]["completed_partitions"]["2026-05"]["run_id"] == "run-test"
+    assert checkpoint["runs"]["run-test"]["completed_partitions"]["2026-05"]["records"] == 1
     assert manifest["record_counts"]["response"] == 1
     assert autosave["run_id"] == "run-test"
     assert run.should_skip_partition("2026-05")
+
+
+def test_collection_run_does_not_skip_partition_completed_by_other_run_id(tmp_path) -> None:
+    first_run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-a",
+        resume=True,
+    )
+    first_run.mark_partition_complete("2026-05")
+
+    second_run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-b",
+        resume=True,
+    )
+
+    assert not second_run.should_skip_partition("2026-05")
+
+
+def test_collection_run_preserves_completed_partitions_for_multiple_run_ids(tmp_path) -> None:
+    first_run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-a",
+        resume=True,
+    )
+    first_run.mark_partition_complete("2026-05")
+
+    second_run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-b",
+        resume=True,
+    )
+    second_run.mark_partition_complete("2026-05")
+
+    resumed_first = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-a",
+        resume=True,
+    )
+    resumed_second = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-b",
+        resume=True,
+    )
+
+    checkpoint_path = tmp_path / "checkpoints" / "fonte" / "dataset.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+
+    assert resumed_first.should_skip_partition("2026-05")
+    assert resumed_second.should_skip_partition("2026-05")
+    assert checkpoint["runs"]["run-a"]["completed_partitions"]["2026-05"]["run_id"] == "run-a"
+    assert checkpoint["runs"]["run-b"]["completed_partitions"]["2026-05"]["run_id"] == "run-b"
+    assert checkpoint["completed_partitions"]["2026-05"]["run_id"] == "run-b"
+
+
+def test_collection_run_can_skip_legacy_checkpoint_when_current_run_has_partition_output(tmp_path) -> None:
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="legacy-run",
+        resume=False,
+    )
+    run.write_record(
+        partition="2026-05",
+        source_id="fonte:1",
+        request={"method": "GET", "path": "/x", "params": {}},
+        response={"status_code": 200, "url": "https://example.test/x", "headers": {}},
+        periodo={"data_inicio": "2026-05-01", "data_fim": "2026-05-18"},
+        payload={"dados": [1]},
+        record_type="response",
+    )
+
+    checkpoint_path = tmp_path / "checkpoints" / "fonte" / "dataset.json"
+    checkpoint_path.write_text(
+        json.dumps(
+            {
+                "source": "fonte",
+                "dataset": "dataset",
+                "completed_partitions": {"2026-05": {"records": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resumed = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="legacy-run",
+        resume=True,
+    )
+
+    assert resumed.should_skip_partition("2026-05")
+
+
+def test_collection_run_does_not_skip_legacy_checkpoint_without_current_run_output(tmp_path) -> None:
+    checkpoint_path = tmp_path / "checkpoints" / "fonte" / "dataset.json"
+    checkpoint_path.parent.mkdir(parents=True)
+    checkpoint_path.write_text(
+        json.dumps(
+            {
+                "source": "fonte",
+                "dataset": "dataset",
+                "completed_partitions": {"2026-05": {"records": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="new-run",
+        resume=True,
+    )
+
+    assert not run.should_skip_partition("2026-05")
 
 
 def test_collection_run_resume_reads_existing_records_and_skips_duplicates(tmp_path) -> None:
@@ -244,6 +378,8 @@ def test_collection_run_marks_failed_partition(tmp_path) -> None:
     checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
 
     assert "2026-05" in checkpoint["failed_partitions"]
+    assert checkpoint["failed_partitions"]["2026-05"]["run_id"] == "run-failed"
+    assert checkpoint["runs"]["run-failed"]["failed_partitions"]["2026-05"]["run_id"] == "run-failed"
     assert not run.should_skip_partition("2026-05")
 
 

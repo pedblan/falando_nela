@@ -50,5 +50,6 @@
 - Imprimir progresso minimo no stdout para acompanhamento no Colab.
 - Gravar JSONL linha a linha, checkpoint e `manifest.autosave.json` durante a execucao.
 - Capturar falhas de reuniao/particao com `try/except`, registrar log estruturado e continuar quando possivel.
-- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular registros existentes.
+- Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular particoes/registros existentes desse `run_id`.
 - Em run complementar, `--resume` deve pular notas/status ja gravados no mesmo `run_id`, mas nao deve considerar um metadado `IndicadorNotasTaquigraficas=N` como prova de ausencia textual.
+- Pode rodar em paralelo com os coletores `camara/plenario_discursos` e `camara/ccjc_eventos` se cada execucao tiver `run_id` distinto.

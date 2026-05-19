@@ -46,10 +46,11 @@ subprocess.run([
 - Registros preservam periodo, request, response, payload e checksum.
 - Fontes preservam URL HTML do Escriba, URL PDF quando houver, audio, video e `urlRegistro`.
 - Para anos anteriores a 2019, a coleta preserva metadados e documenta lacunas sem gerar corpus textual.
+- Pode rodar em paralelo com `camara/plenario_discursos` e com a complementacao `senado/ccj_notas` quando os `run_id`s forem distintos.
 
 ## Validacao de resiliencia
 
 - O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
 - O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
-- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros de API, status Escriba, HTML bruto e corpus ja gravados.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular particoes/registros de API, status Escriba, HTML bruto e corpus ja gravados desse `run_id`, sem pular particoes concluidas por outro `run_id`.

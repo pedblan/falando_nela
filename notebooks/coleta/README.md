@@ -8,6 +8,10 @@ Convencoes:
 - O clone/pull do repositorio e a instalacao de dependencias devem vir depois da montagem do Drive.
 - Estes notebooks nao sao cadernos analiticos de artigo; eles existem para orquestrar coletas e validacoes.
 - Cadernos de artigos devem ficar em outras subpastas de `notebooks/`, separadas por tema ou artigo.
+- Notebooks de datasets diferentes podem rodar ao mesmo tempo se cada um usar `run_id` distinto.
+- Nao rode duas instancias do mesmo notebook/dataset com o mesmo `run_id`; retome com `--resume` apenas depois que a execucao anterior parar.
+- `logs/` e `manifests/` sao indexados somente por `run_id`, entao trate o `run_id` como identificador global da execucao.
+- A combinacao `coleta_camara_plenario.ipynb`, `coleta_senado_ccj_complemento.ipynb` e `coleta_camara_ccjc.ipynb` e suportada em paralelo com os `run_id`s padrao desses cadernos.
 
 Arquivos atuais:
 

@@ -39,7 +39,20 @@ class CollectionRun:
         self.write_autosave(status="started")
 
     def should_skip_partition(self, partition: str) -> bool:
-        return self.resume and partition in self.checkpoint.get("completed_partitions", {})
+        if not self.resume:
+            return False
+        run_completed = self._run_completed_partitions()
+        if partition in run_completed:
+            return True
+
+        completed = self.checkpoint.get("completed_partitions", {})
+        partition_checkpoint = completed.get(partition) if isinstance(completed, dict) else None
+        if not isinstance(partition_checkpoint, dict):
+            return False
+        checkpoint_run_id = partition_checkpoint.get("run_id")
+        if checkpoint_run_id is None:
+            return self._has_partition_output(partition)
+        return checkpoint_run_id == self.run_id
 
     def has_record(self, *, source_id: str, record_type: str) -> bool:
         return self._record_key(source_id=source_id, record_type=record_type) in self.processed_record_keys
@@ -103,22 +116,28 @@ class CollectionRun:
         self._print_progress(event, fields)
 
     def mark_partition_complete(self, partition: str, **metadata: Any) -> None:
-        completed = self.checkpoint.setdefault("completed_partitions", {})
-        completed[partition] = {
+        payload = {
+            **metadata,
+            "run_id": self.run_id,
             "completed_at": utc_now_iso(),
             "records": self.partition_counts.get(partition, 0),
-            **metadata,
         }
+        completed = self.checkpoint.setdefault("completed_partitions", {})
+        completed[partition] = payload
+        self._run_checkpoint().setdefault("completed_partitions", {})[partition] = payload
         self._write_checkpoint()
         self.write_autosave(status="running")
 
     def mark_partition_failed(self, partition: str, **metadata: Any) -> None:
-        failed = self.checkpoint.setdefault("failed_partitions", {})
-        failed[partition] = {
+        payload = {
+            **metadata,
+            "run_id": self.run_id,
             "failed_at": utc_now_iso(),
             "records": self.partition_counts.get(partition, 0),
-            **metadata,
         }
+        failed = self.checkpoint.setdefault("failed_partitions", {})
+        failed[partition] = payload
+        self._run_checkpoint().setdefault("failed_partitions", {})[partition] = payload
         self._write_checkpoint()
         self.write_autosave(status="running_with_failures")
 
@@ -204,6 +223,31 @@ class CollectionRun:
                     if isinstance(source_id, str) and isinstance(record_type, str):
                         keys.add(self._record_key(source_id=source_id, record_type=record_type))
         return keys
+
+    def _has_partition_output(self, partition: str) -> bool:
+        path = self._raw_path(partition)
+        return path.exists() and path.stat().st_size > 0
+
+    def _run_checkpoint(self) -> dict[str, Any]:
+        runs = self.checkpoint.setdefault("runs", {})
+        if not isinstance(runs, dict):
+            runs = {}
+            self.checkpoint["runs"] = runs
+        current = runs.setdefault(self.run_id, {})
+        if not isinstance(current, dict):
+            current = {}
+            runs[self.run_id] = current
+        return current
+
+    def _run_completed_partitions(self) -> dict[str, Any]:
+        runs = self.checkpoint.get("runs", {})
+        if not isinstance(runs, dict):
+            return {}
+        current = runs.get(self.run_id, {})
+        if not isinstance(current, dict):
+            return {}
+        completed = current.get("completed_partitions", {})
+        return completed if isinstance(completed, dict) else {}
 
     def _write_checkpoint(self) -> None:
         self.checkpoint["updated_at"] = utc_now_iso()

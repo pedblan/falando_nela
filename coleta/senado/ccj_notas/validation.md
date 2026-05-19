@@ -32,7 +32,7 @@ Assume que a celula base do README ja montou o Drive, definiu `FALANDO_NELA_DATA
 
 O notebook pronto para esse fluxo fica em `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao do caderno de Plenario: monta o Drive, atualiza o repo, instala dependencias, roda uma validacao curta e deixa a coleta completa em uma celula retomavel com `--resume`.
 
-O notebook especifico da complementacao fica em `notebooks/coleta/coleta_senado_ccj_complemento.ipynb`. Ele usa `run_id` separado e janela ate `2024-12-31`.
+O notebook especifico da complementacao fica em `notebooks/coleta/coleta_senado_ccj_complemento.ipynb`. A validacao curta roda sem `--resume`; o backfill completo usa `run_id` separado, janela ate `2024-12-31` e `--resume`.
 
 ```python
 import subprocess
@@ -65,6 +65,7 @@ subprocess.run([
 - Quando `texto_status=disponivel`, `TextoIntegral` e `texto` contem o texto retornado nas notas taquigraficas, nao apenas links ou pauta.
 - A reuniao `11176` deve gerar `notas_taquigraficas` em `ano=2023/mes=03/{run_id}.jsonl`, mesmo com metadado de notas indicando `N`.
 - Para analise textual, `notas_taquigraficas` ou texto integral da reuniao tem prioridade sobre agenda, pauta e detalhe.
+- Pode rodar em paralelo com `camara/plenario_discursos` e `camara/ccjc_eventos` quando os `run_id`s forem distintos.
 - Falhas de detalhe ou notas aparecem em log estruturado.
 - O checkpoint so marca a particao apos processar a agenda e as reunioes encontradas.
 
@@ -73,4 +74,4 @@ subprocess.run([
 - O stdout deve mostrar eventos de progresso suficientes para acompanhar a execucao no Colab.
 - O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
-- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros de corpus/status ja gravados.
+- Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular particoes/registros de corpus/status ja gravados desse `run_id`, sem pular particoes concluidas por outro `run_id`.
