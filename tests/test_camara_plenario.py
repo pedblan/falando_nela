@@ -13,11 +13,11 @@ from coleta.common.io import CollectionRun
 def test_collect_deputados_paginates_metadata_with_stable_page_ids(tmp_path: Path) -> None:
     responses = {
         "https://example.test/api/v2/deputados?dataInicio=2026-05-01&dataFim=2026-05-18&itens=100&ordem=ASC&ordenarPor=nome": {
-            "dados": [{"id": 10}, {"id": 11}],
+            "dados": [{"id": 10}, {"id": 11}, {"id": 10}],
             "links": [{"rel": "next", "href": "https://example.test/api/v2/deputados?pagina=2"}],
         },
         "https://example.test/api/v2/deputados?pagina=2": {
-            "dados": [{"id": 12}, {"id": 13}],
+            "dados": [{"id": 11}, {"id": 12}, {"id": 13}],
             "links": [],
         },
     }

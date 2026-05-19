@@ -146,6 +146,7 @@ def _collect_deputados(
         "ordenarPor": "nome",
     }
     deputados: list[dict[str, Any]] = []
+    seen_ids: set[int] = set()
     for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
         source_id = f"deputados:pagina:{page_index}"
         run.write_record(
@@ -158,7 +159,14 @@ def _collect_deputados(
             record_type="deputados_page",
         )
         dados = page.data.get("dados", []) if isinstance(page.data, dict) else []
-        deputados.extend([item for item in dados if isinstance(item, dict)])
+        for item in dados:
+            if not isinstance(item, dict):
+                continue
+            deputado_id = item.get("id")
+            if not isinstance(deputado_id, int) or deputado_id in seen_ids:
+                continue
+            deputados.append(item)
+            seen_ids.add(deputado_id)
         if sample and len(deputados) >= 3:
             return deputados[:3]
     return deputados
