@@ -12,7 +12,7 @@
 
 ## Separacao de dados
 
-- Agenda e detalhes de reuniao ficam em `data/raw/senado/ccj_notas/metadata/{run_id}.jsonl`.
+- Agenda, detalhes de reuniao e metadados de disponibilidade das notas ficam em `data/raw/senado/ccj_notas/metadata/{run_id}.jsonl`.
 - Notas taquigraficas e textos integrais ficam em `data/raw/senado/ccj_notas/ano=YYYY/mes=MM/{run_id}.jsonl`.
 - A particao mensal do corpus nao deve ser preenchida apenas com pauta, ementa ou detalhe.
 
@@ -20,6 +20,7 @@
 
 - Agenda mensal bruta.
 - Codigo da reuniao quando disponivel.
+- Metadado de notas por reuniao via `/dadosabertos/comissao/reuniao/notas/{codigoReuniao}`.
 - Detalhe e notas/texto integral por reuniao CCJ quando a API entregar.
 - Registros de notas com `CodigoReuniao`, `codigo_reuniao`, `TextoIntegral`, `texto`, `forma`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.
 - Log de reunioes sem codigo ou endpoints indisponiveis.
