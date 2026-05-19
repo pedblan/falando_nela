@@ -26,15 +26,26 @@
 ## Campos obrigatorios do payload
 
 - `IdProposicao`, `SiglaTipo`, `Numero`, `Ano`.
+- `documento_classe`: `parecer`, `relatorio` ou `voto_em_separado`.
+- `status_deliberativo`: `proposto`, `vencedor`, `vencido`, `aprovado`, `rejeitado` ou `indeterminado`.
+- `vencido`: booleano derivado da tramitacao, despacho, documento ou relacao com parecer vencedor/voto em separado.
 - `TextoIntegral`: texto extraido do documento oficial ou `null`.
 - `TextoIntegralUrl`: URL oficial do documento indicado pela tramitacao.
 - `texto`: mesmo conteudo canonico de `TextoIntegral`.
 - `forma`: `texto` quando ha texto extraido; `documento` quando o arquivo foi encontrado mas ainda nao gerou texto.
 - `metodo_obtencao`: `pdf_text_extraction`, `html_text_extraction`, `text_document_download` ou erro documentado.
 - `texto_status`: `disponivel`, `ausente` ou `erro`.
-- `colegiado.ambito`: `ccj` ou `plenario`.
+- `colegiado.ambito`: `ccj`, `plenario`, `comissao_especial` ou `indeterminado`.
 - `metadata.proposicao`, `metadata.detalhe` e `metadata.tramitacao`: objetos brutos da API.
 - `documento.sha256`, `documento.tamanho_bytes`, `documento.content_type`, `documento.url_final`.
+
+## Classificacao documental
+
+- A Camara nao entrega uma taxonomia documental equivalente ao Senado; o coletor deve classificar a partir de `descricaoTramitacao`, `codTipoTramitacao`, `despacho`, `siglaOrgao`, `uriOrgao` e URL oficial.
+- Codigos de tramitacao que devem ser candidatos a documento de parecer: `322`, `323`, `324`, `325`, `326`, `327`, `328`, `330`, `335`, `336`, `431` e `1040` quando houver URL ou despacho documental compativel.
+- Expressoes candidatas: `parecer do relator`, `parecer proferido`, `parecer vencedor`, `parecer reformulado`, `complementacao de voto`, `relator do vencedor`, `voto em separado` e `relatorio`.
+- Requerimentos e atos de criacao de comissao devem ser excluidos mesmo quando mencionarem "proferir parecer".
+- Quando uma tramitacao indicar que o parecer do relator passou a constituir voto em separado, o documento original deve ser classificado como `status_deliberativo=vencido` se houver URL recuperavel; os votos em separado devem ser preservados como `documento_classe=voto_em_separado`.
 
 ## Politica de retomada
 

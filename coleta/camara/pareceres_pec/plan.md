@@ -12,7 +12,9 @@
 
 O alvo analitico nao e o texto-base da PEC. O alvo e cada documento oficial de parecer associado a tramitacao de PEC no Plenario ou na Comissao de Constituicao e Justica.
 
-Como uma PEC pode ter varios pareceres e versoes, cada tramitacao com documento oficial deve gerar uma linha propria. O coletor nao deve deduplicar por PEC.
+Como uma PEC pode ter varios pareceres, votos em separado, parecer vencedor, relatorio vencido convertido em voto em separado e versoes documentais, cada tramitacao com documento oficial deve gerar uma linha propria. O coletor nao deve deduplicar por PEC.
+
+A Camara nao oferece a mesma taxonomia documental do Senado para pareceres. O ponto de coleta e a tramitacao, cuja representacao e provisoria na propria API, combinando `descricaoTramitacao`, `codTipoTramitacao`, `despacho`, `siglaOrgao`, `uriOrgao` e `url`. Portanto, a especificacao deve tratar o tipo do documento como classificacao derivada da tramitacao e do texto descritivo, nao como campo nativo equivalente a `siglaTipo` do Senado.
 
 ## Filtros
 
@@ -20,8 +22,23 @@ Como uma PEC pode ter varios pareceres e versoes, cada tramitacao com documento 
 - Orgao da tramitacao:
   - `PLEN`: `ambito=plenario`.
   - `CCJC` e historico `CCJR`: `ambito=ccj`.
-- Conteudo da tramitacao: `descricaoTramitacao`, `despacho`, `descricaoSituacao` ou `regime` contendo `parecer`.
+  - Comissoes especiais de PEC com sigla dinamica, como `PEC17193`, devem ser preservadas com `ambito=comissao_especial` quando o documento for claramente parecer, voto em separado ou complementacao de voto. Esse ambito nao substitui `ccj` ou `plenario`, mas evita perder o parecer de merito das PECs na Camara.
+- Conteudo da tramitacao:
+  - Incluir `descricaoTramitacao`, `despacho`, `descricaoSituacao` ou `regime` contendo `parecer`.
+  - Incluir codigos de parecer e correlatos: `322` parecer do relator, `323` parecer do relator sobre emendas, `324` manifestacao, `325` parcial, `326` revisao, `327` relator do vencedor, `328` relator parcial, `330` leitura/publicacao de parecer, `335` rejeicao do parecer, `336` aprovacao do parecer, `431` voto em separado e `1040` ratificacao de parecer quando houver URL ou despacho de parecer.
+  - Incluir expressoes como `parecer vencedor`, `parecer reformulado`, `complementacao de voto`, `voto em separado`, `relator do vencedor`, `parecer do relator` e `parecer proferido`.
+  - Excluir requerimentos e atos de criacao de comissao mesmo quando o despacho mencionar "proferir parecer".
 - Documento: tramitacao com `url` ou `urlDocumento`.
+- `documento_classe` derivado:
+  - `parecer`: parecer do relator, parecer vencedor, parecer reformulado, parecer de redacao e parecer proferido.
+  - `voto_em_separado`: voto em separado e documentos equivalentes de divergencia.
+  - `relatorio`: usar apenas quando o texto da tramitacao ou documento indicar relatorio.
+- `status_deliberativo` derivado:
+  - `vencedor`: quando houver `parecer vencedor`, `relator do vencedor` ou documento equivalente.
+  - `vencido`: quando a tramitacao disser que o parecer original passou a constituir voto em separado, ou quando o documento/descricao indicar vencido.
+  - `aprovado` ou `rejeitado`: quando a tramitacao indicar aprovacao/rejeicao do parecer.
+  - `proposto`: parecer ou voto apresentado sem desfecho claro.
+  - `indeterminado`: quando a fonte nao permitir inferencia segura.
 
 ## Fluxo
 
@@ -30,7 +47,8 @@ Como uma PEC pode ter varios pareceres e versoes, cada tramitacao com documento 
 - Gravar a pagina de descoberta em `metadata/{run_id}.jsonl`.
 - Para cada PEC, baixar detalhe e tramitacoes.
 - Gravar detalhe e tramitacoes brutas em `metadata/{run_id}.jsonl`.
-- Filtrar tramitacoes de parecer em `PLEN`, `CCJC` ou `CCJR`.
+- Filtrar tramitacoes de parecer, voto em separado e parecer vencedor em `PLEN`, `CCJC`, `CCJR` ou comissao especial de PEC.
+- Derivar `documento_classe`, `status_deliberativo` e um indicador booleano `vencido`.
 - Baixar o documento oficial da tramitacao.
 - Seguir meta-refresh HTML quando a Camara redirecionar para `imagem.camara.gov.br`.
 - Extrair texto de PDF, HTML ou texto simples.

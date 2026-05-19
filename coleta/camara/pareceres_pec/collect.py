@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 import unicodedata
 from pathlib import Path
@@ -22,6 +23,23 @@ BASE_URL = "https://dadosabertos.camara.leg.br/"
 PROPOSICOES_ENDPOINT = "api/v2/proposicoes"
 ORGAOS_CCJ = {"CCJC", "CCJR"}
 ORGAOS_PLENARIO = {"PLEN"}
+CODIGOS_TRAMITACAO_PARECER = {
+    "322",
+    "323",
+    "324",
+    "325",
+    "326",
+    "327",
+    "328",
+    "330",
+    "335",
+    "336",
+    "431",
+    "1040",
+}
+CODIGOS_TRAMITACAO_PARECER_COM_TEXTO_OBRIGATORIO = {"327", "328", "1040"}
+AMBITOS_PARECER = {"ccj", "comissao_especial", "plenario"}
+STATUS_DELIBERATIVOS = {"aprovado", "indeterminado", "proposto", "rejeitado", "vencedor", "vencido"}
 
 
 def collect() -> None:
@@ -68,6 +86,7 @@ def collect() -> None:
                             status = "completed_with_errors"
                             run.log("proposicao_failed", proposicao_id=proposicao_id, error=error_summary(exc))
                             continue
+                        tramitacoes = anotar_status_deliberativo(tramitacoes)
                         pareceres = [item for item in tramitacoes if is_parecer_tramitacao(item)]
 
                         for tramitacao_index, tramitacao in enumerate(pareceres, start=1):
@@ -133,6 +152,13 @@ def collect() -> None:
             sample_limit=runtime.sample_limit,
             orgaos_ccj=sorted(ORGAOS_CCJ),
             orgaos_plenario=sorted(ORGAOS_PLENARIO),
+            orgaos_comissao_especial_regex="PEC\\d+",
+            codigos_tramitacao_parecer=sorted(CODIGOS_TRAMITACAO_PARECER),
+            codigos_tramitacao_parecer_com_texto_obrigatorio=sorted(
+                CODIGOS_TRAMITACAO_PARECER_COM_TEXTO_OBRIGATORIO
+            ),
+            ambitos_parecer=sorted(AMBITOS_PARECER),
+            status_deliberativos=sorted(STATUS_DELIBERATIVOS),
             status=status,
             errors=errors,
         )
@@ -236,11 +262,16 @@ def build_parecer_payload(
     document_text: DocumentTextResult,
 ) -> dict[str, Any]:
     texto = document_text.text.strip() or None
+    documento_classe = classificar_documento_classe(tramitacao, texto)
+    status_deliberativo = classificar_status_deliberativo(tramitacao, texto)
     payload: dict[str, Any] = {
         "IdProposicao": proposicao.get("id") or detalhe.get("id"),
         "SiglaTipo": proposicao.get("siglaTipo") or detalhe.get("siglaTipo"),
         "Numero": proposicao.get("numero") or detalhe.get("numero"),
         "Ano": proposicao.get("ano") or detalhe.get("ano"),
+        "documento_classe": documento_classe,
+        "status_deliberativo": status_deliberativo,
+        "vencido": status_deliberativo == "vencido",
         "TextoIntegral": texto,
         "TextoIntegralUrl": document_text.fontes.get("documento"),
         "texto": texto,
@@ -269,7 +300,7 @@ def build_parecer_payload(
 
 
 def is_parecer_tramitacao(tramitacao: dict[str, Any]) -> bool:
-    if classificar_orgao_tramitacao(tramitacao)["ambito"] not in {"ccj", "plenario"}:
+    if classificar_orgao_tramitacao(tramitacao)["ambito"] not in AMBITOS_PARECER:
         return False
     url_documento = tramitacao.get("url") or tramitacao.get("urlDocumento")
     if not isinstance(url_documento, str) or not url_documento:
@@ -278,21 +309,154 @@ def is_parecer_tramitacao(tramitacao: dict[str, Any]) -> bool:
     despacho = normalize_text(tramitacao.get("despacho"))
     cod_tipo = str(tramitacao.get("codTipoTramitacao") or "")
 
-    if "PARECER" in descricao:
-        return True
-    if cod_tipo in {"322", "330", "336"}:
-        return True
-    if "REQUERIMENTO" in descricao:
+    if is_tramitacao_excluida(tramitacao):
         return False
+    if classificar_documento_classe(tramitacao) is None:
+        return False
+    if cod_tipo in CODIGOS_TRAMITACAO_PARECER_COM_TEXTO_OBRIGATORIO:
+        return any(
+            phrase in f"{descricao} {despacho}"
+            for phrase in (
+                "PARECER",
+                "VOTO EM SEPARADO",
+                "COMPLEMENTACAO DE VOTO",
+                "RELATORIO",
+            )
+        )
+    if cod_tipo in CODIGOS_TRAMITACAO_PARECER:
+        return True
     return any(
-        phrase in despacho
+        phrase in f"{descricao} {despacho}"
         for phrase in (
             "PARECER DO RELATOR",
+            "PARECER DO(A) RELATOR(A)",
             "PARECER PROFERIDO",
             "PARECER AS EMENDAS",
             "PARECER A PROPOSTA",
+            "PARECER VENCEDOR",
+            "PARECER REFORMULADO",
+            "COMPLEMENTACAO DE VOTO",
+            "VOTO EM SEPARADO",
         )
     )
+
+
+def is_tramitacao_excluida(tramitacao: dict[str, Any]) -> bool:
+    descricao = normalize_text(tramitacao.get("descricaoTramitacao"))
+    despacho = normalize_text(tramitacao.get("despacho"))
+    cod_tipo = str(tramitacao.get("codTipoTramitacao") or "")
+    texto = f"{descricao} {despacho}"
+
+    if "REQUERIMENTO" in descricao or cod_tipo == "194":
+        return True
+    if "CRIACAO DE COMISSAO" in descricao or "CRIA COMISSAO ESPECIAL" in texto:
+        return True
+    if "COMISSAO ESPECIAL DESTINADA A PROFERIR PARECER" in texto:
+        return True
+    return False
+
+
+def classificar_documento_classe(tramitacao: dict[str, Any], texto: str | None = None) -> str | None:
+    descricao = normalize_text(tramitacao.get("descricaoTramitacao"))
+    despacho = normalize_text(tramitacao.get("despacho"))
+    texto_normalizado = normalize_text(texto)
+    cod_tipo = str(tramitacao.get("codTipoTramitacao") or "")
+    combined = f"{descricao} {despacho} {texto_normalizado}"
+
+    if "VOTO EM SEPARADO" in combined or cod_tipo == "431":
+        return "voto_em_separado"
+    if "RELATORIO" in combined:
+        return "relatorio"
+    if "PARECER" in combined or "COMPLEMENTACAO DE VOTO" in combined:
+        return "parecer"
+    if cod_tipo in CODIGOS_TRAMITACAO_PARECER - CODIGOS_TRAMITACAO_PARECER_COM_TEXTO_OBRIGATORIO:
+        return "parecer"
+    return None
+
+
+def classificar_status_deliberativo(tramitacao: dict[str, Any], texto: str | None = None) -> str:
+    override = tramitacao.get("_status_deliberativo")
+    if override in STATUS_DELIBERATIVOS:
+        return str(override)
+
+    descricao = normalize_text(tramitacao.get("descricaoTramitacao"))
+    despacho = normalize_text(tramitacao.get("despacho"))
+    texto_normalizado = normalize_text(texto)
+    combined = f"{descricao} {despacho} {texto_normalizado}"
+
+    if "VENCID" in combined or "PASSOU A CONSTITUIR VOTO EM SEPARADO" in combined:
+        return "vencido"
+    if "PARECER VENCEDOR" in combined or "RELATOR DO VENCEDOR" in combined:
+        return "vencedor"
+    if "APROVADO O PARECER" in combined or "APROVACAO DO PARECER" in combined:
+        return "aprovado"
+    if "REJEICAO DO PARECER" in combined or "REJEITADO O PARECER" in combined:
+        return "rejeitado"
+    if classificar_documento_classe(tramitacao, texto) is not None:
+        return "proposto"
+    return "indeterminado"
+
+
+def anotar_status_deliberativo(tramitacoes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    anotadas = [dict(item) for item in tramitacoes]
+    for index, tramitacao in enumerate(anotadas):
+        descricao = normalize_text(tramitacao.get("descricaoTramitacao"))
+        despacho = normalize_text(tramitacao.get("despacho"))
+        texto = f"{descricao} {despacho}"
+
+        if "PARECER VENCEDOR" in texto or "RELATOR DO VENCEDOR" in texto:
+            tramitacao.setdefault("_status_deliberativo", "vencedor")
+        if "APROVADO O PARECER" in texto or "APROVACAO DO PARECER" in texto:
+            tramitacao.setdefault("_status_deliberativo", "aprovado")
+        if "REJEICAO DO PARECER" in texto or "REJEITADO O PARECER" in texto:
+            tramitacao.setdefault("_status_deliberativo", "rejeitado")
+
+        if "PASSOU A CONSTITUIR VOTO EM SEPARADO" not in texto:
+            continue
+
+        relator = extrair_nome_relator(texto)
+        candidato = encontrar_parecer_vencido(anotadas[:index], relator=relator)
+        if candidato is not None:
+            candidato["_status_deliberativo"] = "vencido"
+            candidato["_vencido_por_tramitacao"] = {
+                "dataHora": tramitacao.get("dataHora"),
+                "sequencia": tramitacao.get("sequencia"),
+                "despacho": tramitacao.get("despacho"),
+            }
+    return anotadas
+
+
+def encontrar_parecer_vencido(
+    tramitacoes_anteriores: list[dict[str, Any]],
+    *,
+    relator: str | None,
+) -> dict[str, Any] | None:
+    candidatos = [
+        item
+        for item in tramitacoes_anteriores
+        if is_parecer_tramitacao(item)
+        and classificar_documento_classe(item) == "parecer"
+        and classificar_status_deliberativo(item) != "vencedor"
+    ]
+    if relator:
+        for item in reversed(candidatos):
+            if relator in normalize_text(item.get("despacho")):
+                return item
+    return candidatos[-1] if candidatos else None
+
+
+def extrair_nome_relator(texto_normalizado: str) -> str | None:
+    match = re.search(
+        r"PARECER DO(?:\(A\))? RELATOR(?:\(A\))?,?\s+"
+        r"DEP(?:UTAD[OA])?\.?\s+([A-Z ]+?)(?:\s*\(|,|\.| PASSOU|$)",
+        texto_normalizado,
+    )
+    if match is None:
+        match = re.search(r"DEP(?:UTAD[OA])?\.?\s+([A-Z ]+?)(?:\s*\(|,|\.| PASSOU|$)", texto_normalizado)
+    if match is None:
+        return None
+    nome = " ".join(match.group(1).split())
+    return nome or None
 
 
 def classificar_orgao_tramitacao(tramitacao: dict[str, Any]) -> dict[str, str | None]:
@@ -305,8 +469,10 @@ def classificar_orgao_tramitacao(tramitacao: dict[str, Any]) -> dict[str, str | 
         ambito = "ccj"
     elif sigla_normalizada in ORGAOS_PLENARIO or "PLENARIO" in nome_normalizado:
         ambito = "plenario"
+    elif re.fullmatch(r"PEC\d+", sigla_normalizada):
+        ambito = "comissao_especial"
     else:
-        ambito = None
+        ambito = "indeterminado"
 
     return {
         "ambito": ambito,

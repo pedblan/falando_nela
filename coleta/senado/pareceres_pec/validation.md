@@ -12,10 +12,12 @@ python -m coleta.senado.pareceres_pec.collect \
 ## Criterios de aceite
 
 - A execucao gera manifest, log, checkpoint e pelo menos registros de `metadata`.
-- Quando houver parecer/relatorio em `CCJ` ou `PLEN`, a execucao gera registros `record_type=parecer_pec_texto`.
+- Quando houver parecer, relatorio, avulso de parecer ou relatorio do vencido em `CCJ`, `PLEN` ou com colegiado indeterminado mas vinculo documental claro com PEC, a execucao gera registros `record_type=parecer_pec_texto`.
 - Cada registro textual preserva `metadata.processo`, `metadata.documento`, `fontes`, `documento.sha256` e `TextoIntegralUrl`.
 - `TextoIntegral` e `texto` devem conter o texto extraido, nunca apenas a URL do documento.
-- `colegiado.ambito` deve ser `ccj` ou `plenario`.
+- `documento_classe` deve ser preenchido com `parecer`, `relatorio` ou `avulso_parecer`.
+- `status_deliberativo` deve ser preenchido, usando `vencido` quando o documento indicar relatorio do vencido.
+- `colegiado.ambito` deve ser `ccj`, `plenario` ou `indeterminado`.
 - Documentos diferentes da mesma PEC devem permanecer como linhas diferentes.
 
 ## Checks manuais
@@ -53,6 +55,7 @@ print(json.dumps(json.loads(manifest.read_text()), indent=2, ensure_ascii=False)
 
 - PDFs digitalizados podem nao produzir texto com `pypdf`; nesses casos, manter `forma=documento` e planejar OCR em etapa futura.
 - O coletor nao decide qual versao do parecer e final; essa decisao deve ficar para processamento posterior.
+- Avulsos de parecer podem vir sem colegiado explicito; a validacao deve aceitar `colegiado.ambito=indeterminado` quando o registro preservar o documento bruto e a URL oficial.
 
 ## Validacao de resiliencia
 

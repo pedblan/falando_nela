@@ -27,15 +27,25 @@
 
 - `IdProcesso`, `CodigoMateria`, `IdentificacaoPec`.
 - `IdDocumento`.
+- `documento_classe`: `parecer`, `relatorio` ou `avulso_parecer`.
+- `status_deliberativo`: `proposto`, `vencedor`, `vencido`, `aprovado`, `rejeitado` ou `indeterminado`.
+- `vencido`: booleano derivado de `descricao`, `identificacao`, metadados ou texto extraido.
 - `TextoIntegral`: texto extraido do documento oficial ou `null`.
 - `TextoIntegralUrl`: URL oficial do documento.
 - `texto`: mesmo conteudo canonico de `TextoIntegral`.
 - `forma`: `texto` quando ha texto extraido; `documento` quando o arquivo foi encontrado mas ainda nao gerou texto.
 - `metodo_obtencao`: `pdf_text_extraction`, `html_text_extraction`, `text_document_download` ou erro documentado.
 - `texto_status`: `disponivel`, `ausente` ou `erro`.
-- `colegiado.ambito`: `ccj` ou `plenario`.
+- `colegiado.ambito`: `ccj`, `plenario` ou `indeterminado`.
 - `metadata.processo` e `metadata.documento`: objetos brutos da API.
 - `documento.sha256`, `documento.tamanho_bytes`, `documento.content_type`, `documento.url_final`.
+
+## Classificacao documental
+
+- O coletor deve preservar `PARECER`, `RELATORIO`, `AVULSO_PARECER` e variantes claramente documentais de parecer, como parecer de redacao.
+- `LISTAGEM_RELATORIO` e listagens administrativas devem ser excluidas, mesmo quando tiverem URL de documento.
+- `Relatorio do Vencido` deve ser coletado como `documento_classe=relatorio`, `status_deliberativo=vencido` e `vencido=true`.
+- Avulsos de parecer sem colegiado explicito devem ser preservados quando vinculados ao processo de PEC, com `colegiado.ambito=indeterminado`.
 
 ## Politica de retomada
 

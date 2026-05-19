@@ -12,10 +12,12 @@ python -m coleta.camara.pareceres_pec.collect \
 ## Criterios de aceite
 
 - A execucao gera manifest, log, checkpoint e pelo menos registros de `metadata`.
-- Quando houver tramitacao de parecer em `PLEN`, `CCJC` ou `CCJR`, a execucao gera registros `record_type=parecer_pec_texto`.
+- Quando houver tramitacao de parecer, parecer vencedor, voto em separado ou complementacao de voto em `PLEN`, `CCJC`, `CCJR` ou comissao especial de PEC, a execucao gera registros `record_type=parecer_pec_texto`.
 - Cada registro textual preserva `metadata.proposicao`, `metadata.detalhe`, `metadata.tramitacao`, `fontes`, `documento.sha256` e `TextoIntegralUrl`.
 - `TextoIntegral` e `texto` devem conter o texto extraido, nunca apenas a URL do documento.
-- `colegiado.ambito` deve ser `ccj` ou `plenario`.
+- `documento_classe` deve ser preenchido com `parecer`, `relatorio` ou `voto_em_separado`.
+- `status_deliberativo` deve distinguir pelo menos `proposto`, `vencedor`, `vencido`, `aprovado`, `rejeitado` ou `indeterminado`.
+- `colegiado.ambito` deve ser `ccj`, `plenario`, `comissao_especial` ou `indeterminado`.
 - Documentos diferentes da mesma PEC devem permanecer como linhas diferentes.
 
 ## Checks manuais
@@ -54,6 +56,7 @@ print(json.dumps(json.loads(manifest.read_text()), indent=2, ensure_ascii=False)
 - PDFs digitalizados podem nao produzir texto com `pypdf`; nesses casos, manter `forma=documento` e planejar OCR em etapa futura.
 - A API pode registrar pareceres em tramitacoes antigas com links HTML intermediarios; o coletor segue um meta-refresh, mas nao faz scraping fora de URLs oficiais.
 - O coletor nao decide qual parecer e final ou substitutivo; essa decisao deve ficar para processamento posterior.
+- Votos em separado e pareceres vencedores podem ser a unica forma estruturada de recuperar oposicao forte ou relatorio vencido na Camara; esses documentos devem ser preservados e classificados, nao descartados por nao conterem a palavra `parecer` no tipo da tramitacao.
 
 ## Validacao de resiliencia
 

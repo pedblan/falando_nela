@@ -21,7 +21,9 @@ DATASET = "pareceres_pec"
 BASE_URL = "https://legis.senado.leg.br/"
 PROCESSO_ENDPOINT = "dadosabertos/processo"
 DOCUMENTOS_ENDPOINT = "dadosabertos/processo/documento"
-TIPOS_DOCUMENTO_PARECER = {"PARECER", "RELATORIO", "AVULSO_PARECER"}
+TIPOS_DOCUMENTO_PARECER = {"AVULSO_PARECER", "PARECER", "PARECER_REDACAO", "RELATORIO"}
+DOCUMENTO_CLASSES = {"avulso_parecer", "parecer", "relatorio"}
+STATUS_DELIBERATIVOS = {"aprovado", "indeterminado", "proposto", "rejeitado", "vencedor", "vencido"}
 
 
 def collect() -> None:
@@ -142,6 +144,8 @@ def collect() -> None:
             sample=runtime.sample,
             sample_limit=runtime.sample_limit,
             tipos_documento_parecer=sorted(TIPOS_DOCUMENTO_PARECER),
+            documento_classes=sorted(DOCUMENTO_CLASSES),
+            status_deliberativos=sorted(STATUS_DELIBERATIVOS),
             status=status,
             errors=errors,
         )
@@ -187,11 +191,16 @@ def build_parecer_payload(
 ) -> dict[str, Any]:
     texto = document_text.text.strip() or None
     colegiado = classificar_colegiado(documento)
+    documento_classe = classificar_documento_classe(documento)
+    status_deliberativo = classificar_status_deliberativo(documento, texto)
     payload: dict[str, Any] = {
         "IdProcesso": processo.get("id"),
         "CodigoMateria": processo.get("codigoMateria"),
         "IdentificacaoPec": processo.get("identificacao"),
         "IdDocumento": documento.get("id"),
+        "documento_classe": documento_classe,
+        "status_deliberativo": status_deliberativo,
+        "vencido": status_deliberativo == "vencido",
         "TextoIntegral": texto,
         "TextoIntegralUrl": document_text.fontes.get("documento"),
         "texto": texto,
@@ -241,13 +250,49 @@ def extract_documentos(payload: Any) -> list[dict[str, Any]]:
 
 
 def is_parecer_documento(documento: dict[str, Any]) -> bool:
+    documento_classe = classificar_documento_classe(documento)
+    if documento_classe is None:
+        return False
+    ambito = classificar_colegiado(documento)["ambito"]
+    if ambito in {"ccj", "plenario"}:
+        return True
+    return documento_classe == "avulso_parecer" and ambito == "indeterminado"
+
+
+def classificar_documento_classe(documento: dict[str, Any]) -> str | None:
     sigla_tipo = normalize_text(documento.get("siglaTipo"))
     descricao_tipo = normalize_text(documento.get("descricaoTipo"))
     if "LISTAGEM" in sigla_tipo or "LISTAGEM" in descricao_tipo:
-        return False
-    if sigla_tipo not in TIPOS_DOCUMENTO_PARECER and "PARECER" not in descricao_tipo:
-        return False
-    return classificar_colegiado(documento)["ambito"] in {"ccj", "plenario"}
+        return None
+
+    if sigla_tipo == "AVULSO_PARECER" or "AVULSO DE PARECER" in descricao_tipo:
+        return "avulso_parecer"
+    if sigla_tipo in {"PARECER", "PARECER_REDACAO"} or "PARECER" in descricao_tipo:
+        return "parecer"
+    if sigla_tipo == "RELATORIO" or "RELATORIO" in descricao_tipo:
+        return "relatorio"
+    return None
+
+
+def classificar_status_deliberativo(documento: dict[str, Any], texto: str | None = None) -> str:
+    metadata_text = " ".join(
+        normalize_text(documento.get(key))
+        for key in ("descricao", "descricaoTipo", "identificacao", "siglaTipo")
+    )
+    texto_normalizado = normalize_text(texto)
+    combined = f"{metadata_text} {texto_normalizado}"
+
+    if "VENCID" in combined:
+        return "vencido"
+    if "VENCEDOR" in combined:
+        return "vencedor"
+    if "PARECER APROVADO" in metadata_text or "APROVADO O PARECER" in metadata_text:
+        return "aprovado"
+    if "PARECER REJEITADO" in metadata_text or "REJEICAO DO PARECER" in metadata_text:
+        return "rejeitado"
+    if classificar_documento_classe(documento) in DOCUMENTO_CLASSES:
+        return "proposto"
+    return "indeterminado"
 
 
 def classificar_colegiado(documento: dict[str, Any]) -> dict[str, str | None]:
@@ -261,7 +306,7 @@ def classificar_colegiado(documento: dict[str, Any]) -> dict[str, str | None]:
     elif sigla_normalizada in {"PLEN", "PLENARIO"} or "PLENARIO" in nome_normalizado:
         ambito = "plenario"
     else:
-        ambito = None
+        ambito = "indeterminado"
 
     return {
         "ambito": ambito,

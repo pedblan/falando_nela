@@ -76,7 +76,9 @@ Ordem de prioridade para formar corpus textual:
 
 Metadados, resumos, indexacao, pautas e listas de eventos sao contexto e rastreabilidade; nao sao corpus analitico principal quando houver texto integral disponivel.
 
-Para PECs, a unidade analitica prioritaria neste momento e o parecer, nao o texto-base da PEC. Como uma PEC pode ter varios pareceres e versoes documentais, cada parecer/documento oficial deve ser preservado em registro proprio.
+Para PECs, a unidade analitica prioritaria neste momento e o parecer, nao o texto-base da PEC. Como uma PEC pode ter varios pareceres, relatorios, votos em separado, avulsos e versoes documentais, cada documento oficial deve ser preservado em registro proprio.
+
+A normalizacao entre Senado e Camara deve ser comum no payload, mas nao no mecanismo de coleta. No Senado, os pareceres aparecem como documentos tipados do processo (`PARECER`, `RELATORIO`, `AVULSO_PARECER` etc.). Na Camara, a classificacao vem da tramitacao e de seu documento oficial, usando `descricaoTramitacao`, `codTipoTramitacao`, `despacho`, `siglaOrgao` e `url`. Os campos canonicos `documento_classe`, `status_deliberativo` e `vencido` devem carregar essa compatibilizacao.
 
 Quando uma fonte exigir duas etapas, a primeira etapa localiza os itens e grava a resposta bruta em `metadata/`; a segunda etapa baixa o texto integral e grava somente o registro textual consolidado na particao mensal. Esse desenho evita inflar os arquivos de corpus com listas completas de metadados.
 
@@ -101,10 +103,10 @@ Para pareceres em PDF/HTML, `forma=documento` pode aparecer quando o arquivo ofi
 - `senado/plenario_discursos`: discursos do Plenario do Senado (`siglaCasa=SF`).
 - `senado/congresso_discursos`: discursos do Plenario do Congresso (`siglaCasa=CN`).
 - `senado/ccj_notas`: agenda, detalhes e notas taquigraficas da CCJ do Senado.
-- `senado/pareceres_pec`: pareceres e relatorios de PEC no Plenario e na CCJ do Senado.
+- `senado/pareceres_pec`: pareceres, relatorios, avulsos de parecer e relatorios do vencido de PEC no Plenario e na CCJ do Senado.
 - `camara/plenario_discursos`: discursos por deputado na API da Camara.
 - `camara/ccjc_eventos`: eventos, participantes e metadados da CCJC da Camara.
-- `camara/pareceres_pec`: pareceres de PEC no Plenario, CCJC e historica CCJR da Camara.
+- `camara/pareceres_pec`: pareceres, pareceres vencedores, votos em separado e documentos equivalentes de PEC no Plenario, CCJC, historica CCJR e comissoes especiais de PEC da Camara.
 
 ## Execucao
 
@@ -151,6 +153,8 @@ Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_sena
 Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
 
 Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados em `metadata/`, paginas de discursos no JSONL mensal e a presenca de `transcricao` quando a API entregar texto.
+
+Para os fluxos especificos de pareceres de PEC, use `notebooks/coleta/coleta_senado_pareceres_pec.ipynb` e `notebooks/coleta/coleta_camara_pareceres_pec.ipynb`. Eles incluem validacao curta, inspecao dos campos canonicos de parecer e execucao completa retomavel.
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 
