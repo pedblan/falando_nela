@@ -10,6 +10,8 @@ python -m coleta.camara.plenario_discursos.collect --mode dev --run-id smoke-cam
 
 Assume que a celula base do README ja montou o Drive, definiu `FALANDO_NELA_DATA_ROOT` e entrou no diretorio do repo.
 
+O caderno pronto para este fluxo fica em `notebooks/coleta/coleta_camara_plenario.ipynb`.
+
 ```python
 import subprocess
 

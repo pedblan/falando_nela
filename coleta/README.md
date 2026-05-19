@@ -142,6 +142,8 @@ Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_sena
 
 Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
 
+Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados em `metadata/`, paginas de discursos no JSONL mensal e a presenca de `transcricao` quando a API entregar texto.
+
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 
 Celula base para usar no Colab:
