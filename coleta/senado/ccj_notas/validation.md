@@ -3,12 +3,20 @@
 ## Smoke test
 
 ```bash
-python -m coleta.senado.ccj_notas.collect --mode dev --run-id smoke-senado-ccj
+python -m coleta.senado.ccj_notas.collect \
+  --mode dev \
+  --no-sample \
+  --data-inicio 2026-05-01 \
+  --data-fim 2026-05-18 \
+  --sample-limit 1 \
+  --run-id smoke-senado-ccj
 ```
 
 ## Exemplo Colab
 
 Assume que a celula base do README ja montou o Drive, definiu `FALANDO_NELA_DATA_ROOT` e entrou no diretorio do repo.
+
+O notebook pronto para esse fluxo fica em `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao do caderno de Plenario: monta o Drive, atualiza o repo, instala dependencias, roda uma validacao curta e deixa a coleta completa em uma celula retomavel com `--resume`.
 
 ```python
 import subprocess
@@ -30,6 +38,8 @@ subprocess.run([
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
 - A agenda mensal e sempre preservada em `metadata/{run_id}.jsonl`.
 - Reunioes CCJ geram registros `reuniao_detalhe` em `metadata/{run_id}.jsonl` e, quando disponivel, `notas_taquigraficas` na particao mensal.
+- Cada `notas_taquigraficas` contem `CodigoReuniao`, `TextoIntegral`, `texto`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.
+- Quando `texto_status=disponivel`, `TextoIntegral` e `texto` contem o texto retornado nas notas taquigraficas, nao apenas links ou pauta.
 - Para analise textual, `notas_taquigraficas` ou texto integral da reuniao tem prioridade sobre agenda, pauta e detalhe.
 - Falhas de detalhe ou notas aparecem em log estruturado.
 - O checkpoint so marca a particao apos processar a agenda e as reunioes encontradas.

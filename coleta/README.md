@@ -140,6 +140,8 @@ Os notebooks de coleta nao devem usar `check=True` ao chamar coletores. Um colet
 
 Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_senado_plenario.ipynb`. A primeira celula executavel desse notebook monta o Drive antes de clonar o repositorio ou carregar qualquer codigo do projeto.
 
+Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
+
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 
 Celula base para usar no Colab:
