@@ -37,7 +37,10 @@ subprocess.run([
 - Em `dev`, grava em `data/dev` e usa amostra por default.
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
 - A agenda mensal e sempre preservada em `metadata/{run_id}.jsonl`.
-- Reunioes CCJ geram registros `reuniao_detalhe` em `metadata/{run_id}.jsonl` e, quando disponivel, `notas_taquigraficas` na particao mensal.
+- Reunioes CCJ geram registros `reuniao_detalhe` e `notas_taquigraficas_metadata` em `metadata/{run_id}.jsonl`.
+- `notas_taquigraficas_metadata` preserva a resposta de `/dadosabertos/comissao/reuniao/notas/{codigoReuniao}`.
+- Quando `IndicadorNotasTaquigraficas=S`, a reuniao gera `notas_taquigraficas` na particao mensal.
+- Quando `IndicadorNotasTaquigraficas=N`, a ausencia fica preservada no metadado e nao deve criar texto inventado no corpus mensal.
 - Cada `notas_taquigraficas` contem `CodigoReuniao`, `TextoIntegral`, `texto`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.
 - Quando `texto_status=disponivel`, `TextoIntegral` e `texto` contem o texto retornado nas notas taquigraficas, nao apenas links ou pauta.
 - Para analise textual, `notas_taquigraficas` ou texto integral da reuniao tem prioridade sobre agenda, pauta e detalhe.
