@@ -6,6 +6,7 @@
 - `--mode dev|prod`: `dev` usa amostra e `data/dev` por default; `prod` usa coleta completa e destino externo.
 - `--output-dir`: raiz de dados; tem prioridade sobre `FALANDO_NELA_DATA_ROOT`.
 - `--sample` / `--no-sample`: sobrescreve o default do modo.
+- `--sample-limit`: limita a quantidade de reunioes CCJ processadas; default `5` em `dev` e sem limite em `prod`.
 - `--resume`: pula particoes concluidas no checkpoint.
 - `--run-id`: identificador da execucao.
 
@@ -20,6 +21,7 @@
 - Agenda mensal bruta.
 - Codigo da reuniao quando disponivel.
 - Detalhe e notas/texto integral por reuniao CCJ quando a API entregar.
+- Registros de notas com `CodigoReuniao`, `codigo_reuniao`, `TextoIntegral`, `texto`, `forma`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.
 - Log de reunioes sem codigo ou endpoints indisponiveis.
 
 ## Limites
