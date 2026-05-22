@@ -19,3 +19,9 @@ Arquivos atuais:
   `processed/textos_parlamentares/v1` a partir do `raw/` no Google Drive.
 - `descricao_analitica_bases_colab.ipynb`: resume a base processada por fonte,
   dataset, ano, familia textual e preenchimento de campos.
+
+Downloads de amostras gerados no Colab devem ser descompactados localmente em:
+
+```text
+data/samples/textos_parlamentares/v1/
+```

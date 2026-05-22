@@ -83,6 +83,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=["dev", "prod"], default="dev")
     parser.add_argument("--data-root", default=None)
     parser.add_argument("--run-id", default=None)
+    parser.add_argument(
+        "--raw-run-id",
+        action="append",
+        default=None,
+        help="Inclui apenas registros brutos destes run_id. Pode ser repetido. Por default, le todos.",
+    )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--limit-records", type=int, default=None)
     parser.add_argument(
@@ -103,6 +109,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         overwrite=args.overwrite,
         limit_records=args.limit_records,
         datasets=args.dataset,
+        raw_run_ids=args.raw_run_id,
     )
     print(manifest["manifest_path"])
 
@@ -136,10 +143,12 @@ def normalize_data_root(
     overwrite: bool = False,
     limit_records: int | None = None,
     datasets: Iterable[str] | None = None,
+    raw_run_ids: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     data_root = data_root.expanduser()
     run_id = run_id or f"processed-{DATASET_NAME}-{DATASET_VERSION}-{_run_timestamp()}"
     dataset_filter = set(datasets or [])
+    raw_run_id_filter = set(raw_run_ids or [])
     output_root = data_root / "processed" / DATASET_NAME / DATASET_VERSION
     manifest_path = data_root / "processed" / "manifests" / f"{run_id}.json"
 
@@ -155,7 +164,7 @@ def normalize_data_root(
     deputados_index = build_camara_deputados_index(data_root)
     writer = PartitionedJsonlWriter(output_root=output_root, run_id=run_id)
     seen_text_ids: set[str] = set()
-    raw_run_ids: set[str] = set()
+    observed_raw_run_ids: set[str] = set()
     input_files: set[str] = set()
     input_record_counts: Counter[str] = Counter()
     output_record_counts: Counter[str] = Counter()
@@ -178,7 +187,10 @@ def normalize_data_root(
                 input_record_counts[f"{source}/{dataset}/{record_type}"] += 1
                 raw_run_id = raw_record.get("run_id")
                 if isinstance(raw_run_id, str):
-                    raw_run_ids.add(raw_run_id)
+                    observed_raw_run_ids.add(raw_run_id)
+                if raw_run_id_filter and raw_run_id not in raw_run_id_filter:
+                    skipped_counts["raw_run_id_filtered"] += 1
+                    continue
 
                 normalized_records = normalize_raw_record(
                     raw_record,
@@ -221,7 +233,8 @@ def normalize_data_root(
         "input_record_counts": dict(sorted(input_record_counts.items())),
         "output_record_counts": dict(sorted(output_record_counts.items())),
         "skipped_counts": dict(sorted(skipped_counts.items())),
-        "raw_run_ids": sorted(raw_run_ids),
+        "raw_run_ids": sorted(observed_raw_run_ids),
+        "raw_run_id_filter": sorted(raw_run_id_filter),
         "dataset_filter": sorted(dataset_filter),
         "schema": f"data/schemas/processed_{DATASET_NAME}_{DATASET_VERSION}.schema.json",
     }

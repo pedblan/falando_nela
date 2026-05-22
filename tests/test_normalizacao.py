@@ -138,6 +138,21 @@ def test_normalize_data_root_writes_partitioned_jsonl_and_deduplicates_newer_fir
     assert manifest["skipped_counts"]["duplicate_texto_id"] == 1
 
 
+def test_normalize_data_root_can_filter_raw_run_ids(tmp_path: Path) -> None:
+    path = tmp_path / "raw" / "camara" / "plenario_discursos" / "ano=2026" / "mes=05" / "runs.jsonl"
+    path.parent.mkdir(parents=True)
+    _write_jsonl(path, [_camara_discursos_record("old-run", "Texto antigo"), _camara_discursos_record("new-run", "Texto novo")])
+
+    manifest = normalize_data_root(tmp_path, run_id="filtered", overwrite=True, raw_run_ids=["new-run"])
+
+    output_path = tmp_path / "processed" / "textos_parlamentares" / "v1" / "ano=2026" / "mes=05" / "filtered.jsonl"
+    rows = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines()]
+    assert manifest["output_records"] == 1
+    assert manifest["raw_run_id_filter"] == ["new-run"]
+    assert manifest["skipped_counts"]["raw_run_id_filtered"] == 1
+    assert rows[0]["texto"] == "Texto novo"
+
+
 def _camara_discursos_record(run_id: str, texto: str) -> dict[str, object]:
     return {
         "run_id": run_id,
@@ -164,4 +179,3 @@ def _camara_discursos_record(run_id: str, texto: str) -> dict[str, object]:
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
     path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
-

@@ -14,6 +14,8 @@ python -m processamento.normalizacao --mode dev --run-id smoke-processed-v1 --ov
   - `dataset_version = v1`;
   - `output_records > 0` quando houver dados textuais em `raw/`;
   - contagens por `source/dataset`;
+  - `raw_run_ids` incorporados ao processed;
+  - `raw_run_id_filter`, quando usado;
   - duplicatas, se houver reexecucoes sobre a mesma unidade textual.
 
 ## Inspecao de saida
@@ -84,3 +86,21 @@ O caderno deve reportar:
 - preenchimento de campos-chave;
 - exemplos compactos por base;
 - manifests de coleta relacionados quando presentes.
+
+## Validacao das amostras locais
+
+Depois de baixar os ZIPs de
+`/content/drive/MyDrive/falando_nela/data/processed/downloads/{run_id}/`,
+descompactar localmente em:
+
+```text
+data/samples/textos_parlamentares/v1/
+```
+
+Conferir que os arquivos descompactados:
+
+- sao JSONL validos;
+- mantem `dataset_version = v1`;
+- preservam `texto_id`, `source`, `dataset`, `documento_tipo`, `ano`, `mes`,
+  `texto` e `raw_path`;
+- carregam nomes que identificam base, ano e mes.

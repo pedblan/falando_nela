@@ -39,6 +39,11 @@ notebooks/processamento/normalizacao_armazenamento_colab.ipynb
 
 - O notebook monta o Drive, atualiza o repositorio, instala dependencias e
   chama `normalize_data_root(...)` diretamente em Python.
+- Usar `PROCESSED_RUN_ID` para nomear a execucao processada. Esse identificador
+  nao precisa coincidir com os `run_id`s brutos.
+- Deixar `RAW_RUN_IDS = []` para consolidar todos os JSONLs em `raw/` com
+  deduplicacao por `texto_id`. Preencher `RAW_RUN_IDS` apenas se for necessario
+  restringir explicitamente quais execucoes brutas entram.
 - Alternativamente, em ambientes com terminal, rodar:
 
 ```bash
@@ -65,9 +70,17 @@ notebooks/processamento/descricao_analitica_bases_colab.ipynb
 
 ## Etapa 6: amostras locais
 
-- Criar, depois da validacao de `processed`, uma rotina separada para amostras
-  estratificadas.
+- Criar, depois da validacao de `processed`, uma rotina separada para ZIPs de
+  amostras por base.
 - Critério inicial: 1% por ano e por familia textual, com minimo operacional a
   definir para anos muito pequenos.
-- Salvar em `data/samples/textos_parlamentares/v1/` ou em outro destino local
-  explicitamente escolhido.
+- No Colab, gravar ZIPs em
+  `/content/drive/MyDrive/falando_nela/data/processed/downloads/{run_id}/`.
+- Depois do download, descompactar localmente em:
+
+```text
+data/samples/textos_parlamentares/v1/
+```
+
+- Manter os nomes dos JSONLs com base, ano e mes para evitar colisao quando
+  varios ZIPs forem descompactados no mesmo diretorio.

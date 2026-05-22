@@ -55,15 +55,31 @@ Cada registro processado deve expor campos comuns para:
 ## Deduplicacao
 
 - `texto_id` deve ser estavel por unidade textual, independente do `run_id`.
+- O `run_id` da normalizacao identifica somente a execucao processed e os
+  arquivos de saida; ele nao precisa coincidir com nenhum `run_id` bruto.
+- A entrada pode combinar varios `run_id`s brutos por base, por exemplo uma
+  execucao `_v3` do Plenario da Camara junto de execucoes anteriores que cobrem
+  outros periodos.
 - Quando houver varias execucoes brutas com a mesma unidade textual, o arquivo
   mais novo no sistema de arquivos deve ser lido primeiro e ganhar a deduplicacao.
 - Duplicatas ignoradas devem aparecer no manifest como `duplicate_texto_id`.
+- Quando for necessario restringir a entrada, o normalizador deve aceitar uma
+  lista opcional de `raw_run_ids`.
 
-## Amostras locais futuras
+## Amostras locais
 
-Depois de consolidar `processed`, criar uma rotina de amostragem estratificada
-para baixar ou copiar para a maquina local aproximadamente 1% de cada ano e de
-cada familia textual:
+Depois de consolidar `processed`, o Colab deve produzir ZIPs por base para
+facilitar o download local. Cada ZIP deve conter JSONLs da base correspondente,
+separados por ano e mes.
+
+Diretorio local padrao para descompactar os ZIPs:
+
+```text
+data/samples/textos_parlamentares/v1/
+```
+
+A amostragem analitica deve preservar aproximadamente 1% de cada ano e de cada
+familia textual:
 
 - discursos/pronunciamentos de plenario;
 - notas taquigraficas de reunioes ou eventos;
