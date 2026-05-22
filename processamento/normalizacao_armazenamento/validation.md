@@ -171,3 +171,44 @@ data/samples/textos_parlamentares/v1/parquet/manifest.json
   a saida deve permanecer no Drive montado.
 - Nas samples locais, nenhum caminho absoluto do Colab deve aparecer no manifest
   local, exceto em campos de proveniencia bruta preservados dos registros.
+
+## Validacao dos cadernos exploratorios de Parquet
+
+Validar os cadernos:
+
+```text
+notebooks/processamento/exploracao_parquets_colab.ipynb
+notebooks/processamento/exploracao_parquets_samples_local.ipynb
+```
+
+Checks obrigatorios:
+
+- O JSON do notebook e valido.
+- Todas as celulas de codigo compilam com `ast.parse`.
+- O caderno Colab aponta para:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- O caderno local aponta para:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/
+```
+
+- Nenhum dos cadernos executa coleta, normalizacao ou geracao de Parquets.
+- O usuario consegue escolher uma base Parquet antes de carregar o `DataFrame`.
+- O caderno exibe `df.shape`, `df.head()`, `df.info()`,
+  `df.describe(include="all")`, nulos por coluna e `value_counts()` basicos.
+- A tabela compacta nao inclui `texto` por default, para manter a navegacao
+  responsiva.
+- Quando `itables` estiver instalado, a tabela compacta usa visualizacao
+  interativa; quando nao estiver, o fallback pandas funciona sem erro.
+- Ha uma celula para selecionar `texto_id` ou indice e exibir o `texto` integral
+  sem truncamento, junto de metadados de contexto.
+- Filtros por ano, mes, documento_tipo, parlamentar, proposicao, orgao e busca
+  textual funcionam mesmo quando algumas colunas estao ausentes ou so possuem
+  valores nulos.
+- O caderno local roda contra os Parquets de samples sem depender de Google
+  Drive ou de caminhos `/content/`.

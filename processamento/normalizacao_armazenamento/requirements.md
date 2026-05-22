@@ -46,6 +46,12 @@ versionada, rastreavel e pronta para cadernos analiticos.
 - Manter `notebooks/processamento/descricao_analitica_bases_colab.ipynb`
   para descrever cada base processada por fonte, dataset, ano, familia textual,
   tamanho de texto, cobertura temporal e preenchimento de campos.
+- Manter cadernos exploratorios de Parquet, independentes dos cadernos ja
+  executados de normalizacao e geracao:
+  - `notebooks/processamento/exploracao_parquets_colab.ipynb`, lendo os
+    Parquets completos no Google Drive;
+  - `notebooks/processamento/exploracao_parquets_samples_local.ipynb`, lendo os
+    Parquets de `data/samples/textos_parlamentares/v1/parquet/`.
 - Atualizar estes cadernos sempre que o contrato `textos_parlamentares/v1`,
   os caminhos de dados ou o fluxo de validacao mudarem.
 
@@ -134,3 +140,41 @@ Regras obrigatorias:
   ou a lista `PROCESSED_FIELDS` do normalizador.
 - A rotina deve registrar um manifest de Parquet com raiz de entrada, raiz de
   saida, arquivos lidos, arquivos escritos, contagens por base e schema usado.
+
+## Exploracao dos Parquets
+
+Os cadernos exploratorios devem ajudar a aprender a base e inspecionar o texto
+integral sem rerodar coletas, normalizacao ou geracao de Parquets.
+
+Requisitos minimos:
+
+- Permitir selecionar uma base Parquet por nome de arquivo, por exemplo
+  `camara__plenario_discursos.parquet` ou `senado__pareceres_pec.parquet`.
+- Carregar a base selecionada em um `DataFrame` com `pandas`, mantendo uma
+  opcao de limite de linhas para leituras exploratorias de bases grandes.
+- Expor blocos didaticos com:
+  - `df.shape`;
+  - `df.head()`;
+  - `df.info()`;
+  - `df.describe(include="all")` ou equivalente apropriado para colunas
+    textuais e categoricas;
+  - contagem de nulos por coluna;
+  - `value_counts()` para campos-chave como `source`, `dataset`,
+    `documento_tipo`, `unidade_analitica`, `ano`, `mes`, `ambito`,
+    `orgao_sigla`, `parlamentar_partido`, `parlamentar_uf`,
+    `documento_classe`, `status_deliberativo` e `texto_status`, quando
+    existirem.
+- Usar o melhor visualizador interativo disponivel no ambiente para tabelas,
+  preferencialmente `itables` no Colab/Jupyter, com fallback claro para
+  visualizacao padrao do pandas.
+- Oferecer filtros simples antes da leitura detalhada do texto: ano, mes,
+  documento_tipo, parlamentar_nome, proposicao_identificacao, orgao_sigla e
+  busca textual por palavra ou expressao.
+- Permitir selecionar e exibir `texto` integral por `texto_id` ou indice do
+  `DataFrame`, sem truncamento, em bloco legivel com metadados essenciais
+  (`source`, `dataset`, `data`, `documento_tipo`, `titulo`,
+  `parlamentar_nome`, `proposicao_identificacao`, `url_texto` e `raw_path`).
+- Manter uma visualizacao compacta separada para tabelas, evitando que o texto
+  integral torne `head()` e tabelas interativas pesadas ou ilegíveis.
+- Explicar em celulas curtas o que cada comando basico mostra, sem transformar
+  o caderno em tutorial longo.

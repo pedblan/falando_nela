@@ -126,3 +126,51 @@ saida:   data/samples/textos_parlamentares/v1/parquet/
   executados.
 - Atualizar o fluxo local para permitir regerar os Parquets a partir dos JSONLs
   descompactados em `data/samples/textos_parlamentares/v1/`.
+
+## Etapa 8: exploracao didatica dos Parquets
+
+- Criar um caderno Colab independente:
+
+```text
+notebooks/processamento/exploracao_parquets_colab.ipynb
+```
+
+- Criar um caderno local para samples:
+
+```text
+notebooks/processamento/exploracao_parquets_samples_local.ipynb
+```
+
+- O caderno Colab deve montar o Drive, atualizar o repositorio, instalar
+  dependencias e ler diretamente:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- O caderno local deve ler diretamente:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/
+```
+
+- Ambos devem permitir escolher a base Parquet antes de carregar o `DataFrame`.
+- Ambos devem incluir uma primeira passada de EDA basica:
+  - lista de Parquets disponiveis;
+  - schema/colunas;
+  - `df.shape`;
+  - `df.head()`;
+  - `df.info()`;
+  - `df.describe(include="all")`;
+  - contagem de nulos;
+  - `value_counts()` para campos categoricos relevantes.
+- Ambos devem separar uma visao tabular compacta, sem a coluna `texto`, de uma
+  visao de texto integral.
+- A visao tabular deve usar `itables` quando disponivel, com fallback para
+  `IPython.display.display`.
+- A visao de texto integral deve permitir selecionar por `texto_id` ou indice,
+  mostrar metadados essenciais e imprimir o campo `texto` completo sem
+  truncamento.
+- Incluir filtros simples por ano, mes, familia textual, parlamentar,
+  proposicao, orgao e busca textual para reduzir o conjunto antes de abrir
+  textos completos.
