@@ -50,6 +50,17 @@ notebooks de normalizacao ja executados, e:
 notebooks/processamento/geracao_parquets_colab.ipynb
 ```
 
+Para exploracao didatica dos Parquets, use:
+
+```text
+notebooks/processamento/exploracao_parquets_colab.ipynb
+notebooks/processamento/exploracao_parquets_samples_local.ipynb
+```
+
+Eles permitem escolher uma base, carregar um `DataFrame`, revisar `head`,
+`describe`, `value_counts`, aplicar filtros simples e abrir o `texto` integral
+sem truncamento.
+
 ## Amostras locais
 
 Os ZIPs gerados no Colab devem ser descompactados localmente em:

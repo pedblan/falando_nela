@@ -22,6 +22,10 @@ Arquivos atuais:
 - `descricao_analitica_bases_colab.ipynb`: resume a base processada por fonte,
   dataset, ano, familia textual e preenchimento de campos, usando os Parquets
   quando eles estiverem disponiveis.
+- `exploracao_parquets_colab.ipynb`: explora os Parquets completos no Drive com
+  `DataFrame`, contagens basicas, filtros e leitura de texto integral.
+- `exploracao_parquets_samples_local.ipynb`: faz a mesma exploracao sobre os
+  Parquets das samples locais.
 
 Downloads de amostras gerados no Colab devem ser descompactados localmente em:
 
