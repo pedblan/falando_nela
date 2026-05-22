@@ -17,11 +17,20 @@ Arquivos atuais:
 
 - `normalizacao_armazenamento_colab.ipynb`: executa
   `processed/textos_parlamentares/v1` a partir do `raw/` no Google Drive.
+- `geracao_parquets_colab.ipynb`: gera Parquets unificados por base a partir dos
+  JSONLs processed ja existentes no Drive, sem rerodar a normalizacao.
 - `descricao_analitica_bases_colab.ipynb`: resume a base processada por fonte,
-  dataset, ano, familia textual e preenchimento de campos.
+  dataset, ano, familia textual e preenchimento de campos, usando os Parquets
+  quando eles estiverem disponiveis.
 
 Downloads de amostras gerados no Colab devem ser descompactados localmente em:
 
 ```text
 data/samples/textos_parlamentares/v1/
+```
+
+Depois de descompactar os JSONLs localmente, gere os Parquets das samples com:
+
+```bash
+python -m processamento.parquet --profile samples-local --overwrite
 ```

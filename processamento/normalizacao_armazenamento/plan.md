@@ -84,3 +84,45 @@ data/samples/textos_parlamentares/v1/
 
 - Manter os nomes dos JSONLs com base, ano e mes para evitar colisao quando
   varios ZIPs forem descompactados no mesmo diretorio.
+
+## Etapa 7: Parquets unificados por base
+
+- Implementar uma rotina separada da normalizacao principal para converter os
+  JSONLs normalizados em Parquet por `source/dataset`.
+- A rotina deve aceitar raizes explicitas para entrada e saida, porque os
+  arquivos completos no Colab e as amostras locais ficam em diretorios
+  diferentes.
+- Perfil Colab:
+
+```text
+entrada: /content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/
+saida:   /content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- Perfil samples locais:
+
+```text
+entrada: data/samples/textos_parlamentares/v1/
+saida:   data/samples/textos_parlamentares/v1/parquet/
+```
+
+- Gerar um arquivo por base:
+  - `senado__plenario_discursos.parquet`;
+  - `senado__congresso_discursos.parquet`;
+  - `senado__ccj_notas.parquet`;
+  - `senado__pareceres_pec.parquet`;
+  - `camara__plenario_discursos.parquet`;
+  - `camara__ccjc_eventos.parquet`;
+  - `camara__pareceres_pec.parquet`.
+- Ler todos os JSONLs abaixo da raiz de entrada, ignorando subdiretorios
+  `parquet/`, manifests e arquivos que nao sejam registros processados v1.
+- Deduplicar por `texto_id` antes de escrever Parquet, mantendo a mesma
+  politica de preferencia do normalizador quando houver duplicatas nos JSONLs.
+- Escrever um manifest de conversao em:
+  - Colab: `processed/manifests/{run_id}-parquet.json`;
+  - samples locais: `data/samples/textos_parlamentares/v1/parquet/manifest.json`.
+- Criar e manter o notebook `geracao_parquets_colab.ipynb` para gerar os
+  Parquets no Drive sem rerodar ou reabrir notebooks de normalizacao ja
+  executados.
+- Atualizar o fluxo local para permitir regerar os Parquets a partir dos JSONLs
+  descompactados em `data/samples/textos_parlamentares/v1/`.

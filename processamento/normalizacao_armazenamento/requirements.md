@@ -20,6 +20,15 @@ versionada, rastreavel e pronta para cadernos analiticos.
 - Criar `processed/textos_parlamentares/v1/ano=YYYY/mes=MM/{run_id}.jsonl`.
 - Criar `processed/manifests/{run_id}.json` com contagens de entrada, saida,
   duplicatas, arquivos lidos e `raw_run_id`s incorporados.
+- Criar uma camada Parquet unificada por base, derivada dos JSONLs
+  normalizados, para uso analitico em pandas, Polars ou DuckDB.
+- Em producao no Colab, gravar os Parquets em:
+  `processed/textos_parlamentares/v1/parquet/{source}__{dataset}.parquet`.
+- Em amostras locais, gravar os Parquets em:
+  `data/samples/textos_parlamentares/v1/parquet/{source}__{dataset}.parquet`.
+- Nao assumir que o caminho local de samples e o caminho do Colab compartilham
+  o mesmo `data_root`; o processo deve aceitar raizes explicitas de entrada e
+  saida para cada ambiente.
 - Manter o dicionario de dados em
   `data/schemas/processed_textos_parlamentares_v1.dictionary.md`.
 - Manter `dataset_version = "v1"` em cada registro processado.
@@ -31,6 +40,9 @@ versionada, rastreavel e pronta para cadernos analiticos.
 - Manter `notebooks/processamento/normalizacao_armazenamento_colab.ipynb`
   como caminho recomendado para executar a normalizacao no Colab sem depender
   de terminal separado.
+- Manter `notebooks/processamento/geracao_parquets_colab.ipynb` como caminho
+  recomendado para gerar ou regerar somente os Parquets no Colab, a partir dos
+  JSONLs processed ja existentes no Drive.
 - Manter `notebooks/processamento/descricao_analitica_bases_colab.ipynb`
   para descrever cada base processada por fonte, dataset, ano, familia textual,
   tamanho de texto, cobertura temporal e preenchimento de campos.
@@ -69,8 +81,9 @@ Cada registro processado deve expor campos comuns para:
 ## Amostras locais
 
 Depois de consolidar `processed`, o Colab deve produzir ZIPs por base para
-facilitar o download local. Cada ZIP deve conter JSONLs da base correspondente,
-separados por ano e mes.
+facilitar o download local. Cada ZIP deve conter os JSONLs da base
+correspondente, separados por ano e mes, e pode conter tambem o Parquet
+unificado dessa mesma base quando ele ja tiver sido gerado no Colab.
 
 Diretorio local padrao para descompactar os ZIPs:
 
@@ -87,3 +100,37 @@ familia textual:
 
 A amostra deve preservar o schema v1 e ser pequena o suficiente para cadernos
 locais de exemplo.
+
+Depois de descompactadas, as amostras locais devem poder gerar seus proprios
+Parquets sem depender do caminho do Google Drive:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/
+```
+
+## Parquet por base
+
+Cada base canonica deve ter um unico arquivo Parquet por ambiente, agrupando
+todos os anos e meses disponiveis naquele ambiente:
+
+- `senado__plenario_discursos.parquet`;
+- `senado__congresso_discursos.parquet`;
+- `senado__ccj_notas.parquet`;
+- `senado__pareceres_pec.parquet`;
+- `camara__plenario_discursos.parquet`;
+- `camara__ccjc_eventos.parquet`;
+- `camara__pareceres_pec.parquet`.
+
+Regras obrigatorias:
+
+- O conteudo de cada Parquet deve ser equivalente ao subconjunto JSONL em que
+  `source` e `dataset` correspondem ao nome do arquivo.
+- Os Parquets devem manter o contrato `textos_parlamentares/v1`, sem renomear
+  campos nem descartar colunas do schema processado.
+- Colunas ausentes em alguma base devem existir no Parquet com valores nulos,
+  preservando compatibilidade entre bases.
+- A ordem preferencial das colunas deve seguir
+  `processed_textos_parlamentares_v1.schema.json` quando esse arquivo existir,
+  ou a lista `PROCESSED_FIELDS` do normalizador.
+- A rotina deve registrar um manifest de Parquet com raiz de entrada, raiz de
+  saida, arquivos lidos, arquivos escritos, contagens por base e schema usado.

@@ -104,3 +104,70 @@ Conferir que os arquivos descompactados:
 - preservam `texto_id`, `source`, `dataset`, `documento_tipo`, `ano`, `mes`,
   `texto` e `raw_path`;
 - carregam nomes que identificam base, ano e mes.
+
+## Validacao dos Parquets unificados
+
+Rodar a conversao Parquet nos dois ambientes suportados, sempre conferindo que
+as raizes de entrada e saida sao as corretas para o ambiente.
+
+### Colab
+
+Usar o notebook dedicado:
+
+```text
+notebooks/processamento/geracao_parquets_colab.ipynb
+```
+
+Entrada esperada:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/
+```
+
+Saida esperada:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+O manifest da conversao deve ficar em:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/manifests/{run_id}-parquet.json
+```
+
+### Samples locais
+
+Entrada esperada:
+
+```text
+data/samples/textos_parlamentares/v1/
+```
+
+Saida esperada:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/
+```
+
+O manifest da conversao deve ficar em:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/manifest.json
+```
+
+### Checks obrigatorios
+
+- Existem Parquets para todas as bases presentes nos JSONLs de entrada.
+- Cada arquivo Parquet contem apenas uma combinacao `source/dataset`, coerente
+  com o nome `{source}__{dataset}.parquet`.
+- A soma de linhas dos Parquets bate com a quantidade de `texto_id`s distintos
+  dos JSONLs processados lidos.
+- `dataset_version` e sempre `v1`.
+- As colunas seguem o schema processado v1; campos sem valor em uma base ficam
+  nulos, nao ausentes.
+- Nenhum arquivo dentro de `parquet/` entra novamente como input da conversao.
+- No Colab, nenhum arquivo e gravado dentro do repositorio local do notebook;
+  a saida deve permanecer no Drive montado.
+- Nas samples locais, nenhum caminho absoluto do Colab deve aparecer no manifest
+  local, exceto em campos de proveniencia bruta preservados dos registros.
