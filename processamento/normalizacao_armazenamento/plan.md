@@ -174,3 +174,40 @@ data/samples/textos_parlamentares/v1/parquet/
 - Incluir filtros simples por ano, mes, familia textual, parlamentar,
   proposicao, orgao e busca textual para reduzir o conjunto antes de abrir
   textos completos.
+
+## Etapa 9: visualizador Gradio dos Parquets
+
+Proxima tarefa planejada para segunda-feira, 2026-05-25.
+
+- Criar um caderno Colab independente:
+
+```text
+notebooks/processamento/visualizador_parquets_gradio_colab.ipynb
+```
+
+- O caderno deve montar o Drive, atualizar o repositorio, instalar dependencias
+  e iniciar um app Gradio com link publico temporario via `share=True`.
+- Ler os Parquets diretamente de:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- Usar DuckDB ou PyArrow como camada de consulta para evitar carregar a base
+  completa em memoria antes dos filtros.
+- Interface minima:
+  - seletor de base Parquet;
+  - filtros por ano, mes, familia textual, unidade analitica, orgao,
+    parlamentar, proposicao e busca textual;
+  - limite de linhas;
+  - tabela compacta sem `texto`;
+  - campo para selecionar `texto_id`;
+  - painel de metadados;
+  - painel de texto integral sem truncamento.
+- A tabela deve retornar apenas colunas compactas e linhas limitadas; o texto
+  integral deve ser carregado apenas quando um `texto_id` for selecionado.
+- Incluir um botao ou acao para limpar filtros.
+- O app nao deve escrever no Drive nem rerodar normalizacao, geracao de
+  Parquets ou coleta.
+- Atualizar `requirements.txt` com dependencias do visualizador, como `gradio`
+  e `duckdb`, quando a implementacao for feita.

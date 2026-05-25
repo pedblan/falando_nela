@@ -212,3 +212,39 @@ data/samples/textos_parlamentares/v1/parquet/
   valores nulos.
 - O caderno local roda contra os Parquets de samples sem depender de Google
   Drive ou de caminhos `/content/`.
+
+## Validacao do visualizador Gradio dos Parquets
+
+Validar o caderno:
+
+```text
+notebooks/processamento/visualizador_parquets_gradio_colab.ipynb
+```
+
+Checks obrigatorios:
+
+- O JSON do notebook e valido.
+- Todas as celulas de codigo compilam com `ast.parse`.
+- O notebook aponta para:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- O notebook instala e importa `gradio` e a dependencia de consulta escolhida,
+  preferencialmente `duckdb`.
+- O app inicia com `share=True` no Colab.
+- O app lista os arquivos `.parquet` disponiveis no Drive.
+- A consulta inicial de tabela compacta respeita filtros e limite de linhas.
+- A tabela compacta nao inclui a coluna `texto`.
+- A busca textual funciona sem exigir carregamento integral da base em memoria
+  antes dos filtros.
+- A selecao por `texto_id` retorna metadados essenciais e texto integral sem
+  truncamento.
+- O app funciona quando filtros opcionais apontam para colunas ausentes ou
+  totalmente nulas.
+- O app nao executa coleta, normalizacao, geracao de Parquets nem escrita no
+  Drive.
+- Em smoke local, quando houver Parquets de samples, a logica de consulta deve
+  ser testavel contra `data/samples/textos_parlamentares/v1/parquet/`, mesmo que
+  o notebook principal seja voltado ao Colab.

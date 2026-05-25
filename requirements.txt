@@ -1,4 +1,6 @@
 httpx>=0.27,<1.0
+duckdb>=1,<2
+gradio>=4,<6
 ipython>=8,<10
 ipywidgets>=8,<9
 itables>=2,<3

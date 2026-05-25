@@ -52,6 +52,10 @@ versionada, rastreavel e pronta para cadernos analiticos.
     Parquets completos no Google Drive;
   - `notebooks/processamento/exploracao_parquets_samples_local.ipynb`, lendo os
     Parquets de `data/samples/textos_parlamentares/v1/parquet/`.
+- Manter `notebooks/processamento/visualizador_parquets_gradio_colab.ipynb`
+  como proxima tarefa operacional, prevista para segunda-feira,
+  2026-05-25, para abrir um web app Gradio no Colab e navegar pelos Parquets
+  sem rerodar normalizacao ou conversao.
 - Atualizar estes cadernos sempre que o contrato `textos_parlamentares/v1`,
   os caminhos de dados ou o fluxo de validacao mudarem.
 
@@ -178,3 +182,35 @@ Requisitos minimos:
   integral torne `head()` e tabelas interativas pesadas ou ilegíveis.
 - Explicar em celulas curtas o que cada comando basico mostra, sem transformar
   o caderno em tutorial longo.
+
+## Visualizador Gradio dos Parquets
+
+O projeto deve ter um visualizador web simples, executavel pelo Colab, para
+inspecionar os Parquets com mais fluidez que um caderno exploratorio.
+
+Requisitos minimos:
+
+- Implementar o visualizador em
+  `notebooks/processamento/visualizador_parquets_gradio_colab.ipynb`.
+- O notebook deve montar o Google Drive, atualizar o repositorio, instalar
+  dependencias e iniciar um app Gradio com `share=True`.
+- A entrada deve ser:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- O app deve permitir selecionar uma base Parquet por arquivo.
+- O app deve expor filtros por ano, mes, `documento_tipo`, `unidade_analitica`,
+  `orgao_sigla`, `parlamentar_nome`, `proposicao_identificacao` e busca textual.
+- O app deve mostrar uma tabela compacta paginada ou limitada, sem a coluna
+  `texto` por default.
+- O app deve permitir selecionar um `texto_id` da tabela e carregar o `texto`
+  integral sob demanda, junto dos metadados essenciais.
+- Para bases grandes, o app nao deve depender de carregar tudo em memoria no
+  primeiro passo; deve preferir DuckDB ou PyArrow para ler Parquets com filtros
+  e limites antes de converter resultados para pandas.
+- Deve haver controles claros de limite de linhas, ordenacao simples e limpeza
+  dos filtros.
+- O visualizador e ferramenta de inspecao; ele nao deve executar coleta,
+  normalizacao, geracao de Parquets nem alterar arquivos no Drive.

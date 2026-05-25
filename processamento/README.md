@@ -61,13 +61,43 @@ Eles permitem escolher uma base, carregar um `DataFrame`, revisar `head`,
 `describe`, `value_counts`, aplicar filtros simples e abrir o `texto` integral
 sem truncamento.
 
+Para navegar pelos Parquets em um app web Gradio read-only, use no Colab:
+
+```text
+notebooks/processamento/visualizador_parquets_gradio_colab.ipynb
+```
+
+Localmente, contra os Parquets de samples:
+
+```bash
+python -m processamento.visualizador_parquets --profile samples-local
+```
+
 ## Amostras locais
 
-Os ZIPs gerados no Colab devem ser descompactados localmente em:
+Os ZIPs de amostra devem ser gerados no Colab a partir da base completa no
+Google Drive, nao a partir das amostras locais:
+
+```bash
+python -m processamento.samples \
+  --profile colab \
+  --data-root /content/drive/MyDrive/falando_nela/data \
+  --run-id samples-textos-v1-YYYYMMDD \
+  --include-parquet \
+  --overwrite
+```
+
+A saida padrao fica em
+`/content/drive/MyDrive/falando_nela/data/processed/downloads/{run_id}/`.
+Depois do download, descompacte localmente em:
 
 ```text
 data/samples/textos_parlamentares/v1/
 ```
+
+O perfil `samples-local` existe apenas para validacao ou reempacotamento local
+controlado; ele nao substitui a geracao analitica a partir dos dados completos
+no Colab.
 
 Esse diretorio e reservado para os JSONLs pequenos usados em cadernos locais de
 exemplo.

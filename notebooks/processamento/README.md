@@ -26,6 +26,9 @@ Arquivos atuais:
   `DataFrame`, contagens basicas, filtros e leitura de texto integral.
 - `exploracao_parquets_samples_local.ipynb`: faz a mesma exploracao sobre os
   Parquets das samples locais.
+- `visualizador_parquets_gradio_colab.ipynb`: abre um web app Gradio read-only
+  para navegar pelos Parquets do Drive no Colab, com fallback para samples
+  locais quando executado fora do Colab.
 
 Downloads de amostras gerados no Colab devem ser descompactados localmente em:
 
@@ -37,4 +40,10 @@ Depois de descompactar os JSONLs localmente, gere os Parquets das samples com:
 
 ```bash
 python -m processamento.parquet --profile samples-local --overwrite
+```
+
+Para abrir o visualizador local contra os Parquets de samples:
+
+```bash
+python -m processamento.visualizador_parquets --profile samples-local
 ```

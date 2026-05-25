@@ -1,0 +1,4 @@
+interface:
+  display_name: "Falando Nela Colab"
+  short_description: "Criar e corrigir notebooks Colab"
+  default_prompt: "Use $falando-nela-colab-notebooks para criar ou corrigir notebooks Colab do projeto Falando Nela."
