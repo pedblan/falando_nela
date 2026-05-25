@@ -58,6 +58,8 @@ O notebook nao deve executar:
   limitadas da tabela compacta.
 - O grafico anual contem as series `Resultados`, `Por discurso` e
   `Por mil palavras`.
+- O grafico anual usa eixo Y duplo: `Resultados` no eixo esquerdo e as metricas
+  relativas no eixo direito.
 - As series usam estilos distintos: linha continua, linha pontilhada e linha
   com marcadores triangulares.
 - O grafico tem legenda e tooltip/mouseover com ano, serie, valor, resultados,

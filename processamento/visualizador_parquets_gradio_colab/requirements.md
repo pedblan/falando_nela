@@ -79,12 +79,14 @@ O app deve expor:
 - O grafico anual deve usar Altair.
 - O grafico deve ser gerado a partir dos mesmos filtros da consulta, incluindo
   a busca textual, mas sem aplicar o limite de linhas da tabela.
-- O grafico deve ter uma linha continua para a contagem absoluta de resultados
-  por ano.
-- O grafico deve ter uma linha pontilhada para resultados por discurso no ano,
-  calculado como `resultados / registros_textuais_do_ano`.
-- O grafico deve ter uma linha com marcadores triangulares para resultados por
-  mil palavras no ano, calculado como
+- O grafico deve usar eixo Y duplo: eixo esquerdo para a contagem absoluta e
+  eixo direito para as metricas relativas.
+- O grafico deve ter uma linha continua no eixo esquerdo para a contagem
+  absoluta de resultados por ano.
+- O grafico deve ter uma linha pontilhada no eixo direito para resultados por
+  discurso no ano, calculado como `resultados / registros_textuais_do_ano`.
+- O grafico deve ter uma linha no eixo direito com marcadores triangulares para
+  resultados por mil palavras no ano, calculado como
   `resultados * 1000 / palavras_do_ano`.
 - O denominador de discursos/registros e palavras deve usar o corpus do ano
   apos filtros estruturais, mas antes da busca textual.

@@ -357,8 +357,11 @@ def build_yearly_metrics_chart(metrics_df: pd.DataFrame):
 
     base = alt.Chart(metrics_df).encode(
         x=alt.X("ano:O", title="Ano"),
-        y=alt.Y("valor:Q", title="Valor"),
-        color=alt.Color("serie:N", title="Metrica"),
+        color=alt.Color(
+            "serie:N",
+            title="Metrica",
+            legend=alt.Legend(orient="bottom", direction="horizontal"),
+        ),
         tooltip=[
             alt.Tooltip("ano:O", title="Ano"),
             alt.Tooltip("serie:N", title="Metrica"),
@@ -368,14 +371,15 @@ def build_yearly_metrics_chart(metrics_df: pd.DataFrame):
             alt.Tooltip("palavras:Q", title="Palavras", format=","),
         ],
     )
-    hover = alt.selection_point(fields=["ano"], nearest=True, on="pointerover", empty=False)
     solid = (
         base.transform_filter(alt.datum.serie == "Resultados")
         .mark_line(strokeWidth=3)
+        .encode(y=alt.Y("valor:Q", title="Resultados", axis=alt.Axis(orient="left")))
     )
     dotted = (
         base.transform_filter(alt.datum.serie == "Por discurso")
         .mark_line(strokeDash=[2, 4], strokeWidth=3)
+        .encode(y=alt.Y("valor:Q", title="Metricas relativas", axis=alt.Axis(orient="right")))
     )
     triangles = (
         base.transform_filter(alt.datum.serie == "Por mil palavras")
@@ -383,14 +387,12 @@ def build_yearly_metrics_chart(metrics_df: pd.DataFrame):
             point=alt.OverlayMarkDef(shape="triangle-up", filled=True, size=90),
             strokeWidth=3,
         )
+        .encode(y=alt.Y("valor:Q", title="Metricas relativas", axis=alt.Axis(orient="right")))
     )
-    hover_points = (
-        base.mark_point(size=110, filled=True)
-        .encode(opacity=alt.condition(hover, alt.value(1), alt.value(0)))
-        .add_params(hover)
-    )
+    relative = alt.layer(dotted, triangles)
     return (
-        alt.layer(solid, dotted, triangles, hover_points)
+        alt.layer(solid, relative)
+        .resolve_scale(y="independent")
         .properties(width=900, height=320, title="Resultados por ano")
         .interactive()
     )

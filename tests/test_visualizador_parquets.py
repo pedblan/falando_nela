@@ -196,12 +196,21 @@ def test_yearly_metrics_chart_has_required_styles_and_tooltips(tmp_path: Path) -
 
     assert spec["width"] == 900
     assert spec["height"] == 320
-    assert len(spec["layer"]) == 4
+    assert spec["resolve"]["scale"]["y"] == "independent"
+    assert len(spec["layer"]) == 2
     assert spec["layer"][0]["mark"]["type"] == "line"
+    assert spec["layer"][0]["encoding"]["y"]["axis"]["orient"] == "left"
+    assert spec["layer"][0]["encoding"]["y"]["title"] == "Resultados"
     assert "strokeDash" not in spec["layer"][0]["mark"]
-    assert spec["layer"][1]["mark"]["strokeDash"] == [2, 4]
-    assert spec["layer"][2]["mark"]["point"]["shape"] == "triangle-up"
+    relative_layers = spec["layer"][1]["layer"]
+    assert len(relative_layers) == 2
+    assert relative_layers[0]["mark"]["strokeDash"] == [2, 4]
+    assert relative_layers[0]["encoding"]["y"]["axis"]["orient"] == "right"
+    assert relative_layers[0]["encoding"]["y"]["title"] == "Metricas relativas"
+    assert relative_layers[1]["mark"]["point"]["shape"] == "triangle-up"
+    assert relative_layers[1]["encoding"]["y"]["axis"]["orient"] == "right"
     assert spec["layer"][0]["encoding"]["color"]["title"] == "Metrica"
+    assert spec["layer"][0]["encoding"]["color"]["legend"]["orient"] == "bottom"
     tooltip_titles = [item["title"] for item in spec["layer"][0]["encoding"]["tooltip"]]
     assert tooltip_titles == ["Ano", "Metrica", "Valor", "Resultados", "Discursos", "Palavras"]
 
