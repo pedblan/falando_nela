@@ -6,6 +6,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from processamento.visualizador_parquets import (
+    _build_text_search_clause,
     build_yearly_metrics_chart,
     fetch_text_by_id,
     list_parquet_files,
@@ -142,6 +143,24 @@ def test_text_search_accepts_quoted_phrases_exclusions_and_or(tmp_path: Path) ->
         sort_desc=False,
     )
     assert list(exact_word_df["texto_id"]) == ["texto-5"]
+
+
+def test_text_search_clause_prefilters_before_regex() -> None:
+    clause, params = _build_text_search_clause('plexo -complexo OR "saude publica"', 'texto_busca')
+
+    assert "CASE WHEN" in clause
+    assert "ILIKE" in clause
+    assert "regexp_matches" in clause
+    assert clause.index("ILIKE") < clause.index("regexp_matches")
+    assert params == [
+        "%plexo%",
+        r"(^|[^\p{L}\p{N}_])plexo([^\p{L}\p{N}_]|$)",
+        "%saude%",
+        "%publica%",
+        r"(^|[^\p{L}\p{N}_])saude\s+publica([^\p{L}\p{N}_]|$)",
+        "%complexo%",
+        r"(^|[^\p{L}\p{N}_])complexo([^\p{L}\p{N}_]|$)",
+    ]
 
 
 def test_yearly_metrics_count_results_per_discourse_and_per_thousand_words(tmp_path: Path) -> None:

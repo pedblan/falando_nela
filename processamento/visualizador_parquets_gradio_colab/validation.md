@@ -50,6 +50,8 @@ O notebook nao deve executar:
   encontra `saúde`.
 - A busca textual aceita combinacoes com termos simples, `OR` ou `|`, e
   exclusao com `-termo` ou `-"frase"`.
+- A busca textual e executada como SQL vetorizado no DuckDB, com pre-filtro
+  `ILIKE` antes de `regexp_matches`, sem loop Python por linha.
 - Filtros opcionais nao quebram o app quando uma coluna esta ausente ou so tem
   valores nulos.
 - A ordenacao simples funciona somente com colunas existentes.

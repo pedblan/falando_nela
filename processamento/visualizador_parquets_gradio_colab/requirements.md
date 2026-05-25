@@ -112,6 +112,10 @@ O app deve expor:
   `-"saude privada"`.
 - Os operadores devem ser convertidos em filtros parametrizados do DuckDB; o
   app nao deve aceitar SQL livre digitado pelo usuario.
+- A busca textual deve usar uma estrategia em duas fases no DuckDB: primeiro
+  um pre-filtro barato por substring normalizada e, apenas nos candidatos, a
+  verificacao mais cara de fronteira de termo/frase.
+- A busca textual nao deve fazer loop Python linha a linha sobre o Parquet.
 
 ## Tabela compacta
 

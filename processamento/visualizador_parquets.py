@@ -22,6 +22,8 @@ DEFAULT_LIMIT = 100
 MAX_LIMIT = 1_000
 TEXT_COLUMN = "texto"
 TEXT_ID_COLUMN = "texto_id"
+SEARCH_TEXT_COLUMN = "__falando_nela_texto_busca"
+LIKE_ESCAPE_SQL = " ESCAPE '\\'"
 WORD_PATTERN = r"\p{L}[\p{L}\p{N}_]*"
 
 COMPACT_COLUMNS = [
@@ -247,10 +249,17 @@ def query_compact_table(
         "parlamentar_nome": parlamentar_nome,
         "proposicao_identificacao": proposicao_identificacao,
     }
-    where_clauses, params, ignored = _build_where(columns, filters, busca_textual)
+    needs_text_search = _needs_text_search(columns, busca_textual)
+    source_sql = _source_sql(path, columns, include_search_text=needs_text_search)
+    where_clauses, params, ignored = _build_where(
+        columns,
+        filters,
+        busca_textual,
+        search_text_expr=_quote_identifier(SEARCH_TEXT_COLUMN) if needs_text_search else None,
+    )
     effective_limit = _coerce_limit(limit)
     select_sql = ", ".join(_quote_identifier(column) for column in select_columns)
-    sql = f"SELECT {select_sql} FROM {_parquet_table(path)}"
+    sql = f"SELECT {select_sql} FROM {source_sql}"
     if where_clauses:
         sql += " WHERE " + " AND ".join(where_clauses)
 
@@ -307,12 +316,19 @@ def query_yearly_metrics(
         "parlamentar_nome": parlamentar_nome,
         "proposicao_identificacao": proposicao_identificacao,
     }
+    needs_text_search = _needs_text_search(columns, busca_textual)
     denominator_where, denominator_params, _ = _build_where(columns, filters, None)
-    matches_where, matches_params, _ = _build_where(columns, filters, busca_textual)
+    matches_where, matches_params, _ = _build_where(
+        columns,
+        filters,
+        busca_textual,
+        search_text_expr=_quote_identifier(SEARCH_TEXT_COLUMN) if needs_text_search else None,
+    )
     denominator_where_sql = "WHERE " + " AND ".join(denominator_where) if denominator_where else ""
     matches_where_sql = "WHERE " + " AND ".join(matches_where) if matches_where else ""
     word_count_expr = _word_count_expression(columns)
     table_sql = _parquet_table(path)
+    matches_table_sql = _source_sql(path, columns, include_search_text=needs_text_search)
 
     sql = f"""
         WITH denominator AS (
@@ -328,7 +344,7 @@ def query_yearly_metrics(
             SELECT
                 CAST({_quote_identifier("ano")} AS VARCHAR) AS ano,
                 COUNT(*) AS resultados
-            FROM {table_sql}
+            FROM {matches_table_sql}
             {matches_where_sql}
             GROUP BY 1
         )
@@ -664,6 +680,8 @@ def _build_where(
     columns: Sequence[str],
     filters: Mapping[str, Any],
     busca_textual: Any,
+    *,
+    search_text_expr: str | None = None,
 ) -> tuple[list[str], list[Any], list[str]]:
     available = set(columns)
     clauses: list[str] = []
@@ -692,7 +710,10 @@ def _build_where(
     search = _normalize_value(busca_textual)
     if search:
         if TEXT_COLUMN in available:
-            search_clause, search_params = _build_text_search_clause(search)
+            search_clause, search_params = _build_text_search_clause(
+                search,
+                search_text_expr or _search_text_expression(),
+            )
             if search_clause:
                 clauses.append(search_clause)
                 params.extend(search_params)
@@ -702,10 +723,28 @@ def _build_where(
     return clauses, params, ignored
 
 
+def _needs_text_search(columns: Sequence[str], busca_textual: Any) -> bool:
+    return TEXT_COLUMN in columns and bool(_normalize_value(busca_textual))
+
+
+def _source_sql(path: Path, columns: Sequence[str], *, include_search_text: bool = False) -> str:
+    table_sql = _parquet_table(path)
+    if not include_search_text:
+        return table_sql
+    return (
+        f"(SELECT *, {_search_text_expression()} AS {_quote_identifier(SEARCH_TEXT_COLUMN)} "
+        f"FROM {table_sql}) AS parquet_with_search_text"
+    )
+
+
+def _search_text_expression() -> str:
+    return f"strip_accents(COALESCE(CAST({_quote_identifier(TEXT_COLUMN)} AS VARCHAR), ''))"
+
+
 def _word_count_expression(columns: Sequence[str]) -> str:
     if TEXT_COLUMN not in columns:
         return "0"
-    text_expr = f"strip_accents(COALESCE(CAST({_quote_identifier(TEXT_COLUMN)} AS VARCHAR), ''))"
+    text_expr = _search_text_expression()
     return f"len(regexp_extract_all({text_expr}, {_quote_literal(WORD_PATTERN)}, 0, 'i'))"
 
 
@@ -738,9 +777,8 @@ def _yearly_metrics_long(yearly: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
-def _build_text_search_clause(search: str) -> tuple[str, list[str]]:
+def _build_text_search_clause(search: str, text_expr: str) -> tuple[str, list[str]]:
     groups, exclusions = _parse_search_query(search)
-    text_expr = f"strip_accents(CAST({_quote_identifier(TEXT_COLUMN)} AS VARCHAR))"
     params: list[str] = []
     parts: list[str] = []
 
@@ -748,18 +786,18 @@ def _build_text_search_clause(search: str) -> tuple[str, list[str]]:
     for group in groups:
         group_parts: list[str] = []
         for term in group:
-            clause, param = _text_term_clause(text_expr, term)
+            clause, term_params = _included_text_term_clause(text_expr, term)
             group_parts.append(clause)
-            params.append(param)
+            params.extend(term_params)
         if group_parts:
             positive_parts.append("(" + " AND ".join(group_parts) + ")")
     if positive_parts:
         parts.append("(" + " OR ".join(positive_parts) + ")")
 
     for term in exclusions:
-        clause, param = _text_term_clause(text_expr, term)
-        parts.append(f"NOT ({clause})")
-        params.append(param)
+        clause, term_params = _excluded_text_term_clause(text_expr, term)
+        parts.append(clause)
+        params.extend(term_params)
 
     return " AND ".join(parts), params
 
@@ -828,14 +866,43 @@ def _tokenize_search(search: str) -> list[SearchTerm]:
     return tokens
 
 
-def _text_term_clause(text_expr: str, term: SearchTerm) -> tuple[str, str]:
-    return f"regexp_matches({text_expr}, ?, 'i')", _bounded_text_pattern(term.value)
+def _included_text_term_clause(text_expr: str, term: SearchTerm) -> tuple[str, list[str]]:
+    prefilter_clause, prefilter_params = _text_prefilter_clause(text_expr, term.value)
+    return (
+        f"(CASE WHEN {prefilter_clause} THEN regexp_matches({text_expr}, ?, 'i') ELSE false END)",
+        [*prefilter_params, _bounded_text_pattern(term.value)],
+    )
+
+
+def _excluded_text_term_clause(text_expr: str, term: SearchTerm) -> tuple[str, list[str]]:
+    prefilter_clause, prefilter_params = _text_prefilter_clause(text_expr, term.value)
+    return (
+        f"(CASE WHEN {prefilter_clause} THEN NOT regexp_matches({text_expr}, ?, 'i') ELSE true END)",
+        [*prefilter_params, _bounded_text_pattern(term.value)],
+    )
+
+
+def _text_prefilter_clause(text_expr: str, value: str) -> tuple[str, list[str]]:
+    parts = [part for part in re.split(r"\s+", _strip_accents(value.strip())) if part]
+    if not parts:
+        return "true", []
+    clauses = [f"{text_expr} ILIKE ?{LIKE_ESCAPE_SQL}" for _ in parts]
+    params = [_like_contains(part) for part in parts]
+    return "(" + " AND ".join(clauses) + ")", params
 
 
 def _bounded_text_pattern(value: str) -> str:
     escaped = re.escape(_strip_accents(value.strip()))
     escaped = re.sub(r"\\\s+", r"\\s+", escaped)
     return rf"(^|[^\p{{L}}\p{{N}}_]){escaped}([^\p{{L}}\p{{N}}_]|$)"
+
+
+def _like_contains(value: str) -> str:
+    return f"%{_escape_like(value)}%"
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _strip_accents(value: str) -> str:
