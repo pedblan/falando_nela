@@ -22,6 +22,7 @@ DEFAULT_LIMIT = 100
 MAX_LIMIT = 1_000
 TEXT_COLUMN = "texto"
 TEXT_ID_COLUMN = "texto_id"
+WORD_PATTERN = r"\p{L}[\p{L}\p{N}_]*"
 
 COMPACT_COLUMNS = [
     "texto_id",
@@ -279,6 +280,122 @@ def query_compact_table(
     )
 
 
+def query_yearly_metrics(
+    parquet_root: Path | str,
+    parquet_name: str,
+    *,
+    ano: Any = None,
+    mes: Any = None,
+    documento_tipo: Any = None,
+    unidade_analitica: Any = None,
+    orgao_sigla: Any = None,
+    parlamentar_nome: Any = None,
+    proposicao_identificacao: Any = None,
+    busca_textual: Any = None,
+) -> pd.DataFrame:
+    path = resolve_parquet_path(parquet_root, parquet_name)
+    columns = get_columns(parquet_root, parquet_name)
+    if "ano" not in columns:
+        return pd.DataFrame(columns=["ano", "serie", "valor", "resultados", "discursos", "palavras"])
+
+    filters = {
+        "ano": ano,
+        "mes": mes,
+        "documento_tipo": documento_tipo,
+        "unidade_analitica": unidade_analitica,
+        "orgao_sigla": orgao_sigla,
+        "parlamentar_nome": parlamentar_nome,
+        "proposicao_identificacao": proposicao_identificacao,
+    }
+    denominator_where, denominator_params, _ = _build_where(columns, filters, None)
+    matches_where, matches_params, _ = _build_where(columns, filters, busca_textual)
+    denominator_where_sql = "WHERE " + " AND ".join(denominator_where) if denominator_where else ""
+    matches_where_sql = "WHERE " + " AND ".join(matches_where) if matches_where else ""
+    word_count_expr = _word_count_expression(columns)
+    table_sql = _parquet_table(path)
+
+    sql = f"""
+        WITH denominator AS (
+            SELECT
+                CAST({_quote_identifier("ano")} AS VARCHAR) AS ano,
+                COUNT(*) AS discursos,
+                SUM({word_count_expr}) AS palavras
+            FROM {table_sql}
+            {denominator_where_sql}
+            GROUP BY 1
+        ),
+        matches AS (
+            SELECT
+                CAST({_quote_identifier("ano")} AS VARCHAR) AS ano,
+                COUNT(*) AS resultados
+            FROM {table_sql}
+            {matches_where_sql}
+            GROUP BY 1
+        )
+        SELECT
+            denominator.ano,
+            COALESCE(matches.resultados, 0) AS resultados,
+            denominator.discursos,
+            denominator.palavras
+        FROM denominator
+        LEFT JOIN matches USING (ano)
+        ORDER BY denominator.ano
+    """
+    con = duckdb.connect(database=":memory:")
+    try:
+        yearly = con.execute(sql, [*denominator_params, *matches_params]).fetchdf()
+    finally:
+        con.close()
+    return _yearly_metrics_long(yearly)
+
+
+def build_yearly_metrics_chart(metrics_df: pd.DataFrame):
+    if metrics_df.empty:
+        return None
+
+    import altair as alt
+
+    base = alt.Chart(metrics_df).encode(
+        x=alt.X("ano:O", title="Ano"),
+        y=alt.Y("valor:Q", title="Valor"),
+        color=alt.Color("serie:N", title="Metrica"),
+        tooltip=[
+            alt.Tooltip("ano:O", title="Ano"),
+            alt.Tooltip("serie:N", title="Metrica"),
+            alt.Tooltip("valor:Q", title="Valor", format=",.4f"),
+            alt.Tooltip("resultados:Q", title="Resultados", format=","),
+            alt.Tooltip("discursos:Q", title="Discursos", format=","),
+            alt.Tooltip("palavras:Q", title="Palavras", format=","),
+        ],
+    )
+    hover = alt.selection_point(fields=["ano"], nearest=True, on="pointerover", empty=False)
+    solid = (
+        base.transform_filter(alt.datum.serie == "Resultados")
+        .mark_line(strokeWidth=3)
+    )
+    dotted = (
+        base.transform_filter(alt.datum.serie == "Por discurso")
+        .mark_line(strokeDash=[2, 4], strokeWidth=3)
+    )
+    triangles = (
+        base.transform_filter(alt.datum.serie == "Por mil palavras")
+        .mark_line(
+            point=alt.OverlayMarkDef(shape="triangle-up", filled=True, size=90),
+            strokeWidth=3,
+        )
+    )
+    hover_points = (
+        base.mark_point(size=110, filled=True)
+        .encode(opacity=alt.condition(hover, alt.value(1), alt.value(0)))
+        .add_params(hover)
+    )
+    return (
+        alt.layer(solid, dotted, triangles, hover_points)
+        .properties(width=900, height=320, title="Resultados por ano")
+        .interactive()
+    )
+
+
 def fetch_text_by_id(
     parquet_root: Path | str,
     parquet_name: str,
@@ -399,10 +516,25 @@ def build_gradio_app(parquet_root: Path | str):
                 sort_column=sort_column,
                 sort_desc=sort_direction != "ascendente",
             )
+            chart = build_yearly_metrics_chart(
+                query_yearly_metrics(
+                    root,
+                    base_name,
+                    ano=ano,
+                    mes=mes,
+                    documento_tipo=documento_tipo,
+                    unidade_analitica=unidade_analitica,
+                    orgao_sigla=orgao_sigla,
+                    parlamentar_nome=parlamentar_nome,
+                    proposicao_identificacao=proposicao_identificacao,
+                    busca_textual=busca_textual,
+                )
+            )
             choices = _text_id_choices(df)
             first_text_id = choices[0] if choices else None
             return (
                 df,
+                chart,
                 info.status,
                 gr.update(choices=choices, value=first_text_id),
                 "",
@@ -410,6 +542,7 @@ def build_gradio_app(parquet_root: Path | str):
         except Exception as exc:  # pragma: no cover - UI safety net
             return (
                 pd.DataFrame(),
+                None,
                 f"Erro na consulta: {exc}",
                 gr.update(choices=[], value=None),
                 "",
@@ -468,6 +601,7 @@ def build_gradio_app(parquet_root: Path | str):
             clear_button = gr.Button("Limpar filtros")
 
         table = gr.Dataframe(label="Tabela compacta", interactive=False)
+        yearly_plot = gr.Plot(label="Resultados por ano")
         text_id = gr.Dropdown(choices=[], label="texto_id", allow_custom_value=True)
         load_button = gr.Button("Carregar texto")
 
@@ -493,7 +627,7 @@ def build_gradio_app(parquet_root: Path | str):
                 sort_column,
                 sort_direction,
             ],
-            outputs=[table, status, text_id, full_text],
+            outputs=[table, yearly_plot, status, text_id, full_text],
         )
         clear_button.click(
             clear_filters,
@@ -564,6 +698,42 @@ def _build_where(
             ignored.append("busca_textual")
 
     return clauses, params, ignored
+
+
+def _word_count_expression(columns: Sequence[str]) -> str:
+    if TEXT_COLUMN not in columns:
+        return "0"
+    text_expr = f"strip_accents(COALESCE(CAST({_quote_identifier(TEXT_COLUMN)} AS VARCHAR), ''))"
+    return f"len(regexp_extract_all({text_expr}, {_quote_literal(WORD_PATTERN)}, 0, 'i'))"
+
+
+def _yearly_metrics_long(yearly: pd.DataFrame) -> pd.DataFrame:
+    if yearly.empty:
+        return pd.DataFrame(columns=["ano", "serie", "valor", "resultados", "discursos", "palavras"])
+
+    records: list[dict[str, object]] = []
+    for row in yearly.to_dict("records"):
+        ano = str(row.get("ano", ""))
+        resultados = int(row.get("resultados") or 0)
+        discursos = int(row.get("discursos") or 0)
+        palavras = int(row.get("palavras") or 0)
+        metric_values = {
+            "Resultados": float(resultados),
+            "Por discurso": float(resultados / discursos) if discursos else 0.0,
+            "Por mil palavras": float(resultados * 1000 / palavras) if palavras else 0.0,
+        }
+        for serie, valor in metric_values.items():
+            records.append(
+                {
+                    "ano": ano,
+                    "serie": serie,
+                    "valor": valor,
+                    "resultados": resultados,
+                    "discursos": discursos,
+                    "palavras": palavras,
+                }
+            )
+    return pd.DataFrame.from_records(records)
 
 
 def _build_text_search_clause(search: str) -> tuple[str, list[str]]:

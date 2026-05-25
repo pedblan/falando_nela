@@ -16,7 +16,7 @@ notebooks/processamento/visualizador_parquets_gradio_colab.ipynb
 /content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
 ```
 
-- O notebook importa ou instala `gradio` e `duckdb`.
+- O notebook importa ou instala `gradio`, `duckdb` e `altair`.
 - O app e iniciado com `share=True`.
 
 ## Checks read-only
@@ -54,6 +54,14 @@ O notebook nao deve executar:
   valores nulos.
 - A ordenacao simples funciona somente com colunas existentes.
 - O limite de linhas e respeitado.
+- O grafico anual e retornado junto da tabela e nao inclui somente as linhas
+  limitadas da tabela compacta.
+- O grafico anual contem as series `Resultados`, `Por discurso` e
+  `Por mil palavras`.
+- As series usam estilos distintos: linha continua, linha pontilhada e linha
+  com marcadores triangulares.
+- O grafico tem legenda e tooltip/mouseover com ano, serie, valor, resultados,
+  discursos/registros e palavras.
 
 ## Checks de texto integral
 

@@ -6,9 +6,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from processamento.visualizador_parquets import (
+    build_yearly_metrics_chart,
     fetch_text_by_id,
     list_parquet_files,
     query_compact_table,
+    query_yearly_metrics,
     resolve_parquet_path,
 )
 
@@ -140,6 +142,68 @@ def test_text_search_accepts_quoted_phrases_exclusions_and_or(tmp_path: Path) ->
         sort_desc=False,
     )
     assert list(exact_word_df["texto_id"]) == ["texto-5"]
+
+
+def test_yearly_metrics_count_results_per_discourse_and_per_thousand_words(tmp_path: Path) -> None:
+    root = tmp_path / "parquet"
+    path = root / "camara__plenario_discursos.parquet"
+    _write_parquet(
+        path,
+        [
+            {"texto_id": "texto-1", "ano": "2025", "texto": "plexo alfa beta gama"},
+            {"texto_id": "texto-2", "ano": "2025", "texto": "complexo alfa beta gama"},
+            {"texto_id": "texto-3", "ano": "2026", "texto": "plexo alfa beta gama delta"},
+            {"texto_id": "texto-4", "ano": "2026", "texto": "plexo alfa beta gama delta"},
+        ],
+    )
+
+    metrics = query_yearly_metrics(root, path.name, busca_textual="plexo")
+
+    result_rows = {
+        row["ano"]: row
+        for row in metrics[metrics["serie"] == "Resultados"].to_dict("records")
+    }
+    per_discourse_rows = {
+        row["ano"]: row
+        for row in metrics[metrics["serie"] == "Por discurso"].to_dict("records")
+    }
+    per_words_rows = {
+        row["ano"]: row
+        for row in metrics[metrics["serie"] == "Por mil palavras"].to_dict("records")
+    }
+
+    assert result_rows["2025"]["valor"] == 1.0
+    assert result_rows["2026"]["valor"] == 2.0
+    assert per_discourse_rows["2025"]["valor"] == 0.5
+    assert per_discourse_rows["2026"]["valor"] == 1.0
+    assert per_words_rows["2025"]["valor"] == 125.0
+    assert per_words_rows["2026"]["valor"] == 200.0
+
+
+def test_yearly_metrics_chart_has_required_styles_and_tooltips(tmp_path: Path) -> None:
+    root = tmp_path / "parquet"
+    path = root / "camara__plenario_discursos.parquet"
+    _write_parquet(
+        path,
+        [
+            {"texto_id": "texto-1", "ano": "2025", "texto": "plexo alfa beta gama"},
+            {"texto_id": "texto-2", "ano": "2026", "texto": "plexo alfa beta gama delta"},
+        ],
+    )
+
+    chart = build_yearly_metrics_chart(query_yearly_metrics(root, path.name, busca_textual="plexo"))
+    spec = chart.to_dict()
+
+    assert spec["width"] == 900
+    assert spec["height"] == 320
+    assert len(spec["layer"]) == 4
+    assert spec["layer"][0]["mark"]["type"] == "line"
+    assert "strokeDash" not in spec["layer"][0]["mark"]
+    assert spec["layer"][1]["mark"]["strokeDash"] == [2, 4]
+    assert spec["layer"][2]["mark"]["point"]["shape"] == "triangle-up"
+    assert spec["layer"][0]["encoding"]["color"]["title"] == "Metrica"
+    tooltip_titles = [item["title"] for item in spec["layer"][0]["encoding"]["tooltip"]]
+    assert tooltip_titles == ["Ano", "Metrica", "Valor", "Resultados", "Discursos", "Palavras"]
 
 
 def test_fetch_text_by_id_returns_metadata_and_full_text(tmp_path: Path) -> None:
