@@ -27,6 +27,11 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 
 - Consolidar dados brutos em camada `raw`.
 - Criar camada `processed` com campos normalizados entre Senado, Congresso e Camara.
+- Inventariar separadores no corpus completo antes de cortar texto integral,
+  usando os Parquets completos do Drive como fonte principal de auditoria.
+- Criar modulo de processamento do texto integral para separar, de forma
+  auditavel, o corpo analitico de discursos e notas de anexos, artigos citados,
+  expedientes e outros blocos editoriais agregados pela fonte oficial.
 - Produzir dicionario de dados.
 - Definir estrategia de versionamento dos datasets gerados.
 

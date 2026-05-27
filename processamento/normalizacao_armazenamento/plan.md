@@ -1,5 +1,23 @@
 # Plan
 
+## Tarefa operacional de amanha: inventario de separadores
+
+Tarefa planejada para quarta-feira, 2026-05-27.
+
+- Implementar o CLI `python -m processamento.inventario_separadores`.
+- Criar o notebook Colab:
+
+```text
+notebooks/processamento/inventario_separadores_colab.ipynb
+```
+
+- Rodar o inventario sobre os Parquets completos do Drive e salvar os
+  relatorios em:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/audits/separadores/{run_id}/
+```
+
 ## Etapa 1: contrato processed v1
 
 - Definir o dataset `textos_parlamentares/v1`.
@@ -21,6 +39,72 @@
 - Usar metadados de deputados da Camara apenas para enriquecer registros de
   discursos.
 - Escrever manifest de execucao em `processed/manifests/`.
+
+## Etapa 2.1: inventario de separadores
+
+- Criar uma rotina read-only para descobrir separadores em todos os Parquets
+  completos de `textos_parlamentares/v1`, antes de aplicar qualquer corte
+  automatico no campo `texto`.
+- Usar os Parquets completos do Drive como fonte principal:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+- Permitir perfil local contra samples em:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/
+```
+
+- Gerar relatorios em `processed/audits/separadores/{run_id}/`:
+  - `separadores_resumo.csv`;
+  - `separadores_exemplos.jsonl`;
+  - `parenteticos_resumo.csv`;
+  - `amostra_ia_textos.jsonl`;
+  - `amostra_ia_prompt.md`;
+  - `amostra_ia_schema.json`;
+  - `manifest.json`.
+- Classificar candidatos como:
+  - `hard_cut`: separadores fortes de anexos e documentos agregados;
+  - `review`: cabecalhos frequentes mas ambiguos;
+  - `keep`: marcas taquigraficas, incluindo linhas entre parenteses.
+- Tratar como candidatos de alta prioridade:
+  - `ARTIGO A QUE SE REFERE O ORADOR`;
+  - `DOCUMENTO A QUE SE REFERE`;
+  - linhas de `*****` no Senado quando combinadas com cabecalhos estruturais
+    proximos;
+  - cabecalhos como `SEGUE, NA INTEGRA` e `PRONUNCIAMENTO ENCAMINHADO`.
+- Manter parenteses taquigraficos no texto analitico por default, registrando
+  sua frequencia apenas para auditoria.
+- Gerar amostra de IA estratificada de 0,1% por `source/dataset/ano`, com
+  minimo de 1 texto por estrato, e pedir resposta estruturada segundo schema
+  JSON para apoiar a revisao humana dos separadores.
+
+## Etapa 2.2: processamento do texto integral
+
+- Criar um modulo separado da leitura bruta para processar e normalizar o campo
+  `texto` antes da analise, preservando a rastreabilidade para o texto oficial
+  original via metadados de origem ja existentes.
+- Separar o corpo principal de discursos, pronunciamentos e notas
+  taquigraficas de blocos anexos, artigos referidos pelo orador, expedientes,
+  documentos transcritos e outros conteudos agregados que nao sejam fala ou
+  nota principal.
+- Usar o inventario de separadores como requisito previo para definir regras de
+  corte. Comecar por regras auditaveis de alta confianca, como:
+
+```text
+ARTIGO A QUE SE REFERE O ORADOR
+```
+
+- Registrar, por texto processado, o metodo aplicado, os separadores
+  encontrados, se houve corte e os tamanhos antes/depois da limpeza.
+- Manter testes com exemplos sinteticos e reais pequenos para evitar remover
+  trechos validos da fala quando o separador aparecer em contexto ordinario.
+- Definir se o schema v1 recebera campos novos, como `texto_original`,
+  `texto_processado`, `texto_processamento_status` e
+  `texto_processamento_metodo`, ou se a mudanca exigira uma versao posterior do
+  dataset processado.
 
 ## Etapa 3: validacao local
 
@@ -177,7 +261,8 @@ data/samples/textos_parlamentares/v1/parquet/
 
 ## Etapa 9: visualizador Gradio dos Parquets
 
-Proxima tarefa planejada para segunda-feira, 2026-05-25.
+Tarefa operacional planejada anteriormente para segunda-feira, 2026-05-25;
+manter como componente de inspecao read-only dos Parquets.
 
 - Criar um caderno Colab independente:
 

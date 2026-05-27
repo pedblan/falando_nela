@@ -53,9 +53,11 @@ versionada, rastreavel e pronta para cadernos analiticos.
   - `notebooks/processamento/exploracao_parquets_samples_local.ipynb`, lendo os
     Parquets de `data/samples/textos_parlamentares/v1/parquet/`.
 - Manter `notebooks/processamento/visualizador_parquets_gradio_colab.ipynb`
-  como proxima tarefa operacional, prevista para segunda-feira,
-  2026-05-25, para abrir um web app Gradio no Colab e navegar pelos Parquets
-  sem rerodar normalizacao ou conversao.
+  para abrir um web app Gradio no Colab e navegar pelos Parquets sem rerodar
+  normalizacao ou conversao.
+- Criar `notebooks/processamento/inventario_separadores_colab.ipynb` como
+  tarefa operacional de quarta-feira, 2026-05-27, para inventariar separadores
+  nos Parquets completos do Drive antes do corte automatico do texto integral.
 - Atualizar estes cadernos sempre que o contrato `textos_parlamentares/v1`,
   os caminhos de dados ou o fluxo de validacao mudarem.
 
@@ -144,6 +146,68 @@ Regras obrigatorias:
   ou a lista `PROCESSED_FIELDS` do normalizador.
 - A rotina deve registrar um manifest de Parquet com raiz de entrada, raiz de
   saida, arquivos lidos, arquivos escritos, contagens por base e schema usado.
+
+## Inventario de separadores
+
+Antes de implementar qualquer corte automatico no campo `texto`, o projeto deve
+rodar um inventario read-only de separadores no corpus completo.
+
+Fonte principal em producao:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+Fonte local para smoke:
+
+```text
+data/samples/textos_parlamentares/v1/parquet/
+```
+
+JSONLs `processed` e registros `raw` devem ser usados apenas como fallback ou
+auditoria pontual de exemplos suspeitos. A etapa nao deve alterar `processed`,
+Parquets nem schema v1.
+
+O CLI planejado e:
+
+```bash
+python -m processamento.inventario_separadores \
+  --profile colab \
+  --run-id separadores-textos-v1-YYYYMMDD \
+  --overwrite
+```
+
+Saida em producao:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/audits/separadores/{run_id}/
+```
+
+Relatorios obrigatorios:
+
+- `separadores_resumo.csv`;
+- `separadores_exemplos.jsonl`;
+- `parenteticos_resumo.csv`;
+- `amostra_ia_textos.jsonl`;
+- `amostra_ia_prompt.md`;
+- `amostra_ia_schema.json`;
+- `manifest.json`.
+
+Cada candidato deve ser classificado como:
+
+- `hard_cut`: separador forte de anexo, documento agregado ou pronunciamento
+  encaminhado;
+- `review`: cabecalho frequente mas ambiguo;
+- `keep`: marca taquigrafica ou informacao contextual a manter.
+
+Parenteses taquigraficos, como `(Soa a campainha.)`, `(Pausa.)` e
+`(Intervencao fora do microfone.)`, devem ser mantidos por default e registrados
+apenas para auditoria.
+
+A rotina tambem deve gerar uma amostra para revisao por IA, estratificada por
+`source/dataset/ano`, com default de 0,1% dos textos de cada estrato e minimo de
+1 texto por estrato. A amostra deve vir acompanhada de prompt e schema JSON para
+resposta estruturada.
 
 ## Exploracao dos Parquets
 

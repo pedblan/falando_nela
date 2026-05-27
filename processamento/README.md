@@ -73,6 +73,28 @@ Localmente, contra os Parquets de samples:
 python -m processamento.visualizador_parquets --profile samples-local
 ```
 
+## Inventario de separadores
+
+Antes de limpar o campo `texto`, rode o inventario read-only de separadores nos
+Parquets. No Colab, use:
+
+```text
+notebooks/processamento/inventario_separadores_colab.ipynb
+```
+
+Ou, no terminal:
+
+```bash
+python -m processamento.inventario_separadores \
+  --profile colab \
+  --run-id separadores-textos-v1-YYYYMMDD \
+  --overwrite
+```
+
+O inventario gera relatorios em `processed/audits/separadores/{run_id}/`,
+incluindo uma amostra de 0,1% por `source/dataset/ano` para revisao por IA com
+resposta estruturada.
+
 ## Amostras locais
 
 Os ZIPs de amostra devem ser gerados no Colab a partir da base completa no

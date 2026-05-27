@@ -172,6 +172,89 @@ data/samples/textos_parlamentares/v1/parquet/manifest.json
 - Nas samples locais, nenhum caminho absoluto do Colab deve aparecer no manifest
   local, exceto em campos de proveniencia bruta preservados dos registros.
 
+## Validacao do inventario de separadores
+
+Validar as specs:
+
+```text
+processamento/inventario_separadores/plan.md
+processamento/inventario_separadores/requirements.md
+processamento/inventario_separadores/validation.md
+```
+
+Depois da implementacao, validar o CLI:
+
+```bash
+python -m processamento.inventario_separadores \
+  --profile samples-local \
+  --run-id separadores-smoke-local \
+  --overwrite
+```
+
+No Colab, validar:
+
+```bash
+python -m processamento.inventario_separadores \
+  --profile colab \
+  --run-id separadores-textos-v1-YYYYMMDD \
+  --overwrite
+```
+
+Entrada esperada no Colab:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet/
+```
+
+Saida esperada no Colab:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/audits/separadores/{run_id}/
+```
+
+Relatorios obrigatorios:
+
+- `separadores_resumo.csv`;
+- `separadores_exemplos.jsonl`;
+- `parenteticos_resumo.csv`;
+- `amostra_ia_textos.jsonl`;
+- `amostra_ia_prompt.md`;
+- `amostra_ia_schema.json`;
+- `manifest.json`.
+
+Checks obrigatorios:
+
+- A etapa e read-only em relacao aos JSONLs `processed`, aos Parquets de entrada
+  e ao schema v1.
+- `ARTIGO A QUE SE REFERE O ORADOR` aparece como candidato `hard_cut`.
+- `DOCUMENTO A QUE SE REFERE` e `DOCUMENTOS A QUE SE REFERE` aparecem como
+  candidatos `hard_cut`.
+- `*****` no Senado seguido de cabecalho estrutural aparece como `hard_cut`.
+- `*****` sem cabecalho estrutural proximo aparece como `review`.
+- Mencoes comuns a `anexo` dentro de frases nao aparecem como `hard_cut`.
+- Parenteses taquigraficos, como `(Soa a campainha.)`, `(Pausa.)` e
+  `(Intervencao fora do microfone.)`, aparecem como `keep`.
+- `amostra_ia_textos.jsonl` contem amostra deterministica de 0,1% por
+  `source/dataset/ano`, com minimo de 1 texto por estrato.
+- `amostra_ia_schema.json` exige resposta estruturada com acoes `hard_cut`,
+  `review` ou `keep`.
+
+Validar o caderno planejado:
+
+```text
+notebooks/processamento/inventario_separadores_colab.ipynb
+```
+
+Checks do notebook:
+
+- O JSON do notebook e valido.
+- Todas as celulas de codigo compilam com `ast.parse`.
+- O notebook monta o Drive antes de preparar o repositorio.
+- O notebook aponta para os Parquets completos do Drive.
+- O notebook executa apenas o inventario e a leitura dos relatorios.
+- O notebook nao executa coleta, normalizacao, geracao de Parquets nem escrita
+  fora de `processed/audits/separadores/{run_id}/`.
+
 ## Validacao dos cadernos exploratorios de Parquet
 
 Validar os cadernos:

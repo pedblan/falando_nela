@@ -29,6 +29,9 @@ Arquivos atuais:
 - `visualizador_parquets_gradio_colab.ipynb`: abre um web app Gradio read-only
   para navegar pelos Parquets do Drive no Colab, com fallback para samples
   locais quando executado fora do Colab.
+- `inventario_separadores_colab.ipynb`: inventaria separadores nos Parquets
+  completos do Drive, gera relatorios read-only e prepara amostra estruturada
+  para revisao por IA antes de qualquer limpeza do campo `texto`.
 
 Downloads de amostras gerados no Colab devem ser descompactados localmente em:
 
@@ -46,4 +49,11 @@ Para abrir o visualizador local contra os Parquets de samples:
 
 ```bash
 python -m processamento.visualizador_parquets --profile samples-local
+```
+
+Para testar localmente o inventario de separadores contra os Parquets de
+samples:
+
+```bash
+python -m processamento.inventario_separadores --profile samples-local --overwrite
 ```
