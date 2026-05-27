@@ -73,6 +73,19 @@ Localmente, contra os Parquets de samples:
 python -m processamento.visualizador_parquets --profile samples-local
 ```
 
+Para gerar arquivos Excel dos Parquets locais de samples:
+
+```bash
+python -m processamento.parquet_xlsx --profile samples-local --overwrite
+```
+
+A saida padrao fica em `data/samples/textos_parlamentares/v1/xlsx/`, com um
+`.xlsx` por Parquet e um `manifest.json`. Para gerar uma previa mais leve:
+
+```bash
+python -m processamento.parquet_xlsx --profile samples-local --max-rows 1000 --overwrite
+```
+
 ## Inventario de separadores
 
 Antes de limpar o campo `texto`, rode o inventario read-only de separadores nos

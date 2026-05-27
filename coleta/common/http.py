@@ -128,9 +128,11 @@ class OpenDataClient:
                 "content-length",
                 "content-type",
                 "date",
+                "deprecation",
                 "link",
                 "location",
                 "retry-after",
+                "sunset",
                 "x-total-count",
             }
         }

@@ -107,6 +107,7 @@ Para pareceres em PDF/HTML, `forma=documento` pode aparecer quando o arquivo ofi
 - `camara/plenario_discursos`: discursos por deputado na API da Camara.
 - `camara/ccjc_eventos`: eventos, participantes e metadados da CCJC da Camara.
 - `camara/pareceres_pec`: pareceres, pareceres vencedores, votos em separado e documentos equivalentes de PEC no Plenario, CCJC, historica CCJR e comissoes especiais de PEC da Camara.
+- `parlamentares`: metadados de deputados e senadores para juncao temporal com `textos_parlamentares/v1`.
 
 ## Execucao
 
@@ -155,6 +156,8 @@ Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_cc
 Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados em `metadata/`, paginas de discursos no JSONL mensal e a presenca de `transcricao` quando a API entregar texto.
 
 Para os fluxos especificos de pareceres de PEC, use `notebooks/coleta/coleta_senado_pareceres_pec.ipynb` e `notebooks/coleta/coleta_camara_pareceres_pec.ipynb`. Eles incluem validacao curta, inspecao dos campos canonicos de parecer e execucao completa retomavel.
+
+Para o fluxo transversal de metadados de parlamentares, use `notebooks/coleta/coleta_parlamentares.ipynb`. Ele valida a coleta curta no Drive, roda a coleta completa retomavel de Camara e Senado, chama o processamento `parlamentares/v1` e deixa celulas para auditoria de juncao com os Parquets de textos.
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 
