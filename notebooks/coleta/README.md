@@ -16,6 +16,7 @@ Convencoes:
 Arquivos atuais:
 
 - `coleta_template.ipynb`: template geral para rodar todos os coletores, incluindo pareceres de PEC.
+- `coleta_backfill_historico_colab.ipynb`: orquestrador Colab para backfill historico longo de todas as bases, com `run_id`s fixos, `--resume`, validacao curta, processamento, Parquets e samples.
 - `coleta_senado_plenario.ipynb`: fluxo especifico para validar e rodar a coleta do Plenario do Senado.
 - `coleta_senado_ccj.ipynb`: fluxo especifico para validar e rodar a coleta de notas da CCJ do Senado.
 - `coleta_senado_ccj_complemento.ipynb`: fluxo especifico para complementar lacunas de notas da CCJ do Senado ate 2024.

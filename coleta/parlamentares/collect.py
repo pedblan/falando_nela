@@ -37,6 +37,8 @@ class ParlamentaresRuntime:
     resume: bool
     run_id: str
     source: str
+    ids_from_textos_only: bool
+    textos_root: Path | None
 
 
 def collect(argv: Sequence[str] | None = None) -> None:
@@ -94,6 +96,16 @@ def collect(argv: Sequence[str] | None = None) -> None:
 def parse_args(argv: Sequence[str] | None = None) -> ParlamentaresRuntime:
     parser = build_parser("Coleta metadados de parlamentares da Camara e do Senado.")
     parser.add_argument("--source", choices=["camara", "senado", "all"], default="all")
+    parser.add_argument(
+        "--ids-from-textos-only",
+        action="store_true",
+        help="Baixa apenas parlamentares com parlamentar_id encontrado nos textos processados informados.",
+    )
+    parser.add_argument(
+        "--textos-root",
+        default=None,
+        help="Raiz de textos processed/textos_parlamentares/v1 ou de seus Parquets. Default tenta samples locais em dev.",
+    )
     args = parser.parse_args(argv)
 
     data_inicio = parse_iso_date(args.data_inicio)
@@ -125,38 +137,48 @@ def parse_args(argv: Sequence[str] | None = None) -> ParlamentaresRuntime:
         resume=bool(args.resume),
         run_id=args.run_id or f"parlamentares-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
         source=args.source,
+        ids_from_textos_only=bool(args.ids_from_textos_only),
+        textos_root=Path(args.textos_root).expanduser() if args.textos_root else None,
     )
 
 
 def collect_camara(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[str, Any]:
     periodo = _periodo(runtime)
     stats: Counter[str] = Counter()
-    discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, CAMARA_SOURCE))
+    if runtime.ids_from_textos_only:
+        textos_root = resolve_textos_root(runtime)
+        discovered_ids = discover_text_parlamentar_ids(textos_root, CAMARA_SOURCE)
+        stats["ids_from_textos_only"] = 1
+        stats["textos_root_exists"] = int(textos_root.exists())
+        stats["textos_root"] = textos_root.as_posix()
+    else:
+        discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, CAMARA_SOURCE))
 
     with OpenDataClient(CAMARA_BASE_URL) as client:
-        params = {
-            "dataInicio": runtime.data_inicio.isoformat(),
-            "dataFim": runtime.data_fim.isoformat(),
-            "itens": 100,
-            "ordem": "ASC",
-            "ordenarPor": "nome",
-        }
-        for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
-            source_id = f"camara:deputados:periodo:{runtime.data_inicio.isoformat()}:{runtime.data_fim.isoformat()}:pagina:{page_index}"
-            written = run.write_record(
-                partition="metadata",
-                source_id=source_id,
-                request={"method": "GET", "path": "api/v2/deputados", "params": params if page_index == 1 else {}},
-                response=page.response_metadata,
-                periodo=periodo,
-                payload=page.data,
-                record_type="camara_deputados_page",
-            )
-            stats["paginas_deputados"] += int(written)
-            discovered_ids.extend(_extract_camara_ids_from_page(page.data))
-            discovered_ids = _ordered_ids(discovered_ids)
-            if runtime.sample and runtime.sample_limit is not None and len(discovered_ids) >= runtime.sample_limit:
-                break
+        if not runtime.ids_from_textos_only:
+            params = {
+                "dataInicio": runtime.data_inicio.isoformat(),
+                "dataFim": runtime.data_fim.isoformat(),
+                "itens": 100,
+                "ordem": "ASC",
+                "ordenarPor": "nome",
+            }
+            for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
+                source_id = f"camara:deputados:periodo:{runtime.data_inicio.isoformat()}:{runtime.data_fim.isoformat()}:pagina:{page_index}"
+                written = run.write_record(
+                    partition="metadata",
+                    source_id=source_id,
+                    request={"method": "GET", "path": "api/v2/deputados", "params": params if page_index == 1 else {}},
+                    response=page.response_metadata,
+                    periodo=periodo,
+                    payload=page.data,
+                    record_type="camara_deputados_page",
+                )
+                stats["paginas_deputados"] += int(written)
+                discovered_ids.extend(_extract_camara_ids_from_page(page.data))
+                discovered_ids = _ordered_ids(discovered_ids)
+                if runtime.sample and runtime.sample_limit is not None and len(discovered_ids) >= runtime.sample_limit:
+                    break
 
         selected_ids = _limit_ids(discovered_ids, runtime)
         stats["ids_descobertos"] = len(discovered_ids)
@@ -232,11 +254,18 @@ def _collect_camara_endpoint(
 def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[str, Any]:
     periodo = _periodo(runtime)
     stats: Counter[str] = Counter()
-    discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, SENADO_SOURCE))
+    if runtime.ids_from_textos_only:
+        textos_root = resolve_textos_root(runtime)
+        discovered_ids = discover_text_parlamentar_ids(textos_root, SENADO_SOURCE)
+        stats["ids_from_textos_only"] = 1
+        stats["textos_root_exists"] = int(textos_root.exists())
+        stats["textos_root"] = textos_root.as_posix()
+    else:
+        discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, SENADO_SOURCE))
     legislaturas = legislaturas_for_period(runtime.data_inicio, runtime.data_fim)
 
     with OpenDataClient(SENADO_BASE_URL) as client:
-        if legislaturas:
+        if legislaturas and not runtime.ids_from_textos_only:
             inicio, fim = min(legislaturas), max(legislaturas)
             path = f"dadosabertos/senador/lista/legislatura/{inicio}/{fim}.json"
             source_id = f"senado:senadores:legislatura:{inicio}:{fim}"
@@ -253,19 +282,20 @@ def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
             stats["listas_legislatura"] += int(written)
             discovered_ids.extend(extract_senado_parlamentar_ids(result.data))
 
-        current_path = "dadosabertos/senador/lista/atual.json"
-        current_result = client.get_json(current_path)
-        written = run.write_record(
-            partition="metadata",
-            source_id="senado:senadores:atual",
-            request={"method": "GET", "path": current_path, "params": {}},
-            response=current_result.response_metadata,
-            periodo=periodo,
-            payload=current_result.data,
-            record_type="senado_parlamentares_atual",
-        )
-        stats["listas_atual"] += int(written)
-        discovered_ids.extend(extract_senado_parlamentar_ids(current_result.data))
+        if not runtime.ids_from_textos_only:
+            current_path = "dadosabertos/senador/lista/atual.json"
+            current_result = client.get_json(current_path)
+            written = run.write_record(
+                partition="metadata",
+                source_id="senado:senadores:atual",
+                request={"method": "GET", "path": current_path, "params": {}},
+                response=current_result.response_metadata,
+                periodo=periodo,
+                payload=current_result.data,
+                record_type="senado_parlamentares_atual",
+            )
+            stats["listas_atual"] += int(written)
+            discovered_ids.extend(extract_senado_parlamentar_ids(current_result.data))
 
         discovered_ids = _ordered_ids(discovered_ids)
         selected_ids = _limit_ids(discovered_ids, runtime)
@@ -359,6 +389,64 @@ def discover_existing_parlamentar_ids(data_root: Path, source: str) -> list[str]
                 if parlamentar_id:
                     ids.append(parlamentar_id)
     return _ordered_ids(ids)
+
+
+def resolve_textos_root(runtime: ParlamentaresRuntime) -> Path:
+    if runtime.textos_root is not None:
+        return runtime.textos_root
+    samples_root = Path("data/samples/textos_parlamentares/v1")
+    if runtime.mode == "dev" and samples_root.exists():
+        return samples_root
+    return runtime.output_dir / "processed" / "textos_parlamentares" / "v1"
+
+
+def discover_text_parlamentar_ids(textos_root: Path, source: str) -> list[str]:
+    ids: list[str] = []
+    if not textos_root.exists():
+        return ids
+
+    jsonl_paths = sorted(textos_root.rglob("*.jsonl"))
+    for path in jsonl_paths:
+        if "audits" in path.parts:
+            continue
+        for record in _iter_jsonl(path):
+            if record.get("source") != source:
+                continue
+            parlamentar_id = _string(record.get("parlamentar_id"))
+            if parlamentar_id:
+                ids.append(parlamentar_id)
+
+    for path in sorted(textos_root.rglob("*.parquet")):
+        ids.extend(_parquet_parlamentar_ids(path, source))
+    return _ordered_ids(ids)
+
+
+def _parquet_parlamentar_ids(path: Path, source: str) -> list[str]:
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        return []
+
+    try:
+        schema_names = set(pq.read_schema(path).names)
+    except Exception:
+        return []
+    if "source" not in schema_names or "parlamentar_id" not in schema_names:
+        return []
+
+    try:
+        table = pq.read_table(path, columns=["source", "parlamentar_id"])
+    except Exception:
+        return []
+
+    ids: list[str] = []
+    for row in table.to_pylist():
+        if row.get("source") != source:
+            continue
+        parlamentar_id = _string(row.get("parlamentar_id"))
+        if parlamentar_id:
+            ids.append(parlamentar_id)
+    return ids
 
 
 def _ids_from_raw_record(record: dict[str, Any], source: str) -> list[str]:

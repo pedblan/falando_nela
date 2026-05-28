@@ -4,7 +4,10 @@ import json
 from datetime import date
 from pathlib import Path
 
+from processamento.normalizacao import DATASET_VERSION, PROCESSED_FIELDS
+from processamento.parlamentares import write_parquet_table
 from coleta.parlamentares.collect import (
+    discover_text_parlamentar_ids,
     discover_existing_parlamentar_ids,
     extract_senado_parlamentar_ids,
     legislaturas_for_period,
@@ -59,6 +62,47 @@ def test_discover_existing_parlamentar_ids_uses_official_ids_only(tmp_path: Path
     assert discover_existing_parlamentar_ids(tmp_path, "camara") == ["204379", "204380"]
 
 
+def test_discover_text_parlamentar_ids_reads_jsonl_and_parquet_samples(tmp_path: Path) -> None:
+    textos_root = tmp_path / "samples" / "textos_parlamentares" / "v1"
+    _write_jsonl(
+        textos_root / "ano=2026" / "mes=05" / "sample.jsonl",
+        [
+            {"source": "camara", "parlamentar_id": "204379"},
+            {"source": "senado", "parlamentar_id": "5672"},
+            {"source": "camara", "parlamentar_id": None},
+        ],
+    )
+    write_parquet_table(
+        textos_root / "parquet" / "camara__plenario_discursos.parquet",
+        [
+            _processed_row("camara", "204380"),
+            _processed_row("senado", "5000"),
+        ],
+        PROCESSED_FIELDS,
+    )
+
+    assert discover_text_parlamentar_ids(textos_root, "camara") == ["204379", "204380"]
+    assert discover_text_parlamentar_ids(textos_root, "senado") == ["5000", "5672"]
+
+
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
+
+
+def _processed_row(source: str, parlamentar_id: str) -> dict[str, object]:
+    row = {field: None for field in PROCESSED_FIELDS}
+    row.update(
+        {
+            "texto_id": f"{source}:{parlamentar_id}:texto",
+            "dataset_version": DATASET_VERSION,
+            "source": source,
+            "dataset": "plenario_discursos",
+            "documento_tipo": "discurso",
+            "data": "2026-05-01",
+            "ano": "2026",
+            "parlamentar_id": parlamentar_id,
+            "texto": "Texto",
+        }
+    )
+    return row
