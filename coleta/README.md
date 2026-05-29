@@ -160,7 +160,7 @@ python -m coleta.senado.pareceres_pec.collect --mode dev --sample-limit 2 --run-
 python -m coleta.camara.pareceres_pec.collect --mode dev --sample-limit 2 --run-id smoke-camara-pareceres-pec
 ```
 
-Exemplos previstos para apartes, quando os coletores forem implementados:
+Exemplos para apartes:
 
 ```bash
 python -m coleta.senado.plenario_apartes.collect --mode dev --sample-limit 5 --run-id smoke-senado-apartes
