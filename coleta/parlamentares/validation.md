@@ -130,6 +130,20 @@ Checks obrigatorios:
 - A distribuicao de genero e calculada apenas para textos com match valido.
 - A auditoria reporta cobertura por `source/dataset/documento_tipo/ano`.
 
+## Validacao de juncao com apartes
+
+Depois de gerar `apartes_parlamentares/v1`, a auditoria desse processamento
+deve confirmar:
+
+- `aparteante_genero`, `aparteante_partido` e `aparteante_uf` vieram de
+  `parlamentares_periodos` ou ficaram nulos quando nao houve match.
+- `orador_genero`, `orador_partido` e `orador_uf` seguem a mesma regra.
+- Nenhum genero foi inferido por nome.
+- Casos da Camara sem ID oficial aparecem como `name_only` ou `ambiguous`.
+- A cobertura de match e reportada separadamente para oradores e aparteantes.
+- As contagens anuais por genero, partido e UF usam somente linhas com match
+  valido quando o agrupamento exigir atributo parlamentar.
+
 ## Validacao da integracao com atualizacao
 
 - O roteiro de atualizacao deve incluir `coleta.parlamentares.collect` e

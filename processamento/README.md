@@ -18,6 +18,31 @@ A saida e gravada em `processed/textos_parlamentares/v1`, com um manifest em
 Para uma descricao analitica das bases processadas, use
 `notebooks/processamento/descricao_analitica_bases_colab.ipynb`.
 
+## Apartes parlamentares
+
+`apartes_parlamentares/v1` e uma tabela relacional separada de
+`textos_parlamentares/v1`. Ela conta relacoes oficiais
+`aparteante -> discurso/pronunciamento` por ano e cruza essas relacoes com
+`parlamentares/v1` para atributos como genero, partido e UF.
+
+Quando implementado, o processamento deve ler:
+
+```text
+raw/senado/plenario_apartes/metadata/
+raw/camara/plenario_apartes/metadata/
+processed/parlamentares/v1/
+```
+
+e gerar:
+
+```text
+processed/apartes_parlamentares/v1/parquet/apartes_parlamentares.parquet
+processed/audits/apartes_parlamentares/{run_id}/
+```
+
+O texto individual do aparte fica fora do escopo inicial, e genero nunca deve
+ser inferido por nome.
+
 ## Parquets por base
 
 Depois de existir JSONL processado, gere um Parquet unificado por

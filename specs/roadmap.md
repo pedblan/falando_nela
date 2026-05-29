@@ -22,6 +22,10 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Executar coletas longas com retries, checkpoints e logs.
 - Permitir retomada segura de execucoes interrompidas.
 - Evitar duplicacao de registros entre execucoes.
+- Descarregar metadados oficiais de apartes em Plenario como base raw
+  separada, antes mesmo do backfill historico completo de discursos, porque
+  esses registros nao dependem de texto integral para a primeira analise
+  relacional.
 - Orquestrar backfill historico de todas as bases existentes com `run_id`s
   fixos, `--resume`, validacao curta e inspecao de manifests antes do
   processamento.
@@ -32,6 +36,10 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 
 - Consolidar dados brutos em camada `raw`.
 - Criar camada `processed` com campos normalizados entre Senado, Congresso e Camara.
+- Criar `apartes_parlamentares/v1` como tabela relacional independente de
+  `textos_parlamentares/v1`, voltada a contagens anuais de relacoes
+  `aparteante -> discurso/pronunciamento` e cruzamento com
+  `parlamentares/v1`.
 - Inventariar separadores no corpus completo antes de cortar texto integral,
   usando os Parquets completos do Drive como fonte principal de auditoria.
 - Diagnosticar separadores especificamente nos discursos historicos anteriores a

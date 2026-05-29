@@ -50,6 +50,10 @@ export FALANDO_NELA_DATA_ROOT=/content/drive/MyDrive/falando_nela/data
 
 Regra operacional: respostas de lista ou descoberta nao devem ser misturadas ao JSONL mensal do corpus textual. Esses payloads podem ser grandes e sao preservados em `metadata/` para auditoria, enquanto `ano=YYYY/mes=MM/` fica reservado a registros como `pronunciamento_texto`.
 
+Bases metadata-only, como `plenario_apartes` e `parlamentares`, nao produzem
+particoes mensais de corpus. Elas gravam tudo em `metadata/` e alimentam
+tabelas relacionais processadas.
+
 ## Envelope bruto
 
 Cada linha JSONL preserva:
@@ -98,13 +102,31 @@ Registros em `transcription_queue` nao devem ser usados como texto analitico ate
 
 Para pareceres em PDF/HTML, `forma=documento` pode aparecer quando o arquivo oficial foi localizado, mas a extracao textual ainda nao produziu texto. Esses casos devem ser tratados em etapa futura de OCR ou revisao documental, sem substituir silenciosamente documentos ja extraidos.
 
+## Metadados relacionais
+
+Algumas bases nao sao corpus textual, mas relacionam textos, eventos e
+parlamentares.
+
+`plenario_apartes` registra relacoes oficiais `aparteante -> discurso` ou
+`aparteante -> pronunciamento`. A coleta preserva os payloads oficiais em
+`metadata/` e o processamento posterior gera `apartes_parlamentares/v1` para
+contagens anuais por genero, partido e UF usando `parlamentares/v1`.
+
+O texto individual do aparte fica fora do escopo inicial. O coletor nao deve
+inferir genero, partido ou UF por nome; esses atributos entram apenas na
+normalizacao relacional via metadados oficiais de parlamentares.
+
 ## Tarefas
 
 - `senado/plenario_discursos`: discursos do Plenario do Senado (`siglaCasa=SF`).
+- `senado/plenario_apartes`: metadados de apartes no Plenario do Senado,
+  gravados somente em `metadata/`.
 - `senado/congresso_discursos`: discursos do Plenario do Congresso (`siglaCasa=CN`).
 - `senado/ccj_notas`: agenda, detalhes e notas taquigraficas da CCJ do Senado.
 - `senado/pareceres_pec`: pareceres, relatorios, avulsos de parecer e relatorios do vencido de PEC no Plenario e na CCJ do Senado.
 - `camara/plenario_discursos`: discursos por deputado na API da Camara.
+- `camara/plenario_apartes`: metadados de apartes no Plenario da Camara via
+  Banco de Discursos/Sitaq, gravados somente em `metadata/`.
 - `camara/ccjc_eventos`: eventos, participantes e metadados da CCJC da Camara.
 - `camara/pareceres_pec`: pareceres, pareceres vencedores, votos em separado e documentos equivalentes de PEC no Plenario, CCJC, historica CCJR e comissoes especiais de PEC da Camara.
 - `parlamentares`: metadados de deputados e senadores para juncao temporal com `textos_parlamentares/v1`.
@@ -128,6 +150,13 @@ Exemplos para pareceres de PEC:
 ```bash
 python -m coleta.senado.pareceres_pec.collect --mode dev --sample-limit 2 --run-id smoke-senado-pareceres-pec
 python -m coleta.camara.pareceres_pec.collect --mode dev --sample-limit 2 --run-id smoke-camara-pareceres-pec
+```
+
+Exemplos previstos para apartes, quando os coletores forem implementados:
+
+```bash
+python -m coleta.senado.plenario_apartes.collect --mode dev --sample-limit 5 --run-id smoke-senado-apartes
+python -m coleta.camara.plenario_apartes.collect --mode dev --sample-limit 5 --run-id smoke-camara-apartes
 ```
 
 Todos os scripts aceitam:
@@ -154,6 +183,14 @@ Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_sena
 Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
 
 Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados em `metadata/`, paginas de discursos no JSONL mensal e a presenca de `transcricao` quando a API entregar texto.
+
+Para apartes de Plenario, use
+`notebooks/coleta/coleta_senado_plenario_apartes.ipynb` e
+`notebooks/coleta/coleta_camara_plenario_apartes.ipynb`. Esses cadernos
+orquestram os coletores metadata-only `senado/plenario_apartes` e
+`camara/plenario_apartes`, que podem rodar antes do backfill historico de
+discursos porque o primeiro objetivo e contar relacoes oficiais de aparte por
+ano e cruzar com `parlamentares/v1`.
 
 Para os fluxos especificos de pareceres de PEC, use `notebooks/coleta/coleta_senado_pareceres_pec.ipynb` e `notebooks/coleta/coleta_camara_pareceres_pec.ipynb`. Eles incluem validacao curta, inspecao dos campos canonicos de parecer e execucao completa retomavel.
 

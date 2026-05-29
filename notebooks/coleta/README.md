@@ -25,3 +25,8 @@ Arquivos atuais:
 - `coleta_camara_ccjc.ipynb`: fluxo especifico para validar e rodar a coleta de eventos e notas da CCJC da Camara via Escriba.
 - `coleta_camara_pareceres_pec.ipynb`: fluxo especifico para validar e rodar a coleta de pareceres, votos em separado e pareceres vencedores de PEC na Camara.
 - `coleta_parlamentares.ipynb`: fluxo transversal para validar, coletar e processar metadados de deputados e senadores para juncao com os textos parlamentares.
+- `coleta_senado_plenario_apartes.ipynb`: fluxo metadata-only para apartes do Plenario do Senado.
+- `coleta_camara_plenario_apartes.ipynb`: fluxo metadata-only para apartes do Plenario da Camara via Banco de Discursos/Sitaq.
+
+Os notebooks de apartes podem rodar antes do backfill historico completo de
+discursos, desde que usem `run_id`s distintos e gravem apenas em `metadata/`.

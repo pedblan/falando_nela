@@ -5,7 +5,8 @@
 Baixar, versionar e normalizar metadados oficiais de deputados e senadores para
 que o corpus `textos_parlamentares/v1` possa ser correlacionado a atributos de
 parlamentares, especialmente genero/sexo informado pela fonte, partido, UF,
-legislatura e periodos de mandato.
+legislatura e periodos de mandato. A mesma dimensao deve atender bases
+relacionais como `apartes_parlamentares/v1`.
 
 ## Parametros
 
@@ -183,6 +184,20 @@ valores nulos para campos indisponiveis em uma casa.
   de textos como fonte primaria:
   `processed/textos_parlamentares_enriquecidos/v1/parquet/`.
 
+## Juncao com apartes parlamentares
+
+- `apartes_parlamentares/v1` deve usar `parlamentares_periodos` como fonte
+  oficial de genero, partido, UF, cargo e legislatura por data.
+- O match preferencial usa `source`, `parlamentar_id` e data.
+- Quando o raw da Camara tiver somente nome de aparteante, a reconciliacao por
+  nome deve ocorrer no processamento de apartes, nao no coletor.
+- Matches por nome devem registrar status explicito:
+  `matched`, `name_only` ou `ambiguous`.
+- Nenhum campo de genero em apartes pode ser inferido por nome, tratamento,
+  pronome, foto ou texto.
+- A auditoria de apartes deve reportar cobertura de match para oradores e
+  aparteantes separadamente.
+
 ## Integracao com atualizacao
 
 Depois de uma atualizacao temporal de qualquer base textual:
@@ -196,6 +211,16 @@ Depois de uma atualizacao temporal de qualquer base textual:
 6. Rodar a auditoria de juncao entre textos e `parlamentares_periodos`.
 7. Gerar amostras locais incluindo Parquets de textos e de parlamentares.
 
+Depois de uma atualizacao de apartes:
+
+1. Rodar os coletores raw `senado/plenario_apartes` e/ou
+   `camara/plenario_apartes`.
+2. Rodar `coleta.parlamentares.collect` se houver novos IDs ou nomes sem
+   cobertura suficiente.
+3. Rodar `processamento.parlamentares`.
+4. Rodar `processamento.apartes_parlamentares`.
+5. Revisar `contagens_anuais.csv`, `match_status.csv` e cobertura por casa.
+
 ## Integracao com expansao
 
 Ao adicionar nova base textual:
@@ -206,6 +231,13 @@ Ao adicionar nova base textual:
 - validar cobertura contra `parlamentares/v1`;
 - documentar excecoes quando a unidade textual nao tiver autoria parlamentar
   individual, como notas de reuniao sem orador segmentado.
+
+Ao adicionar uma base relacional parlamentar, como apartes:
+
+- registrar qual campo oficial identifica cada participante;
+- preservar nomes brutos quando o ID oficial nao existir;
+- fazer reconciliacao por nome apenas em processamento auditavel;
+- usar `parlamentares/v1` como unica fonte de genero normalizado.
 
 ## Limites
 

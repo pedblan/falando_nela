@@ -5,7 +5,9 @@
 Criar um modulo transversal para baixar metadados oficiais de parlamentares da
 Camara dos Deputados e do Senado Federal no mesmo periodo dos bancos de textos,
 permitindo correlacionar discursos, notas e pareceres com atributos como
-genero, sexo informado pela fonte, partido, UF, mandato e legislatura.
+genero, sexo informado pela fonte, partido, UF, mandato e legislatura. A mesma
+dimensao tambem deve servir a bases relacionais, como
+`apartes_parlamentares/v1`.
 
 O periodo baseline do projeto continua sendo `2011-05-18` a `2026-05-18`.
 Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
@@ -52,6 +54,9 @@ Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
   `processed/parlamentares/v1`.
 - Gerar uma tabela de intervalos pronta para juncao temporal com
   `textos_parlamentares/v1`.
+- Gerar metadados suficientes para juncao temporal de bases relacionais, como
+  `apartes_parlamentares/v1`, sem exigir que exista texto integral associado ao
+  registro.
 - Produzir auditoria de cobertura da juncao entre textos e metadados de
   parlamentares.
 
@@ -108,6 +113,18 @@ Criar o dataset processado `parlamentares/v1`:
   para preencher genero. A fonte de verdade para genero/sexo fica em
   `parlamentares/v1`.
 
+## Juncao com apartes
+
+- `apartes_parlamentares/v1` deve usar `parlamentares_periodos` para preencher
+  `aparteante_genero`, `aparteante_partido`, `aparteante_uf`,
+  `orador_genero`, `orador_partido` e `orador_uf`.
+- Quando o raw de apartes trouxer ID oficial, a juncao deve usar `source`,
+  `parlamentar_id` e `data`.
+- Quando a Camara trouxer somente nome do aparteante, a reconciliacao por nome
+  deve ser uma etapa explicita do processamento de apartes, registrando
+  `matched`, `name_only` ou `ambiguous`.
+- Genero nunca deve ser inferido a partir do nome do aparteante ou do orador.
+
 ## Integracao operacional
 
 - Manter o caderno Colab `notebooks/coleta/coleta_parlamentares.ipynb` como
@@ -122,6 +139,9 @@ Criar o dataset processado `parlamentares/v1`:
   `parlamentar_uf` e `parlamentar_cargo` quando esses dados estiverem no
   proprio payload, mas a analise de genero deve usar a dimensao
   `parlamentares/v1`.
+- A normalizacao de apartes deve usar a mesma dimensao `parlamentares/v1` para
+  genero, partido e UF por data, preservando nomes sem match automatico quando
+  a fonte nao trouxer ID oficial.
 - Amostras locais devem incluir amostras ou Parquets pequenos de
   `parlamentares/v1`, suficientes para validar joins em notebooks locais.
 
