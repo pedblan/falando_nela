@@ -4,6 +4,9 @@
 
 Criar uma etapa read-only para inventariar separadores e marcas editoriais nos
 textos parlamentares antes de implementar corte automatico no campo `texto`.
+O backfill historico exige uma subauditoria dos discursos antigos, porque
+marcas de separacao anteriores a 2010 podem seguir padroes diferentes dos
+registros recentes.
 
 ## Etapa 1: CLI de inventario
 
@@ -63,7 +66,25 @@ notebooks/processamento/inventario_separadores_colab.ipynb
 - O caderno nao deve executar coleta, normalizacao, geracao de Parquets nem
   alteracao do schema processado.
 
-## Etapa 5: decisao posterior
+## Etapa 5: diagnostico historico de discursos
+
+- Criar:
+
+```text
+notebooks/processamento/diagnostico_separadores_discursos_antigos_colab.ipynb
+```
+
+- O caderno deve ler os Parquets completos do Drive, filtrar por
+  `senado/plenario_discursos`, `senado/congresso_discursos` e
+  `camara/plenario_discursos`, usar `ano <= 2009` como faixa historica
+  principal e incluir `2010-2012` como referencia comparativa curta.
+- Gerar relatorios em `processed/audits/separadores_antigos/{run_id}/` com
+  cobertura anual, resumo de separadores, exemplos com contexto e resumo de
+  marcas parenteticas.
+- Nao executar coleta, normalizacao, Parquet, limpeza textual nem alteracao do
+  schema processado.
+
+## Etapa 6: decisao posterior
 
 - Revisar os relatorios antes de criar regras de limpeza.
 - Usar a amostra de IA como apoio de auditoria, nao como regra automatica.

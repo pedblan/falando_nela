@@ -90,3 +90,25 @@ Checks:
 - O notebook executa apenas o inventario e leitura de relatorios.
 - O notebook nao executa coleta, normalizacao, geracao de Parquets nem escrita
   fora de `processed/audits/separadores/{run_id}/`.
+
+## Validacao do diagnostico historico
+
+Validar:
+
+```text
+notebooks/processamento/diagnostico_separadores_discursos_antigos_colab.ipynb
+```
+
+Checks:
+
+- O JSON do notebook e valido.
+- Todas as celulas de codigo compilam com `ast.parse`.
+- O notebook monta o Drive antes de preparar o repositorio.
+- O notebook aponta para os Parquets completos do Drive.
+- O filtro default inclui apenas discursos de Plenario/Congresso, com faixa
+  historica anterior a 2010 e faixa comparativa `2010-2012`.
+- A escrita fica restrita a
+  `processed/audits/separadores_antigos/{run_id}/`.
+- A saida esperada inclui `cobertura_discursos_antigos.csv`,
+  `separadores_antigos_resumo.csv`, `separadores_antigos_exemplos.jsonl`,
+  `parenteticos_antigos_resumo.csv` e `manifest.json`.

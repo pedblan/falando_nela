@@ -4,17 +4,26 @@ O `falando_nela` e um projeto de pesquisa computacional dedicado a analisar empi
 
 O objetivo primario e estudar como temas constitucionais aparecem, circulam e sao disputados em pronunciamentos, debates e registros parlamentares, com foco na construcao de dados rastreaveis e analises reprodutiveis.
 
-## Escopo inicial
+## Escopo de coleta
 
-As fontes-alvo iniciais sao:
+As fontes-alvo sao:
 
 - Plenario do Senado Federal.
 - Plenario do Congresso Nacional.
 - Plenario da Camara dos Deputados.
 - Comissao de Constituicao, Justica e Cidadania do Senado Federal.
 - Comissao de Constituicao e Justica e de Cidadania da Camara dos Deputados.
+- Pareceres, relatorios e documentos equivalentes de PEC no Senado Federal e
+  na Camara dos Deputados.
+- Metadados de parlamentares necessarios para juncao temporal com os textos.
 
-A janela inicial de coleta cobre os ultimos quinze anos, usando como baseline o periodo de `2011-05-18` a `2026-05-18`. Esse intervalo deve ser parametrizavel em implementacoes futuras.
+A diretriz de coleta e maximizar a cobertura historica auditavel: cada fonte
+deve ser consultada ate a data mais antiga em que a fonte oficial entregue dados
+uteis, preservando lacunas, falhas e mudancas de formato como metadados de
+proveniencia. Para analises substantivas, o recorte `2010-01-01` em diante e o
+default recomendado, porque a qualidade e a regularidade dos dados anteriores a
+2010 tendem a ser piores. Dados anteriores a 2010 podem entrar no corpus, mas
+devem ser marcados como historicos e de menor confianca.
 
 ## Principios
 
@@ -25,3 +34,6 @@ A janela inicial de coleta cobre os ultimos quinze anos, usando como baseline o 
 - Separacao entre metadados e corpus: respostas de lista, descoberta e contexto devem ser preservadas em area propria de `metadata`, sem inflar os arquivos mensais de registros textuais.
 - Versionamento por specs: mudancas relevantes de escopo, metodo, dados e tecnologia devem ser registradas em especificacoes antes da implementacao.
 - Execucao adequada ao ambiente: testes locais devem ser leves e usar apenas uma parcela estratificada dos dados; coletas longas devem ser preparadas para execucao confiavel no Google Colab.
+- Specs sempre atualizadas: novos notebooks operacionais, mudancas de janela
+  historica, criterios de qualidade e regras de limpeza textual devem atualizar
+  as specs correspondentes no mesmo ciclo de trabalho.

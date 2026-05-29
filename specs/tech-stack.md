@@ -6,7 +6,9 @@ O projeto sera construido de forma incremental, com prioridade para ferramentas 
 
 - Python 3.11+ como linguagem principal.
 - Jupyter Notebook para exploracao, prototipos e cadernos analiticos.
-- Google Colab Pro para tarefas longas, especialmente coletas completas que dependam de conexoes prolongadas.
+- Google Colab Pro para tarefas longas, especialmente coletas completas,
+  backfills historicos, geracao de Parquets e auditorias read-only sobre bases
+  completas.
 - Ambiente local usado apenas para prototipos leves, validacao de contratos de dados e uma parcela estratificada dos dados, evitando ocupar espaco com a coleta completa.
 
 ## Coleta
@@ -18,6 +20,9 @@ O cliente HTTP padrao para o modulo de coleta sera `httpx`, tanto nos prototipos
 Quando implementado, o modulo de coleta deve prever:
 
 - Parametros explicitos de fonte, periodo e escopo.
+- Janelas historicas longas com retomada, manifests e criterios de qualidade
+  temporal, sem assumir que dados anteriores a 2010 tem a mesma confiabilidade
+  analitica dos dados recentes.
 - Transferencia prioritaria de texto integral de discurso, sessao ou reuniao, quando a fonte oficial disponibilizar esse conteudo.
 - Paginacao nos endpoints que exigirem.
 - Retries para falhas temporarias.
@@ -30,6 +35,9 @@ O armazenamento sera definido por camadas:
 
 - `raw`: respostas ou registros preservados com o minimo de transformacao possivel.
 - `processed`: dados normalizados para analise, unificacao de fontes e criacao de cadernos.
+- `processed/audits`: relatorios read-only derivados de `processed`, como
+  inventarios de separadores e diagnosticos historicos, sem alterar Parquets ou
+  schemas analiticos.
 
 Dentro de `raw`, o corpus textual e os metadados de descoberta devem ficar separados:
 
@@ -50,5 +58,8 @@ A maquina local deve manter apenas uma amostra estratificada suficiente para des
 - pandas ou Polars para manipulacao tabular, conforme tamanho dos dados e ergonomia da etapa.
 - Altair como biblioteca principal de visualizacao estatistica.
 - Metodos estatisticos e NLP serao adicionados por specs especificas, de acordo com os cadernos por artigo constitucional.
+- Auditorias metodologicas, como diagnostico de separadores em discursos
+  antigos, devem usar Parquets completos no Drive como entrada primaria e gravar
+  apenas artefatos derivados em `processed/audits/`.
 
 Nenhuma dependencia operacional fica fixada nesta spec inicial; a lista de pacotes deve ser criada apenas quando houver codigo ou notebooks correspondentes.

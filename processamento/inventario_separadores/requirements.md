@@ -6,6 +6,11 @@ Inventariar separadores, anexos e marcas editoriais nos textos parlamentares
 processados, sem alterar o corpus, para orientar uma etapa posterior de limpeza
 auditavel do texto integral.
 
+O inventario tambem deve suportar diagnostico especifico dos discursos antigos,
+especialmente registros anteriores a `2010-01-01`, porque o backfill historico
+pode trazer marcas editoriais e separadores diferentes dos observados no
+baseline recente.
+
 ## Entrada
 
 - Fonte principal em producao:
@@ -45,6 +50,20 @@ data/samples/textos_parlamentares/v1/audits/separadores/{run_id}/
   - `amostra_ia_prompt.md`;
   - `amostra_ia_schema.json`;
   - `manifest.json`.
+
+Para diagnostico de discursos antigos, os relatorios derivados devem ficar em:
+
+```text
+/content/drive/MyDrive/falando_nela/data/processed/audits/separadores_antigos/{run_id}/
+```
+
+Arquivos esperados:
+
+- `cobertura_discursos_antigos.csv`;
+- `separadores_antigos_resumo.csv`;
+- `separadores_antigos_exemplos.jsonl`;
+- `parenteticos_antigos_resumo.csv`;
+- `manifest.json`.
 
 ## Classificacao
 
@@ -126,3 +145,15 @@ notebooks/processamento/inventario_separadores_colab.ipynb
 O notebook deve montar o Drive, preparar o repositorio, instalar dependencias,
 conferir Parquets, executar o CLI, abrir os relatorios e deixar claro que a
 etapa e read-only.
+
+Manter tambem o notebook:
+
+```text
+notebooks/processamento/diagnostico_separadores_discursos_antigos_colab.ipynb
+```
+
+Esse caderno deve focar `senado/plenario_discursos`,
+`senado/congresso_discursos` e `camara/plenario_discursos`, filtrar por anos
+anteriores a 2010 como faixa principal, incluir `2010-2012` como referencia
+comparativa curta, comparar cobertura por ano e salvar exemplos com contexto
+para revisao manual dos separadores historicos.

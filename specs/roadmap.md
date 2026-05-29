@@ -22,6 +22,11 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Executar coletas longas com retries, checkpoints e logs.
 - Permitir retomada segura de execucoes interrompidas.
 - Evitar duplicacao de registros entre execucoes.
+- Orquestrar backfill historico de todas as bases existentes com `run_id`s
+  fixos, `--resume`, validacao curta e inspecao de manifests antes do
+  processamento.
+- Registrar separadamente cobertura historica maxima e recorte analitico
+  recomendado `2010-01-01` em diante.
 
 ## Fase 3: normalizacao e armazenamento
 
@@ -29,6 +34,9 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Criar camada `processed` com campos normalizados entre Senado, Congresso e Camara.
 - Inventariar separadores no corpus completo antes de cortar texto integral,
   usando os Parquets completos do Drive como fonte principal de auditoria.
+- Diagnosticar separadores especificamente nos discursos historicos anteriores a
+  2010, comparando por fonte, dataset e ano antes de promover qualquer regra de
+  corte automatico.
 - Criar modulo de processamento do texto integral para separar, de forma
   auditavel, o corpo analitico de discursos e notas de anexos, artigos citados,
   expedientes e outros blocos editoriais agregados pela fonte oficial.
@@ -48,3 +56,6 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Documentar limitacoes de cobertura, vieses de fonte e decisoes metodologicas.
 - Preparar releases de datasets e resultados analiticos quando apropriado.
 - Atualizar specs sempre que escopo, metodo ou stack mudarem de forma relevante.
+- Tratar specs desatualizadas como bloqueio metodologico: cadernos, coletores e
+  processamento novos devem ser acompanhados pela spec que descreve objetivo,
+  entradas, saidas e validacao.

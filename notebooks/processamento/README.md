@@ -32,6 +32,9 @@ Arquivos atuais:
 - `inventario_separadores_colab.ipynb`: inventaria separadores nos Parquets
   completos do Drive, gera relatorios read-only e prepara amostra estruturada
   para revisao por IA antes de qualquer limpeza do campo `texto`.
+- `diagnostico_separadores_discursos_antigos_colab.ipynb`: diagnostica marcas
+  de separacao em discursos antigos, com foco em anos anteriores a 2010 e
+  comparacao curta com 2010-2012.
 
 Downloads de amostras gerados no Colab devem ser descompactados localmente em:
 
