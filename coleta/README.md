@@ -5,6 +5,14 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
 ## Convencoes comuns
 
 - Periodo baseline: `2011-05-18` a `2026-05-18`.
+- Para apartes de Plenario, a coleta de producao deve tentar a cobertura
+  historica maxima da fonte oficial, alinhada ao backfill historico do projeto,
+  usando `1900-01-01` como inicio amplo quando a fonte aceitar a janela;
+  lacunas ou anos sem retorno devem ficar preservados em manifests/logs.
+- Para analises substantivas, o recorte recomendado continua sendo
+  `2010-01-01` em diante, inclusive para apartes. Dados anteriores podem ser
+  coletados para auditoria historica, mas devem ser tratados como cobertura de
+  qualidade potencialmente desigual.
 - Cliente HTTP: `httpx`, com `Accept: application/json`, retries e respeito a `Retry-After`.
 - Execucao local: usar `--mode dev`, que grava em `data/dev` e usa amostra por default.
 - Execucao de producao: usar `--mode prod`, preferencialmente no Google Colab com Drive montado.
@@ -189,8 +197,10 @@ Para apartes de Plenario, use
 `notebooks/coleta/coleta_camara_plenario_apartes.ipynb`. Esses cadernos
 orquestram os coletores metadata-only `senado/plenario_apartes` e
 `camara/plenario_apartes`, que podem rodar antes do backfill historico de
-discursos porque o primeiro objetivo e contar relacoes oficiais de aparte por
-ano e cruzar com `parlamentares/v1`.
+discursos. A janela de producao dos cadernos comeca em `1900-01-01` para
+alinhar com o backfill historico e maximizar a cobertura oficial, mas o
+recorte analitico recomendado e `2010-01-01` em diante. O primeiro objetivo e
+contar relacoes oficiais de aparte por ano e cruzar com `parlamentares/v1`.
 
 Para os fluxos especificos de pareceres de PEC, use `notebooks/coleta/coleta_senado_pareceres_pec.ipynb` e `notebooks/coleta/coleta_camara_pareceres_pec.ipynb`. Eles incluem validacao curta, inspecao dos campos canonicos de parecer e execucao completa retomavel.
 

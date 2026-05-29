@@ -76,6 +76,10 @@ textual.
 - `dev`: usa amostra, grava em `data/dev` e limita a poucos nomes/janelas.
 - `prod`: coleta completa, exige destino externo via `--output-dir` ou
   `FALANDO_NELA_DATA_ROOT`.
+- A janela de producao recomendada tenta maximizar a cobertura historica com
+  `--data-inicio 1900-01-01`, preservando lacunas ou anos sem retorno como
+  metadados de cobertura. Para analise substantiva, o recorte recomendado e
+  `2010-01-01` em diante.
 - O `run_id` recomendado para producao e especifico do dataset, por exemplo
   `prod-camara-plenario-apartes`.
 
