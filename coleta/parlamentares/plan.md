@@ -8,6 +8,10 @@ permitindo correlacionar discursos, notas e pareceres com atributos como
 genero, sexo informado pela fonte, partido, UF, mandato e legislatura. A mesma
 dimensao tambem deve servir a bases relacionais, como
 `apartes_parlamentares/v1`.
+Ela tambem serve como insumo operacional para reduzir o fan-out de coletores
+historicos: `camara/plenario_discursos` e `camara/plenario_apartes` podem usar
+`parlamentares_periodos` para consultar apenas deputados com mandato vigente em
+cada ano.
 
 O periodo baseline do projeto continua sendo `2011-05-18` a `2026-05-18`.
 Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
@@ -57,6 +61,9 @@ Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
 - Gerar metadados suficientes para juncao temporal de bases relacionais, como
   `apartes_parlamentares/v1`, sem exigir que exista texto integral associado ao
   registro.
+- Disponibilizar `parlamentares_periodos` cedo no backfill historico, antes dos
+  coletores lentos da Camara, para guiar buscas por mandato e evitar anos em
+  que o parlamentar nao estava em exercicio.
 - Produzir auditoria de cobertura da juncao entre textos e metadados de
   parlamentares.
 
@@ -144,6 +151,10 @@ Criar o dataset processado `parlamentares/v1`:
   a fonte nao trouxer ID oficial.
 - Amostras locais devem incluir amostras ou Parquets pequenos de
   `parlamentares/v1`, suficientes para validar joins em notebooks locais.
+- No backfill historico amplo, `coleta.parlamentares.collect` e
+  `processamento.parlamentares` devem rodar antes de
+  `camara/plenario_discursos` e `camara/plenario_apartes` quando o objetivo for
+  reduzir requisicoes vazias por deputado/ano.
 
 ## Dev e producao
 

@@ -26,6 +26,13 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
   do corpus em `ano=YYYY/mes=MM/`. Em `camara/plenario_discursos`, o coletor
   usa preflight anual e trimestral em `metadata/`; apenas meses positivos sao
   paginados e gravados como corpus textual.
+- Para `camara/plenario_discursos` e `camara/plenario_apartes`, quando
+  `processed/parlamentares/v1` existir no mesmo `data_root`, os coletores usam
+  `parlamentares_periodos` como plano de mandato: consultam somente deputados
+  cujo mandato intercepta o ano e clipam a janela ao intervalo efetivo. A
+  descoberta ampla via `/api/v2/deputados` fica como fallback. Em coleta
+  completa, uma tabela pequena demais e tratada como amostra insuficiente, para
+  evitar pular deputados por engano.
 - Para analises substantivas, o recorte recomendado continua sendo
   `2010-01-01` em diante, inclusive para apartes. Dados anteriores podem ser
   coletados para auditoria historica, mas devem ser tratados como cobertura de
@@ -143,6 +150,12 @@ periodos vazios sem mudar o raw: quando o trimestre tem retorno, a coleta abre
 os meses para manter janelas menores e cada resposta oficial continua em
 `metadata/`.
 
+Na Camara, esse fan-out deve ser reduzido ainda antes dos probes por nome:
+`parlamentares/v1` fornece os intervalos de mandato usados para mapear quais
+deputados precisam ser consultados em cada ano. Se essa tabela nao existir, os
+coletores continuam funcionais, mas voltam ao fallback mais lento de descoberta
+pela API.
+
 O texto individual do aparte fica fora do escopo inicial. O coletor nao deve
 inferir genero, partido ou UF por nome; esses atributos entram apenas na
 normalizacao relacional via metadados oficiais de parlamentares.
@@ -232,6 +245,11 @@ contar relacoes oficiais de aparte por ano e cruzar com `parlamentares/v1`.
 Para os fluxos especificos de pareceres de PEC, use `notebooks/coleta/coleta_senado_pareceres_pec.ipynb` e `notebooks/coleta/coleta_camara_pareceres_pec.ipynb`. Eles incluem validacao curta, inspecao dos campos canonicos de parecer e execucao completa retomavel.
 
 Para o fluxo transversal de metadados de parlamentares, use `notebooks/coleta/coleta_parlamentares.ipynb`. Ele valida a coleta curta no Drive, roda a coleta completa retomavel de Camara e Senado, chama o processamento `parlamentares/v1` e deixa celulas para auditoria de juncao com os Parquets de textos.
+
+No backfill historico geral, rode e processe `parlamentares/v1` antes dos
+coletores lentos da Camara. Isso permite que `camara/plenario_discursos` e
+`camara/plenario_apartes` usem mandatos oficiais para evitar consultas de
+deputados em anos em que eles nao estavam ativos.
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 

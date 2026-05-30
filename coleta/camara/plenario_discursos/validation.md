@@ -42,6 +42,7 @@ pytest tests/test_camara_plenario.py -q
 
 Os testes devem cobrir:
 
+- carregamento de `parlamentares_periodos` e filtragem de mandatos por janela;
 - paginacao de deputados por intervalo anual;
 - escrita de `deputados_page` em `metadata/`;
 - probe anual vazio sem abertura de meses;
@@ -55,6 +56,11 @@ Os testes devem cobrir:
 - Em `dev`, grava em `data/dev` e usa amostra por default.
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
 - Metadados de deputados e probes ficam em `metadata/{run_id}.jsonl`.
+- Quando `processed/parlamentares/v1` existir, o manifest registra
+  `deputados_periodos_carregados > 0` e o log da particao mostra
+  `planejamento=parlamentares_periodos`.
+- Quando `processed/parlamentares/v1` nao existir, o coletor cai no fallback
+  oficial `api_deputados_periodo`.
 - `discursos_year_probe` e `discursos_quarter_probe` nunca aparecem em
   `ano=YYYY/mes=MM/`.
 - `discursos_page` e gravado apenas para requisicoes mensais.

@@ -50,6 +50,9 @@ Depois da validacao curta, a coleta completa pode remover `--sample-limit`.
 - `Aparte` objeto unico e `Aparte` lista sao preservados de forma parseavel no
   payload.
 - Uma segunda execucao com `--resume` nao duplica requisicoes ja gravadas.
+- Se uma interrupcao ou latencia do Drive deixar linha JSONL parcial, novas
+  gravacoes devem comecar em nova linha e as celulas de inspecao devem reportar
+  a linha invalida sem derrubar a verificacao do manifest/raw restante.
 
 ## Fixtures esperadas
 

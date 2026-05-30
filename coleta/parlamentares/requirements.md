@@ -7,6 +7,9 @@ que o corpus `textos_parlamentares/v1` possa ser correlacionado a atributos de
 parlamentares, especialmente genero/sexo informado pela fonte, partido, UF,
 legislatura e periodos de mandato. A mesma dimensao deve atender bases
 relacionais como `apartes_parlamentares/v1`.
+`parlamentares_periodos` tambem deve poder ser usado pelos coletores historicos
+da Camara como plano de mandato para reduzir consultas de deputados fora de
+exercicio.
 
 ## Parametros
 
@@ -143,6 +146,13 @@ preferencial para cruzar textos com metadados:
 Os intervalos devem ser fechados no inicio e abertos no fim para juncao
 computacional (`data >= vigencia_inicio` e `data < vigencia_fim_exclusivo`), mas
 tambem devem expor `vigencia_fim` legivel para auditoria.
+
+Para planejamento de coleta, `camara/plenario_discursos` e
+`camara/plenario_apartes` podem ler essa tabela e filtrar somente linhas com
+`source=camara`, `intervalo_fonte=mandato` e `intervalo_inferido=false`,
+clipando a janela da requisicao ao intervalo de mandato que intercepta o ano.
+Em execucoes completas, amostras pequenas de `parlamentares_periodos` nao devem
+ser usadas como plano suficiente.
 
 ## Parquets
 

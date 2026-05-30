@@ -157,6 +157,10 @@ deve confirmar:
   surgiram `parlamentar_id`s sem metadados.
 - Samples locais devem incluir Parquets de `parlamentares/v1` suficientes para
   reproduzir o join localmente.
+- No backfill historico geral, `parlamentares/v1` deve estar disponivel antes
+  de `camara/plenario_discursos` e `camara/plenario_apartes` quando a meta for
+  reduzir consultas vazias; os logs desses coletores devem indicar
+  `planejamento=parlamentares_periodos`.
 
 ## Validacao da integracao com expansao
 
@@ -179,6 +183,8 @@ deve confirmar:
 - Processed: deduplicacao por `parlamentar_key`.
 - Processed: construcao de `parlamentares_periodos` sem sobreposicoes
   silenciosas.
+- Common coleta: carregamento de `parlamentares_periodos` e filtragem por
+  janela de mandato para planejamento de coletores.
 - Join: match por intervalo temporal, unmatched e ambiguidades.
 - CLI: `--mode prod` recusa destino dentro do repositorio.
 - Resume: segunda execucao com mesmo `run_id` nao duplica endpoints.

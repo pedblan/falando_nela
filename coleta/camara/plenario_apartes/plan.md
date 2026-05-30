@@ -44,25 +44,29 @@ auditar cobertura.
 ## Fluxo
 
 1. Particionar o periodo por ano para fazer preflight de existencia.
-2. Se a busca anual retornar zero resultados, preservar a pagina anual em
+2. Tentar carregar `processed/parlamentares/v1/parquet/parlamentares_periodos.parquet`
+   ou, como fallback local, `processed/parlamentares/v1/parlamentares_periodos.jsonl`.
+3. Quando `parlamentares_periodos` existir, montar o plano de buscas apenas com
+   deputados cujos mandatos oficiais interceptam cada ano e clipar a janela
+   consultada ao intervalo efetivo do mandato naquele ano.
+4. Quando `parlamentares_periodos` nao existir, carregar deputados pela API
+   oficial no periodo total como fallback.
+5. Se a busca anual retornar zero resultados, preservar a pagina anual em
    `metadata/` e nao abrir meses.
-3. Se a busca anual retornar resultados, for inconclusiva ou falhar, abrir
+6. Se a busca anual retornar resultados, for inconclusiva ou falhar, abrir
    aquele ano em trimestres.
-4. Se a busca trimestral retornar resultados, for inconclusiva ou falhar, abrir
+7. Se a busca trimestral retornar resultados, for inconclusiva ou falhar, abrir
    aquele trimestre em meses e gravar as paginas mensais em `metadata/`.
-5. Carregar deputados e variantes de nome de `parlamentares/v1` quando existir
-   no mesmo `data_root`; se nao existir, usar a API oficial de deputados como
-   fallback.
-6. Para cada parlamentar e janela, consultar o Sitaq com `txAparteante`.
-7. Paginar resultados do Sitaq ate a ultima pagina disponivel.
-8. Gravar cada pagina em
+8. Para cada parlamentar e janela, consultar o Sitaq com `txAparteante`.
+9. Paginar resultados do Sitaq ate a ultima pagina disponivel.
+10. Gravar cada pagina em
    `data/raw/camara/plenario_apartes/metadata/{run_id}.jsonl` com
    `record_type=sitaq_apartes_search_page`.
-9. Preservar HTML bruto e parametros de busca no payload.
-10. Extrair, quando possivel, chaves de `TextoHTML.asp` apenas como metadados
+11. Preservar HTML bruto e parametros de busca no payload.
+12. Extrair, quando possivel, chaves de `TextoHTML.asp` apenas como metadados
    auxiliares: `nuSessao`, `nuQuarto`, `nuOrador`, `nuInsercao`, fase, data e
    apelido do orador.
-11. Em processamento posterior, reconciliar `txAparteante` com
+13. Em processamento posterior, reconciliar `txAparteante` com
    `parlamentares/v1` e marcar ambiguidades.
 
 ## Saidas
@@ -87,6 +91,9 @@ textual.
   `2010-01-01` em diante.
 - O `run_id` recomendado para producao e especifico do dataset, por exemplo
   `prod-camara-plenario-apartes`.
+- Para reduzir o fan-out historico, rode `coleta.parlamentares.collect` e
+  `processamento.parlamentares` antes da coleta completa de apartes da Camara
+  sempre que possivel.
 
 ## Resiliencia operacional
 

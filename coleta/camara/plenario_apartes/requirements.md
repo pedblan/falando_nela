@@ -26,8 +26,8 @@ discursos de Plenario com determinado aparteante, para alimentar
 - Parser HTML estruturado da biblioteca padrao ou dependencia explicita futura,
   se a implementacao justificar.
 - Infra comum em `coleta/common/`.
-- Leitura opcional de `processed/parlamentares/v1` para obter nomes oficiais e
-  IDs dos deputados.
+- Leitura opcional de `processed/parlamentares/v1` para obter nomes oficiais,
+  IDs dos deputados e intervalos de mandato.
 
 ## Fontes oficiais
 
@@ -54,6 +54,14 @@ discursos de Plenario com determinado aparteante, para alimentar
 - As particoes de checkpoint sao anuais por default. A busca anual por
   `txAparteante` serve para eliminar anos vazios antes de qualquer subdivisao
   operacional futura.
+- Quando `processed/parlamentares/v1` existir no `data_root`, o plano anual
+  deve consultar apenas deputados cujos mandatos oficiais interceptam aquele
+  ano e deve clipar `dtInicio`/`dtFim` ao intervalo de mandato dentro do ano.
+- Em coleta completa (`--no-sample`), um `parlamentares_periodos` com poucos IDs
+  deve ser considerado amostra insuficiente, para evitar pular deputados por
+  engano.
+- Quando `parlamentares_periodos` nao existir, o coletor deve cair no fallback
+  de descoberta oficial via `/api/v2/deputados`.
 - O preflight anual deve usar `record_type=sitaq_apartes_year_probe`; anos
   positivos, inconclusivos ou com falha de preflight devem abrir preflight
   trimestral com `record_type=sitaq_apartes_quarter_probe`; trimestres

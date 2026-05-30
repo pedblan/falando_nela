@@ -36,6 +36,11 @@ Depois da validacao curta, a coleta completa pode remover `--sample-limit`.
 - Gera JSONL bruto, log, manifest e checkpoint.
 - Em `dev`, grava em `data/dev` e usa amostra por default.
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
+- Quando `processed/parlamentares/v1` existir, o log da particao registra
+  `planejamento=parlamentares_periodos` e as consultas por nome ficam limitadas
+  aos deputados com mandato oficial que intercepta a janela.
+- Quando `processed/parlamentares/v1` nao existir, o coletor usa o fallback
+  oficial `/api/v2/deputados`.
 - Todos os registros ficam em `metadata/{run_id}.jsonl`.
 - Nao existem particoes mensais `ano=YYYY/mes=MM/` para
   `camara/plenario_apartes`.
@@ -49,6 +54,9 @@ Depois da validacao curta, a coleta completa pode remover `--sample-limit`.
 - O HTML bruto da pagina oficial e preservado.
 - Paginas com zero resultados sao preservadas.
 - Uma segunda execucao com `--resume` nao duplica paginas ja gravadas.
+- Se houver uma linha JSONL parcial deixada por interrupcao anterior, a retomada
+  deve preservar a linha invalida isolada e gravar novos registros em linhas
+  JSON validas.
 
 ## Fixtures esperadas
 

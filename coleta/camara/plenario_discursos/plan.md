@@ -25,26 +25,34 @@
 ## Fluxo
 
 1. Particionar o periodo por ano.
-2. Para cada ano, coletar a lista de deputados ativos no intervalo daquele ano
-   como metadado auxiliar.
-3. Para cada deputado ativo no ano, consultar
+2. Antes de abrir requisicoes por deputado, tentar carregar
+   `processed/parlamentares/v1/parquet/parlamentares_periodos.parquet` ou,
+   como fallback local, `processed/parlamentares/v1/parlamentares_periodos.jsonl`.
+3. Quando `parlamentares_periodos` existir, montar o plano anual apenas com
+   deputados cujos mandatos oficiais interceptam o ano e clipar a janela de
+   cada deputado ao intervalo efetivo do mandato naquele ano.
+4. Quando `parlamentares_periodos` nao existir, usar o comportamento antigo:
+   coletar a lista de deputados ativos no intervalo daquele ano pela API da
+   Camara como metadado auxiliar.
+5. Para cada deputado ativo no ano, consultar
    `/api/v2/deputados/{id}/discursos` com `itens=1` como preflight anual.
-4. Se o preflight anual vier sem `dados`, gravar o probe em `metadata/` e nao
+6. Se o preflight anual vier sem `dados`, gravar o probe em `metadata/` e nao
    abrir trimestres nem meses para aquele deputado/ano.
-5. Se o ano for positivo, consultar trimestres com `itens=1`.
-6. Trimestres vazios param no probe; trimestres positivos abrem as janelas
+7. Se o ano for positivo, consultar trimestres com `itens=1`.
+8. Trimestres vazios param no probe; trimestres positivos abrem as janelas
    mensais daquele trimestre.
-7. Apenas requisicoes mensais completas sao paginadas e gravadas em
+9. Apenas requisicoes mensais completas sao paginadas e gravadas em
    `ano=YYYY/mes=MM/{run_id}.jsonl`.
-8. Preservar `transcricao` como texto oficial quando entregue pela API.
-9. Quando houver endpoint oficial mais granular para texto integral do discurso
+10. Preservar `transcricao` como texto oficial quando entregue pela API.
+11. Quando houver endpoint oficial mais granular para texto integral do discurso
    ou sessao, esse texto deve ter prioridade sobre metadados, `sumario` e
    palavras-chave.
 
 ## Record Types
 
 - `deputados_page`: lista de deputados ativos no intervalo anual, em
-  `metadata/`.
+  `metadata/`, usada somente quando `parlamentares_periodos` nao estiver
+  disponivel.
 - `discursos_year_probe`: primeira pagina anual com `itens=1`, em
   `metadata/`.
 - `discursos_quarter_probe`: primeira pagina trimestral com `itens=1`, em
@@ -68,6 +76,9 @@
 - So paginas de requisicoes mensais podem ser gravadas em
   `ano=YYYY/mes=MM/{run_id}.jsonl`.
 - O caderno de backfill deve auditar esse contrato antes do processamento.
+- O caderno de backfill historico deve coletar e processar `parlamentares/v1`
+  antes de `camara/plenario_discursos` sempre que possivel, para reduzir anos
+  vazios por deputado.
 
 ## Dev E Producao
 

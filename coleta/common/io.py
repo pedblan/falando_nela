@@ -93,6 +93,7 @@ class CollectionRun:
 
         raw_path = self._raw_path(partition)
         raw_path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_append_newline(raw_path)
         with raw_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True, default=str) + "\n")
 
@@ -193,6 +194,15 @@ class CollectionRun:
             / f"mes={month}"
             / f"{self.run_id}.jsonl"
         )
+
+    @staticmethod
+    def _ensure_append_newline(path: Path) -> None:
+        if not path.exists() or path.stat().st_size == 0:
+            return
+        with path.open("rb+") as handle:
+            handle.seek(-1, 2)
+            if handle.read(1) != b"\n":
+                handle.write(b"\n")
 
     def _load_checkpoint(self) -> dict[str, Any]:
         if not self.checkpoint_path.exists():

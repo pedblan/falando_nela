@@ -12,6 +12,7 @@ from coleta.common.config import PROD_DATA_ROOT_ENV, quarter_windows, year_windo
 from coleta.common.documents import download_and_extract_document, extract_meta_refresh_url, extract_text_from_html_bytes
 from coleta.common.http import OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun
+from coleta.common.parlamentares import active_parlamentares_for_window, load_parlamentares_periodos
 
 
 def test_year_windows_preserve_requested_bounds() -> None:
@@ -41,6 +42,75 @@ def test_quarter_windows_preserve_requested_bounds() -> None:
 def test_quarter_windows_reject_inverted_period() -> None:
     with pytest.raises(ValueError, match="data_inicio"):
         list(quarter_windows(date(2026, 1, 2), date(2026, 1, 1)))
+
+
+def test_load_parlamentares_periodos_filters_and_clips_mandates(tmp_path) -> None:
+    output_root = tmp_path / "processed" / "parlamentares" / "v1"
+    output_root.mkdir(parents=True)
+    rows = [
+        {
+            "source": "camara",
+            "parlamentar_id": "10",
+            "nome_parlamentar": "Deputada A",
+            "vigencia_inicio": "2026-02-01",
+            "vigencia_fim": "2026-06-30",
+            "intervalo_fonte": "mandato",
+            "intervalo_inferido": False,
+        },
+        {
+            "source": "camara",
+            "parlamentar_id": "11",
+            "nome_parlamentar": "Deputado B",
+            "vigencia_inicio": "2025-01-01",
+            "vigencia_fim": "2025-12-31",
+            "intervalo_fonte": "mandato",
+            "intervalo_inferido": False,
+        },
+        {
+            "source": "camara",
+            "parlamentar_id": "12",
+            "nome_parlamentar": "Inferido",
+            "vigencia_inicio": "0001-01-01",
+            "vigencia_fim": "9999-12-31",
+            "intervalo_fonte": "identidade",
+            "intervalo_inferido": True,
+        },
+    ]
+    path = output_root / "parlamentares_periodos.jsonl"
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    periodos = load_parlamentares_periodos(
+        tmp_path,
+        source="camara",
+        data_inicio=date(2026, 1, 1),
+        data_fim=date(2026, 12, 31),
+    )
+    planejados = active_parlamentares_for_window(
+        periodos,
+        start=date(2026, 1, 1),
+        end=date(2026, 12, 31),
+    )
+
+    assert list(periodos) == ["10"]
+    assert planejados == [
+        {
+            "id": 10,
+            "nome": "Deputada A",
+            "_active_start": date(2026, 2, 1),
+            "_active_end": date(2026, 6, 30),
+            "_periodos_mandato": 1,
+        }
+    ]
+    assert (
+        load_parlamentares_periodos(
+            tmp_path,
+            source="camara",
+            data_inicio=date(2026, 1, 1),
+            data_fim=date(2026, 12, 31),
+            min_ids=2,
+        )
+        == {}
+    )
 
 
 def test_open_data_client_retries_transient_status() -> None:
@@ -391,6 +461,33 @@ def test_collection_run_resume_reads_existing_records_and_skips_duplicates(tmp_p
     assert resumed.has_record(source_id="fonte:1", record_type="response")
     assert second_write is False
     assert len(raw_path.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_collection_run_appends_after_partial_jsonl_line_on_resume(tmp_path) -> None:
+    raw_path = tmp_path / "raw" / "fonte" / "dataset" / "metadata" / "run-resume.jsonl"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_text('{"partial": true', encoding="utf-8")
+
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-resume",
+        resume=True,
+    )
+    run.write_record(
+        partition="metadata",
+        source_id="fonte:2",
+        request={"method": "GET", "path": "/x", "params": {}},
+        response={"status_code": 200, "url": "https://example.test/x", "headers": {}},
+        periodo={"data_inicio": "2026-05-01", "data_fim": "2026-05-18"},
+        payload={"dados": [2]},
+        record_type="response",
+    )
+
+    lines = raw_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[1])["source_id"] == "fonte:2"
 
 
 def test_collection_run_marks_failed_partition(tmp_path) -> None:

@@ -37,6 +37,11 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   `senado/congresso_discursos`, o endpoint rejeita janelas acima de um mes; o
   backfill operacional usa os primeiros meses com retorno observado,
   respectivamente `1995-02-01` e `1996-05-01`.
+- Antes dos coletores historicos lentos da Camara, gerar `parlamentares/v1` e
+  usar `parlamentares_periodos` como plano de mandato para
+  `camara/plenario_discursos` e `camara/plenario_apartes`, evitando consultas de
+  deputados em anos fora do exercicio oficial. A descoberta via API permanece
+  como fallback quando a tabela ainda nao existir.
 - Registrar separadamente cobertura historica maxima e recorte analitico
   recomendado `2010-01-01` em diante.
 

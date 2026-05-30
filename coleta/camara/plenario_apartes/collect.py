@@ -16,6 +16,11 @@ from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, month_windows, quarter_windows, year_windows
 from coleta.common.http import OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun, error_summary
+from coleta.common.parlamentares import (
+    active_parlamentares_for_window,
+    load_parlamentares_periodos,
+    parlamentar_active_period,
+)
 
 SOURCE = "camara"
 DATASET = "plenario_apartes"
@@ -43,15 +48,27 @@ def collect() -> None:
     status = "completed"
     errors = 0
     stats: Counter[str] = Counter()
+    periodos_by_deputado = load_parlamentares_periodos(
+        runtime.output_dir,
+        source=SOURCE,
+        data_inicio=runtime.data_inicio,
+        data_fim=runtime.data_fim,
+        min_ids=1 if runtime.sample else 100,
+    )
 
     try:
-        with OpenDataClient(CAMARA_API_BASE_URL) as api_client:
-            deputados = discover_deputados(api_client, runtime.data_inicio, runtime.data_fim, run, periodo_total)
-        stats["deputados_descobertos"] = len(deputados)
-        if runtime.sample and runtime.sample_limit is not None:
-            deputados = deputados[: runtime.sample_limit]
-        stats["deputados_selecionados"] = len(deputados)
-        run.log("deputados_loaded", total=stats["deputados_descobertos"], selecionados=len(deputados))
+        deputados: list[dict[str, Any]] = []
+        if periodos_by_deputado:
+            stats["deputados_periodos_carregados"] = len(periodos_by_deputado)
+            run.log("deputados_periodos_loaded", total=len(periodos_by_deputado))
+        else:
+            with OpenDataClient(CAMARA_API_BASE_URL) as api_client:
+                deputados = discover_deputados(api_client, runtime.data_inicio, runtime.data_fim, run, periodo_total)
+            stats["deputados_descobertos"] = len(deputados)
+            if runtime.sample and runtime.sample_limit is not None:
+                deputados = deputados[: runtime.sample_limit]
+            stats["deputados_selecionados"] = len(deputados)
+            run.log("deputados_loaded", total=stats["deputados_descobertos"], selecionados=len(deputados))
 
         with OpenDataClient(SITAQ_BASE_URL) as sitaq_client:
             for partition, start, end in windows:
@@ -60,17 +77,41 @@ def collect() -> None:
                     continue
                 periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
                 try:
-                    run.log("partition_started", partition=partition, periodo=periodo, deputados=len(deputados))
-                    for deputado in deputados:
+                    deputados_partition = (
+                        active_parlamentares_for_window(
+                            periodos_by_deputado,
+                            start=start,
+                            end=end,
+                            sample=runtime.sample,
+                            sample_limit=runtime.sample_limit,
+                        )
+                        if periodos_by_deputado
+                        else deputados
+                    )
+                    if periodos_by_deputado:
+                        stats["partitions_with_mandate_plan"] += 1
+                    run.log(
+                        "partition_started",
+                        partition=partition,
+                        periodo=periodo,
+                        deputados=len(deputados_partition),
+                        planejamento="parlamentares_periodos" if periodos_by_deputado else "api_deputados_periodo",
+                    )
+                    for deputado in deputados_partition:
+                        request_start, request_end = parlamentar_active_period(deputado, start, end)
+                        request_periodo = {
+                            "data_inicio": request_start.isoformat(),
+                            "data_fim": request_end.isoformat(),
+                        }
                         try:
                             page_stats = collect_apartes_deputado_adaptive(
                                 sitaq_client,
                                 run,
                                 deputado=deputado,
-                                start=start,
-                                end=end,
+                                start=request_start,
+                                end=request_end,
                                 partition=partition,
-                                periodo=periodo,
+                                periodo=request_periodo,
                             )
                             stats.update(page_stats)
                             stats["deputados_processados"] += 1

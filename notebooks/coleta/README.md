@@ -34,6 +34,18 @@ Os coletores de apartes usam preflight anual e trimestral para evitar consultas
 mensais vazias no recorte historico amplo; trimestres positivos sao expandidos
 para meses.
 
+Na Camara, `coleta_camara_plenario.ipynb`,
+`coleta_camara_plenario_apartes.ipynb` e o backfill historico geral devem
+aproveitar `processed/parlamentares/v1` quando existir. Os coletores leem
+`parlamentares_periodos` para mapear deputados por ano de mandato e evitar
+consultas de deputados fora de exercicio; se a tabela ainda nao existir, eles
+voltam ao fallback oficial pela API. Em coleta completa, uma tabela muito
+pequena e tratada como amostra insuficiente.
+
+No caderno `coleta_backfill_historico_colab.ipynb`, a etapa de
+`parlamentares/v1` deve rodar antes dos coletores textuais lentos da Camara
+quando o backfill completo estiver ligado.
+
 Depois da coleta raw de apartes, a geracao da tabela e do Parquet deve ser feita
 em `notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb`. Esse
 processamento ignora os probes anuais/trimestrais para as linhas analiticas e

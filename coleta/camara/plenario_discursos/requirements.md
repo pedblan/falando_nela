@@ -32,8 +32,17 @@
 ## Preflight
 
 - O coletor deve particionar por ano.
-- A lista de deputados deve ser coletada por ano, para evitar consultar
-  parlamentares que nao estavam ativos naquele intervalo.
+- Quando `processed/parlamentares/v1` existir no `data_root`, o coletor deve
+  carregar `parlamentares_periodos` e consultar apenas deputados cujos mandatos
+  oficiais interceptem o ano corrente.
+- Em coleta completa (`--no-sample`), um `parlamentares_periodos` muito pequeno
+  deve ser tratado como amostra/insuficiente e nao pode substituir a descoberta
+  oficial de deputados.
+- A janela enviada ao endpoint de discursos deve ser clipada ao intervalo de
+  mandato do deputado dentro daquele ano, quando esse plano estiver disponivel.
+- Quando `parlamentares_periodos` nao existir, a lista de deputados deve ser
+  coletada por ano pela API, para evitar consultar parlamentares que nao
+  estavam ativos naquele intervalo.
 - Para cada deputado/ano, o coletor deve fazer probe anual com `itens=1`.
 - Ano vazio nao abre trimestre nem mes.
 - Ano positivo abre probes trimestrais com `itens=1`.
@@ -54,6 +63,8 @@
 - `transcricao` deve ser preservada como texto prioritario quando estiver
   disponivel.
 - URL final, status HTTP, payload e checksum.
+- O manifest deve registrar `deputados_periodos_carregados` quando o plano por
+  mandato for usado.
 
 ## Limites
 

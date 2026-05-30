@@ -13,6 +13,11 @@ from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, month_windows, quarter_windows, year_windows
 from coleta.common.http import OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun, error_summary
+from coleta.common.parlamentares import (
+    active_parlamentares_for_window,
+    load_parlamentares_periodos,
+    parlamentar_active_period,
+)
 
 SOURCE = "camara"
 DATASET = "plenario_discursos"
@@ -40,6 +45,13 @@ def collect() -> None:
     preflight_stats: Counter[str] = Counter()
     status = "completed"
     errors = 0
+    periodos_by_deputado = load_parlamentares_periodos(
+        runtime.output_dir,
+        source=SOURCE,
+        data_inicio=runtime.data_inicio,
+        data_fim=runtime.data_fim,
+        min_ids=1 if runtime.sample else 100,
+    )
 
     try:
         with OpenDataClient(BASE_URL) as client:
@@ -52,20 +64,31 @@ def collect() -> None:
 
                 periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
                 try:
-                    deputados = _collect_deputados(
-                        client,
-                        run,
-                        data_inicio=start.isoformat(),
-                        data_fim=end.isoformat(),
-                        sample=runtime.sample,
-                        sample_limit=runtime.sample_limit,
-                    )
+                    if periodos_by_deputado:
+                        deputados = active_parlamentares_for_window(
+                            periodos_by_deputado,
+                            start=start,
+                            end=end,
+                            sample=runtime.sample,
+                            sample_limit=runtime.sample_limit,
+                        )
+                        preflight_stats["partitions_with_mandate_plan"] += 1
+                    else:
+                        deputados = _collect_deputados(
+                            client,
+                            run,
+                            data_inicio=start.isoformat(),
+                            data_fim=end.isoformat(),
+                            sample=runtime.sample,
+                            sample_limit=runtime.sample_limit,
+                        )
                     run.log(
                         "partition_started",
                         partition=partition,
                         periodo=periodo,
                         deputados=len(deputados),
                         granularidade="ano",
+                        planejamento="parlamentares_periodos" if periodos_by_deputado else "api_deputados_periodo",
                     )
 
                     for deputado in deputados:
@@ -84,15 +107,20 @@ def collect() -> None:
                         deputado_id = deputado.get("id")
                         if deputado_id is None:
                             continue
+                        request_start, request_end = parlamentar_active_period(deputado, start, end)
+                        request_periodo = {
+                            "data_inicio": request_start.isoformat(),
+                            "data_fim": request_end.isoformat(),
+                        }
                         try:
                             stats = _collect_discursos_deputado_adaptive(
                                 client,
                                 run,
                                 deputado_id=int(deputado_id),
-                                start=start,
-                                end=end,
+                                start=request_start,
+                                end=request_end,
                                 partition=partition,
-                                periodo=periodo,
+                                periodo=request_periodo,
                             )
                         except Exception as exc:
                             errors += 1
@@ -143,6 +171,7 @@ def collect() -> None:
             sample=runtime.sample,
             sample_limit=runtime.sample_limit,
             deputados_processados=processed_deputados,
+            deputados_periodos_carregados=len(periodos_by_deputado),
             paginas_discursos=processed_discourse_pages,
             discursos=processed_discourses,
             discursos_com_transcricao=processed_transcricoes,
