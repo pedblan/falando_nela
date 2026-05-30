@@ -19,6 +19,10 @@ Arquivos atuais:
   `processed/textos_parlamentares/v1` a partir do `raw/` no Google Drive.
 - `geracao_parquets_colab.ipynb`: gera Parquets unificados por base a partir dos
   JSONLs processed ja existentes no Drive, sem rerodar a normalizacao.
+- `geracao_apartes_parlamentares_colab.ipynb`: gera
+  `processed/apartes_parlamentares/v1` e o Parquet
+  `apartes_parlamentares.parquet` a partir dos raws metadata-only de apartes do
+  Senado e da Camara, com auditorias anuais e validacao de schema.
 - `descricao_analitica_bases_colab.ipynb`: resume a base processada por fonte,
   dataset, ano, familia textual e preenchimento de campos, usando os Parquets
   quando eles estiverem disponiveis.
@@ -46,6 +50,12 @@ Depois de descompactar os JSONLs localmente, gere os Parquets das samples com:
 
 ```bash
 python -m processamento.parquet --profile samples-local --overwrite
+```
+
+Esse comando e apenas para `textos_parlamentares/v1`. Para apartes, use:
+
+```bash
+python -m processamento.apartes_parlamentares --mode dev --overwrite
 ```
 
 Para abrir o visualizador local contra os Parquets de samples:

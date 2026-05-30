@@ -13,6 +13,19 @@ Coletar pronunciamentos do Plenario do Senado Federal como unidade textual anali
 - Fallback textual por sessao: `GET /dadosabertos/taquigrafia/notas/sessao/{codigoSessao}.json`.
 - Fonte candidata para transcricao futura: `GET /dadosabertos/taquigrafia/videos/sessao/{codigoSessao}` e URLs de video/binario presentes no payload de descoberta.
 
+## Recorte Operacional
+
+- A pagina oficial de Dados Abertos do Senado descreve pronunciamentos como
+  discursos, falas e questoes de ordem em sessoes do Senado Federal e do
+  Congresso Nacional, mas nao fixa data minima do endpoint.
+- Probes mensais no endpoint `plenario/lista/discursos` indicaram primeiro
+  retorno em `1995-02-20` para `siglaCasa=SF`; portanto o backfill operacional
+  deve iniciar em `1995-02-01`.
+- O acervo historico de Anais do Senado existe para periodos anteriores, mas e
+  outra fonte documental. O intervalo anterior a `1995-02-01` deve ser tratado
+  como diagnostico ou projeto de acervo historico separado, nao como backfill
+  normal deste endpoint.
+
 ## Unidade de Coleta
 
 - Unidade de descoberta: lista mensal de sessoes e pronunciamentos.
@@ -49,19 +62,14 @@ Coletar pronunciamentos do Plenario do Senado Federal como unidade textual anali
 
 ## Otimizacao historica
 
-- O backfill de `1900-01-01` pode consultar o endpoint de lista por ano como
-  preflight antes de abrir em meses.
-- Anos sem `Pronunciamento` podem ser registrados em `metadata/` e marcados no
-  checkpoint sem disparar 12 consultas mensais vazias.
-- Anos com retorno podem ser expandidos para trimestres como segundo preflight.
-  Trimestres vazios param ali; trimestres positivos ou inconclusivos abrem
-  meses.
-- Requisicoes anuais ou trimestrais nunca devem ser gravadas no corpus
-  `ano=YYYY/mes=MM/`; elas sao somente descoberta em `metadata/`, porque podem
-  misturar meses diferentes.
-- So requisicoes mensais podem gerar `pronunciamento_texto`; se a resposta
-  anual ou trimestral for grande, incompleta ou instavel, a coleta deve cair
-  para janelas menores sem alterar os IDs deterministas dos pronunciamentos.
+- O endpoint de lista de discursos do Senado aceita janelas mensais, mas
+  retorna HTTP 400 para janelas trimestrais ou anuais testadas.
+- Portanto, este coletor nao deve prometer preflight `ano -> trimestre -> mes`
+  nesse endpoint. A reducao de consultas vazias deve vir do recorte operacional
+  `1995-02-01` e da retomada por checkpoint.
+- Requisicoes mensais de descoberta ficam em `metadata/`.
+- So requisicoes mensais podem gerar `pronunciamento_texto` em
+  `ano=YYYY/mes=MM/`.
 
 ## Dev e Producao
 
@@ -82,7 +90,7 @@ subprocess.run([
     "--mode", "prod",
     "--resume",
     "--run-id", "prod-senado-plenario",
-    "--data-inicio", "2011-05-18",
+    "--data-inicio", "1995-02-01",
     "--data-fim", "2026-05-18",
 ], check=False)
 ```

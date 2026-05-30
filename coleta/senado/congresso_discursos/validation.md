@@ -18,7 +18,7 @@ subprocess.run([
     "--mode", "prod",
     "--resume",
     "--run-id", "prod-senado-congresso",
-    "--data-inicio", "2011-05-18",
+    "--data-inicio", "1996-05-01",
     "--data-fim", "2026-05-18",
 ], check=False)
 ```
@@ -29,6 +29,10 @@ subprocess.run([
 - Em `dev`, grava em `data/dev` e usa amostra por default.
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
 - As listas mensais ficam em `metadata/{run_id}.jsonl`; registros mensais `ano=YYYY/mes=MM` devem ser reservados ao corpus textual.
+- O backfill operacional usa `1996-05-01` como inicio para evitar varrer meses
+  anteriores sem cobertura no endpoint.
+- A coleta continua mensal; nao deve depender de preflight anual/trimestral no
+  endpoint de lista do Senado.
 - O registro bruto preserva metadados de periodo, mas a saida analitica deve priorizar registros com texto integral por pronunciamento.
 - O request preserva `siglaCasa=CN`.
 - Analises futuras devem usar o texto integral transferido, nao `Resumo` ou apenas metadados de sessao.

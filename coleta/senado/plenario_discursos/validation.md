@@ -48,7 +48,7 @@ subprocess.run([
     "--mode", "prod",
     "--resume",
     "--run-id", "prod-senado-plenario",
-    "--data-inicio", "2011-05-18",
+    "--data-inicio", "1995-02-01",
     "--data-fim", "2026-05-18",
 ], check=False)
 ```
@@ -59,6 +59,10 @@ subprocess.run([
 - Em `dev`, grava em `data/dev` e usa amostra por default.
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
 - `metadata/{run_id}.jsonl` contem a lista mensal como `record_type=discursos_periodo_metadata`.
+- O backfill operacional usa `1995-02-01` como inicio para evitar varrer meses
+  anteriores sem cobertura no endpoint.
+- A coleta continua mensal; nao deve depender de preflight anual/trimestral no
+  endpoint de lista do Senado.
 - `ano=YYYY/mes=MM/{run_id}.jsonl` contem apenas `record_type=pronunciamento_texto`.
 - `discursos_periodo_metadata` nao aparece em particao mensal do corpus textual.
 - Cada `pronunciamento_texto` contem `CodigoPronunciamento`, `TextoIntegral`, `TextoIntegralUrl`, `texto`, `forma`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.

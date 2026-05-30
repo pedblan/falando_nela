@@ -2,11 +2,19 @@
 
 ## Objetivo
 
-Normalizar os raws `senado/plenario_apartes` e `camara/plenario_apartes` em
-uma tabela relacional para analises de contagem anual e cruzamento com
+Normalizar os raws `senado/plenario_apartes` e `camara/plenario_apartes` em uma
+tabela relacional para analises de contagem anual e cruzamento com
 `parlamentares/v1`.
 
 ## Interface CLI
+
+O modulo deve rodar com:
+
+```bash
+python -m processamento.apartes_parlamentares
+```
+
+Argumentos obrigatorios/aceitos:
 
 - `--mode dev|prod`.
 - `--data-root CAMINHO`.
@@ -16,6 +24,28 @@ uma tabela relacional para analises de contagem anual e cruzamento com
 - `--overwrite`.
 - `--limit-records N`, para validacoes locais.
 
+Em `--mode prod`, `--data-root` ou `FALANDO_NELA_DATA_ROOT` deve apontar para
+diretorio externo ao repositorio.
+
+## Notebook Operacional
+
+Deve existir um caderno Colab em:
+
+```text
+notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb
+```
+
+O caderno deve:
+
+- montar o Google Drive na primeira celula executavel;
+- definir `FALANDO_NELA_DATA_ROOT`;
+- clonar/atualizar o repositorio e instalar `requirements.txt`;
+- conferir raws de Senado e Camara em `metadata/`;
+- conferir a existencia de `parlamentares/v1`, sem bloquear quando ausente;
+- chamar `processamento.apartes_parlamentares.process_apartes_data_root`;
+- validar schema, unicidade de `aparte_id`, ausencia de `texto`, Parquet e
+  auditorias.
+
 ## Entradas
 
 - Raws:
@@ -24,8 +54,21 @@ uma tabela relacional para analises de contagem anual e cruzamento com
 - Metadados de parlamentares:
   - `processed/parlamentares/v1/parlamentares_periodos.jsonl`; ou
   - `processed/parlamentares/v1/parquet/parlamentares_periodos.parquet`.
-- Textos processados sao entrada opcional apenas para preencher
-  `pending_text_match` ou `matched_text`.
+
+## Record Types
+
+Geram linhas:
+
+- `senador_apartes_metadata`;
+- `sitaq_apartes_search_page`.
+
+Nao geram linhas, mas entram no manifest:
+
+- `senador_apartes_year_probe`;
+- `senador_apartes_quarter_probe`;
+- `sitaq_apartes_year_probe`;
+- `sitaq_apartes_quarter_probe`;
+- registros de descoberta de parlamentares usados pelos coletores.
 
 ## Saidas
 
@@ -38,9 +81,9 @@ uma tabela relacional para analises de contagem anual e cruzamento com
 - Auditorias:
   `processed/audits/apartes_parlamentares/{run_id}/`.
 
-## Schema minimo
+## Schema Minimo
 
-`apartes_parlamentares/v1` deve conter:
+`apartes_parlamentares/v1` deve conter exatamente os campos minimos:
 
 - `aparte_id`;
 - `dataset_version`;
@@ -77,39 +120,40 @@ uma tabela relacional para analises de contagem anual e cruzamento com
 - `raw_path`;
 - `raw_response_url`.
 
-## IDs e deduplicacao
+## IDs E Deduplicacao
 
 - `aparte_id` deve ser deterministico e estavel.
-- Senado: deduplicar por `source`, `pronunciamento_id` e
-  `aparteante_id`.
-- Camara: deduplicar por `source`, `discurso_chave` e
-  `aparteante_id` quando houver ID; quando nao houver ID, usar
-  `aparteante_nome` normalizado e manter `match_status=name_only`.
-- Duplicatas exatas entre raw runs devem aparecer no manifest como
+- Senado: deduplicar por relacao equivalente a `source`, data,
+  `pronunciamento_id`, `sessao_id` e `aparteante_id`.
+- Camara: deduplicar por relacao equivalente a `source`, data,
+  `discurso_chave`, `sessao_id` e `aparteante_id`; quando nao houver ID, usar
+  `aparteante_nome` normalizado.
+- Duplicatas exatas entre raw runs ou paginas devem aparecer no manifest como
   `duplicate_aparte_id`.
 
-## Match com parlamentares
+## Match Com Parlamentares
 
 - O match oficial usa `source`, `parlamentar_id` e `data` dentro do intervalo
   de `parlamentares_periodos`.
-- `genero`, partido e UF devem vir de `parlamentares/v1` quando houver match.
+- `genero` deve vir somente de `parlamentares/v1`.
+- Partido e UF devem vir de `parlamentares/v1` quando houver match; fallback de
+  partido/UF pode usar campos oficiais do raw do Senado.
 - Para a Camara, se o raw tiver somente nome:
   - match unico por nome e data pode preencher `aparteante_id`;
   - multiplos candidatos geram `match_status=ambiguous`;
   - nenhum candidato gera `match_status=name_only`.
 - Nao inferir genero por nome em nenhuma circunstancia.
 
-## Valores de match_status
+## Valores De match_status
 
-- `matched`: orador e aparteante com match suficiente para analise por
-  parlamentares.
-- `name_only`: aparteante ou orador preservado apenas por nome.
-- `ambiguous`: mais de um parlamentar possivel.
-- `pending_text_match`: relacao de aparte criada, mas discurso textual ainda
-  nao encontrado em `textos_parlamentares/v1`.
+- `matched`: relacao com identificador suficiente para a analise relacional.
+- `name_only`: parlamentar preservado apenas por nome.
+- `ambiguous`: mais de um parlamentar possivel no match por nome.
 - `missing_date`: registro sem data suficiente para juncao temporal.
+- `pending_text_match`: reservado para etapa futura em que a tabela for cruzada
+  com `textos_parlamentares/v1`; nao e exigido pela geracao inicial.
 
-## Relatorios anuais
+## Relatorios Anuais
 
 Gerar pelo menos:
 
@@ -128,5 +172,6 @@ O manifest deve registrar:
 - contagens de entrada por fonte/record_type;
 - linhas processadas por fonte;
 - deduplicacoes;
-- skipped por motivo;
-- caminho dos JSONLs, Parquets e auditorias gerados.
+- skipped por motivo, incluindo `probe_record`;
+- caminhos dos JSONLs, Parquets e auditorias gerados;
+- resumo do indice de `parlamentares/v1`.

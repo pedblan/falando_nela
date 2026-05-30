@@ -36,6 +36,16 @@
   - path: `/dadosabertos/taquigrafia/notas/sessao/{codigoSessao}.json`;
   - usado somente quando o texto por pronunciamento falhar ou vier vazio.
 
+## Recorte E Granularidade
+
+- Backfill operacional do endpoint: `1995-02-01` em diante.
+- Probes mensais encontraram o primeiro pronunciamento de `siglaCasa=SF` em
+  `1995-02-20`.
+- Janelas acima de um mes no endpoint de lista retornam HTTP 400; por isso, o
+  coletor deve continuar mensal e nao usar preflight anual/trimestral.
+- Periodos anteriores a `1995-02-01` ficam fora do backfill normal deste
+  endpoint e devem ser tratados como diagnostico separado.
+
 ## Separacao de Dados
 
 - `metadata/{run_id}.jsonl` recebe somente registros de descoberta, como `discursos_periodo_metadata`.
@@ -99,7 +109,7 @@ subprocess.run([
     "--mode", "prod",
     "--resume",
     "--run-id", "prod-senado-plenario",
-    "--data-inicio", "2011-05-18",
+    "--data-inicio", "1995-02-01",
     "--data-fim", "2026-05-18",
 ], check=False)
 ```

@@ -15,6 +15,16 @@
 - O corpus textual mensal fica reservado a registros consolidados com texto integral.
 - A lista mensal nao deve ser tratada como substituta do texto integral.
 
+## Recorte E Granularidade
+
+- Backfill operacional do endpoint: `1996-05-01` em diante.
+- Probes mensais encontraram o primeiro pronunciamento de `siglaCasa=CN` em
+  `1996-05-21`.
+- Janelas acima de um mes no endpoint de lista retornam HTTP 400; por isso, o
+  coletor deve continuar mensal e nao usar preflight anual/trimestral.
+- Periodos anteriores a `1996-05-01` ficam fora do backfill normal deste
+  endpoint e devem ser tratados como diagnostico separado.
+
 ## Campos obrigatorios
 
 - Fonte, dataset, periodo e endpoint consultado.

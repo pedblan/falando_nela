@@ -31,8 +31,12 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   processamento.
 - Reduzir consultas vazias no backfill longo com janelas anuais de preflight:
   apartes preservam anos e trimestres vazios em `metadata/` e expandem apenas
-  trimestres positivos para meses; discursos podem usar o mesmo preflight, mas
-  somente requisicoes mensais entram no corpus textual.
+  trimestres positivos para meses; `camara/plenario_discursos` usa o mesmo
+  principio com inicio oficial em `1946-01-01`, probes em `metadata/` e somente
+  requisicoes mensais no corpus textual. Para `senado/plenario_discursos` e
+  `senado/congresso_discursos`, o endpoint rejeita janelas acima de um mes; o
+  backfill operacional usa os primeiros meses com retorno observado,
+  respectivamente `1995-02-01` e `1996-05-01`.
 - Registrar separadamente cobertura historica maxima e recorte analitico
   recomendado `2010-01-01` em diante.
 
@@ -43,7 +47,8 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Criar `apartes_parlamentares/v1` como tabela relacional independente de
   `textos_parlamentares/v1`, voltada a contagens anuais de relacoes
   `aparteante -> discurso/pronunciamento` e cruzamento com
-  `parlamentares/v1`.
+  `parlamentares/v1`, com JSONL, Parquet, manifest e auditorias gerados por
+  `processamento.apartes_parlamentares`.
 - Inventariar separadores no corpus completo antes de cortar texto integral,
   usando os Parquets completos do Drive como fonte principal de auditoria.
 - Diagnosticar separadores especificamente nos discursos historicos anteriores a

@@ -6,6 +6,17 @@
 - Endpoint: `GET /dadosabertos/plenario/lista/discursos/{dataInicio}/{dataFim}.json`.
 - Parametros fixos: `siglaCasa=CN`, `v=4`.
 
+## Recorte Operacional
+
+- A pagina oficial de Dados Abertos do Senado descreve pronunciamentos como
+  discursos, falas e questoes de ordem em sessoes do Senado Federal e do
+  Congresso Nacional, mas nao fixa data minima do endpoint.
+- Probes mensais no endpoint `plenario/lista/discursos` indicaram primeiro
+  retorno em `1996-05-21` para `siglaCasa=CN`; portanto o backfill operacional
+  deve iniciar em `1996-05-01`.
+- Periodos anteriores devem ser tratados como diagnostico separado, nao como
+  backfill normal deste endpoint.
+
 ## Fluxo
 
 - Particionar o periodo por mes.
@@ -26,16 +37,14 @@
 
 ## Otimizacao historica
 
-- O backfill historico pode usar consulta anual ao endpoint de lista como
-  preflight para pular anos vazios antes de abrir particoes mensais.
-- Anos com discursos podem ser expandidos para trimestres como segundo
-  preflight. Trimestres vazios param ali; trimestres positivos ou
-  inconclusivos abrem meses.
-- Requisicoes anuais ou trimestrais ficam somente em `metadata/`; registros
-  textuais continuam restritos a requisicoes mensais em `ano=YYYY/mes=MM/`,
-  mantendo o mesmo contrato de `senado/plenario_discursos`.
-- Se a resposta anual ou trimestral for grande ou instavel, a coleta deve cair
-  para meses sem alterar a semantica de `source_id`.
+- O endpoint de lista de discursos do Senado aceita janelas mensais, mas
+  retorna HTTP 400 para janelas trimestrais ou anuais testadas.
+- Portanto, este coletor nao deve prometer preflight `ano -> trimestre -> mes`
+  nesse endpoint. A reducao de consultas vazias deve vir do recorte operacional
+  `1996-05-01` e da retomada por checkpoint.
+- Requisicoes mensais de descoberta ficam em `metadata/`; registros textuais,
+  quando implementados, continuam restritos a requisicoes mensais em
+  `ano=YYYY/mes=MM/`.
 
 ## Dev e producao
 

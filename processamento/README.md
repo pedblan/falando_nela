@@ -25,7 +25,7 @@ Para uma descricao analitica das bases processadas, use
 `aparteante -> discurso/pronunciamento` por ano e cruza essas relacoes com
 `parlamentares/v1` para atributos como genero, partido e UF.
 
-Quando implementado, o processamento deve ler:
+O processamento le:
 
 ```text
 raw/senado/plenario_apartes/metadata/
@@ -33,12 +33,34 @@ raw/camara/plenario_apartes/metadata/
 processed/parlamentares/v1/
 ```
 
-e gerar:
+e gera:
 
 ```text
+processed/apartes_parlamentares/v1/apartes_parlamentares.jsonl
 processed/apartes_parlamentares/v1/parquet/apartes_parlamentares.parquet
+processed/manifests/{run_id}-apartes-parlamentares.json
 processed/audits/apartes_parlamentares/{run_id}/
 ```
+
+Comando local:
+
+```bash
+python -m processamento.apartes_parlamentares \
+  --mode dev \
+  --run-id processed-apartes-parlamentares-v1-dev \
+  --overwrite
+```
+
+No Colab, use:
+
+```text
+notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb
+```
+
+Probes anuais e trimestrais dos coletores ficam no manifest/auditoria e nao
+viram linhas na tabela, para evitar duplicacao. O Parquet de apartes e gerado
+diretamente por esse processador; nao passa por `processamento.parquet`, que e
+reservado aos JSONLs de `textos_parlamentares/v1`.
 
 O texto individual do aparte fica fora do escopo inicial, e genero nunca deve
 ser inferido por nome.

@@ -5,6 +5,15 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
 ## Convencoes comuns
 
 - Periodo baseline: `2011-05-18` a `2026-05-18`.
+- Para `camara/plenario_discursos`, o backfill historico oficial deve comecar
+  em `1946-01-01`, conforme a cobertura documentada do Banco de Discursos da
+  Camara. O intervalo `1900-01-01` a `1945-12-31` fica reservado a diagnostico
+  separado de anomalias, nao ao corpus mensal default.
+- Para os endpoints de lista de discursos do Senado, o backfill operacional
+  deve comecar no primeiro mes com retorno observado no proprio endpoint:
+  `1995-02-01` para `senado/plenario_discursos` (`siglaCasa=SF`) e
+  `1996-05-01` para `senado/congresso_discursos` (`siglaCasa=CN`). O endpoint
+  rejeita janelas trimestrais/anuais, entao esses coletores continuam mensais.
 - Para apartes de Plenario, a coleta de producao deve tentar a cobertura
   historica maxima da fonte oficial, alinhada ao backfill historico do projeto,
   usando `1900-01-01` como inicio amplo quando a fonte aceitar a janela;
@@ -14,8 +23,9 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
   trimestres; trimestre positivo ou inconclusivo abre meses. Tudo permanece em
   `metadata/`.
 - No backfill textual de discursos, a particao mensal continua sendo o contrato
-  do corpus em `ano=YYYY/mes=MM/`. Consultas anuais ou trimestrais podem ser
-  usadas apenas como preflight em `metadata/`, nunca como corpus textual.
+  do corpus em `ano=YYYY/mes=MM/`. Em `camara/plenario_discursos`, o coletor
+  usa preflight anual e trimestral em `metadata/`; apenas meses positivos sao
+  paginados e gravados como corpus textual.
 - Para analises substantivas, o recorte recomendado continua sendo
   `2010-01-01` em diante, inclusive para apartes. Dados anteriores podem ser
   coletados para auditoria historica, mas devem ser tratados como cobertura de
@@ -139,13 +149,17 @@ normalizacao relacional via metadados oficiais de parlamentares.
 
 ## Tarefas
 
-- `senado/plenario_discursos`: discursos do Plenario do Senado (`siglaCasa=SF`).
+- `senado/plenario_discursos`: discursos do Plenario do Senado (`siglaCasa=SF`),
+  com backfill operacional a partir de `1995-02-01`.
 - `senado/plenario_apartes`: metadados de apartes no Plenario do Senado,
   gravados somente em `metadata/`.
-- `senado/congresso_discursos`: discursos do Plenario do Congresso (`siglaCasa=CN`).
+- `senado/congresso_discursos`: discursos do Plenario do Congresso
+  (`siglaCasa=CN`), com backfill operacional a partir de `1996-05-01`.
 - `senado/ccj_notas`: agenda, detalhes e notas taquigraficas da CCJ do Senado.
 - `senado/pareceres_pec`: pareceres, relatorios, avulsos de parecer e relatorios do vencido de PEC no Plenario e na CCJ do Senado.
-- `camara/plenario_discursos`: discursos por deputado na API da Camara.
+- `camara/plenario_discursos`: discursos por deputado na API da Camara, com
+  backfill oficial a partir de `1946-01-01` e preflight
+  `ano -> trimestre -> mes`.
 - `camara/plenario_apartes`: metadados de apartes no Plenario da Camara via
   Banco de Discursos/Sitaq, gravados somente em `metadata/`.
 - `camara/ccjc_eventos`: eventos, participantes e metadados da CCJC da Camara.
@@ -199,11 +213,11 @@ O notebook `notebooks/coleta/coleta_template.ipynb` monta o Google Drive, define
 
 Os notebooks de coleta nao devem usar `check=True` ao chamar coletores. Um coletor que falhe deve imprimir stdout/stderr, registrar o resultado e permitir que o fluxo siga para o proximo modulo ou para a inspecao dos logs.
 
-Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_senado_plenario.ipynb`. A primeira celula executavel desse notebook monta o Drive antes de clonar o repositorio ou carregar qualquer codigo do projeto.
+Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_senado_plenario.ipynb`. A primeira celula executavel desse notebook monta o Drive antes de clonar o repositorio ou carregar qualquer codigo do projeto. A producao historica desse fluxo deve iniciar em `1995-02-01`.
 
 Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
 
-Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados em `metadata/`, paginas de discursos no JSONL mensal e a presenca de `transcricao` quando a API entregar texto.
+Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados e probes em `metadata/`, paginas mensais de discursos no JSONL de corpus e a presenca de `transcricao` quando a API entregar texto. A producao desse fluxo deve iniciar em `1946-01-01`.
 
 Para apartes de Plenario, use
 `notebooks/coleta/coleta_senado_plenario_apartes.ipynb` e
@@ -211,7 +225,7 @@ Para apartes de Plenario, use
 orquestram os coletores metadata-only `senado/plenario_apartes` e
 `camara/plenario_apartes`, que podem rodar antes do backfill historico de
 discursos. A janela de producao dos cadernos comeca em `1900-01-01` para
-alinhar com o backfill historico e maximizar a cobertura oficial, mas o
+maximizar a cobertura historica oficial de apartes, mas o
 recorte analitico recomendado e `2010-01-01` em diante. O primeiro objetivo e
 contar relacoes oficiais de aparte por ano e cruzar com `parlamentares/v1`.
 
@@ -255,7 +269,7 @@ subprocess.run([
     "--mode", "prod",
     "--resume",
     "--run-id", "prod-senado-plenario",
-    "--data-inicio", "2011-05-18",
+    "--data-inicio", "1995-02-01",
     "--data-fim", "2026-05-18",
 ], check=False)
 ```

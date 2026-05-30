@@ -34,7 +34,23 @@ Os coletores de apartes usam preflight anual e trimestral para evitar consultas
 mensais vazias no recorte historico amplo; trimestres positivos sao expandidos
 para meses.
 
+Depois da coleta raw de apartes, a geracao da tabela e do Parquet deve ser feita
+em `notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb`. Esse
+processamento ignora os probes anuais/trimestrais para as linhas analiticas e
+usa `parlamentares/v1` como fonte de genero, partido e UF por data.
+
 No backfill textual, consultas anuais ou trimestrais podem existir apenas como
 preflight em `metadata/`. O corpus textual em `ano=YYYY/mes=MM/` deve ser
 formado somente por requisicoes mensais; o caderno de backfill audita esse
 contrato antes do processamento.
+
+No backfill historico geral, `camara/plenario_discursos` deve usar
+`1946-01-01` como inicio operacional, respeitando a cobertura documentada do
+Banco de Discursos da Camara. O intervalo `1900-01-01` a `1945-12-31` deve ser
+tratado apenas como diagnostico separado de anomalias, se necessario.
+
+Para os discursos do Senado no endpoint `plenario/lista/discursos`, o caderno
+de backfill deve usar os inicios operacionais encontrados por probes mensais:
+`1995-02-01` para `senado/plenario_discursos` e `1996-05-01` para
+`senado/congresso_discursos`. Esse endpoint rejeita janelas trimestrais/anuais,
+entao esses dois coletores continuam mensais.
