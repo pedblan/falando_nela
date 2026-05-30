@@ -40,6 +40,7 @@ subprocess.run([
     "--run-id", "prod-parlamentares-20260527",
     "--data-inicio", "2011-05-18",
     "--data-fim", "2026-05-18",
+    "--skip-existing-id-scan",
 ], check=False)
 
 subprocess.run([
@@ -67,6 +68,10 @@ subprocess.run([
 - Reexecutar com o mesmo `--run-id --resume` nao duplica linhas ja gravadas.
 - Falhas por parlamentar aparecem em `logs/{run_id}.jsonl` e no checkpoint, sem
   impedir a coleta dos demais IDs.
+- O stdout/log deve mostrar progresso em eventos como `source_started`,
+  `ids_existing_scan_started`, `ids_existing_scan_skipped`,
+  `camara_deputado_progress` e `senado_senador_progress`, evitando celulas
+  longas sem sinal de vida.
 
 ## Criterios da camada processed
 

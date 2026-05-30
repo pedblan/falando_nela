@@ -38,6 +38,7 @@ class ParlamentaresRuntime:
     run_id: str
     source: str
     ids_from_textos_only: bool
+    skip_existing_id_scan: bool
     textos_root: Path | None
 
 
@@ -63,6 +64,14 @@ def collect(argv: Sequence[str] | None = None) -> None:
             continue
 
         try:
+            run.log(
+                "source_started",
+                partition="metadata",
+                source_selected=source,
+                periodo=_periodo(runtime),
+                sample=runtime.sample,
+                sample_limit=runtime.sample_limit,
+            )
             if source == CAMARA_SOURCE:
                 stats = collect_camara(run, runtime)
             else:
@@ -102,6 +111,14 @@ def parse_args(argv: Sequence[str] | None = None) -> ParlamentaresRuntime:
         help="Baixa apenas parlamentares com parlamentar_id encontrado nos textos processados informados.",
     )
     parser.add_argument(
+        "--skip-existing-id-scan",
+        action="store_true",
+        help=(
+            "Nao varre raw/ e processed/textos_parlamentares/v1 para complementar IDs. "
+            "Use quando a lista oficial por periodo for suficiente e a varredura do Drive estiver lenta."
+        ),
+    )
+    parser.add_argument(
         "--textos-root",
         default=None,
         help="Raiz de textos processed/textos_parlamentares/v1 ou de seus Parquets. Default tenta samples locais em dev.",
@@ -138,6 +155,7 @@ def parse_args(argv: Sequence[str] | None = None) -> ParlamentaresRuntime:
         run_id=args.run_id or f"parlamentares-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
         source=args.source,
         ids_from_textos_only=bool(args.ids_from_textos_only),
+        skip_existing_id_scan=bool(args.skip_existing_id_scan),
         textos_root=Path(args.textos_root).expanduser() if args.textos_root else None,
     )
 
@@ -147,12 +165,20 @@ def collect_camara(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
     stats: Counter[str] = Counter()
     if runtime.ids_from_textos_only:
         textos_root = resolve_textos_root(runtime)
+        run.log("ids_textos_scan_started", textos_root=textos_root.as_posix())
         discovered_ids = discover_text_parlamentar_ids(textos_root, CAMARA_SOURCE)
         stats["ids_from_textos_only"] = 1
         stats["textos_root_exists"] = int(textos_root.exists())
         stats["textos_root"] = textos_root.as_posix()
+        run.log("ids_textos_scan_completed", ids_descobertos=len(discovered_ids), textos_root=textos_root.as_posix())
+    elif runtime.skip_existing_id_scan:
+        discovered_ids = []
+        stats["skip_existing_id_scan"] = 1
+        run.log("ids_existing_scan_skipped", motivo="skip_existing_id_scan")
     else:
-        discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, CAMARA_SOURCE))
+        run.log("ids_existing_scan_started", data_root=runtime.output_dir.as_posix())
+        discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, CAMARA_SOURCE, run=run))
+        run.log("ids_existing_scan_completed", ids_descobertos=len(discovered_ids))
 
     with OpenDataClient(CAMARA_BASE_URL) as client:
         if not runtime.ids_from_textos_only:
@@ -163,6 +189,7 @@ def collect_camara(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
                 "ordem": "ASC",
                 "ordenarPor": "nome",
             }
+            run.log("camara_deputados_list_started", periodo=periodo)
             for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
                 source_id = f"camara:deputados:periodo:{runtime.data_inicio.isoformat()}:{runtime.data_fim.isoformat()}:pagina:{page_index}"
                 written = run.write_record(
@@ -177,14 +204,28 @@ def collect_camara(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
                 stats["paginas_deputados"] += int(written)
                 discovered_ids.extend(_extract_camara_ids_from_page(page.data))
                 discovered_ids = _ordered_ids(discovered_ids)
+                run.log(
+                    "camara_deputados_page_loaded",
+                    pagina=page_index,
+                    written=written,
+                    ids_descobertos=len(discovered_ids),
+                )
                 if runtime.sample and runtime.sample_limit is not None and len(discovered_ids) >= runtime.sample_limit:
                     break
 
         selected_ids = _limit_ids(discovered_ids, runtime)
         stats["ids_descobertos"] = len(discovered_ids)
         stats["ids_selecionados"] = len(selected_ids)
-        for deputado_id in selected_ids:
+        run.log("camara_deputados_selected", ids_descobertos=len(discovered_ids), ids_selecionados=len(selected_ids))
+        for index, deputado_id in enumerate(selected_ids, start=1):
             stats["deputados_processados"] += 1
+            _log_item_progress(
+                run,
+                event="camara_deputado_progress",
+                index=index,
+                total=len(selected_ids),
+                parlamentar_id=deputado_id,
+            )
             _collect_camara_endpoint(
                 client,
                 run,
@@ -256,12 +297,20 @@ def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
     stats: Counter[str] = Counter()
     if runtime.ids_from_textos_only:
         textos_root = resolve_textos_root(runtime)
+        run.log("ids_textos_scan_started", textos_root=textos_root.as_posix())
         discovered_ids = discover_text_parlamentar_ids(textos_root, SENADO_SOURCE)
         stats["ids_from_textos_only"] = 1
         stats["textos_root_exists"] = int(textos_root.exists())
         stats["textos_root"] = textos_root.as_posix()
+        run.log("ids_textos_scan_completed", ids_descobertos=len(discovered_ids), textos_root=textos_root.as_posix())
+    elif runtime.skip_existing_id_scan:
+        discovered_ids = []
+        stats["skip_existing_id_scan"] = 1
+        run.log("ids_existing_scan_skipped", motivo="skip_existing_id_scan")
     else:
-        discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, SENADO_SOURCE))
+        run.log("ids_existing_scan_started", data_root=runtime.output_dir.as_posix())
+        discovered_ids = _ordered_ids(discover_existing_parlamentar_ids(runtime.output_dir, SENADO_SOURCE, run=run))
+        run.log("ids_existing_scan_completed", ids_descobertos=len(discovered_ids))
     legislaturas = legislaturas_for_period(runtime.data_inicio, runtime.data_fim)
 
     with OpenDataClient(SENADO_BASE_URL) as client:
@@ -269,6 +318,7 @@ def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
             inicio, fim = min(legislaturas), max(legislaturas)
             path = f"dadosabertos/senador/lista/legislatura/{inicio}/{fim}.json"
             source_id = f"senado:senadores:legislatura:{inicio}:{fim}"
+            run.log("senado_legislatura_list_started", legislatura_inicio=inicio, legislatura_fim=fim)
             result = client.get_json(path)
             written = run.write_record(
                 partition="metadata",
@@ -281,9 +331,17 @@ def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
             )
             stats["listas_legislatura"] += int(written)
             discovered_ids.extend(extract_senado_parlamentar_ids(result.data))
+            run.log(
+                "senado_legislatura_list_loaded",
+                legislatura_inicio=inicio,
+                legislatura_fim=fim,
+                written=written,
+                ids_descobertos=len(_ordered_ids(discovered_ids)),
+            )
 
         if not runtime.ids_from_textos_only:
             current_path = "dadosabertos/senador/lista/atual.json"
+            run.log("senado_atual_list_started")
             current_result = client.get_json(current_path)
             written = run.write_record(
                 partition="metadata",
@@ -296,14 +354,23 @@ def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
             )
             stats["listas_atual"] += int(written)
             discovered_ids.extend(extract_senado_parlamentar_ids(current_result.data))
+            run.log("senado_atual_list_loaded", written=written, ids_descobertos=len(_ordered_ids(discovered_ids)))
 
         discovered_ids = _ordered_ids(discovered_ids)
         selected_ids = _limit_ids(discovered_ids, runtime)
         stats["ids_descobertos"] = len(discovered_ids)
         stats["ids_selecionados"] = len(selected_ids)
+        run.log("senado_senadores_selected", ids_descobertos=len(discovered_ids), ids_selecionados=len(selected_ids))
 
-        for senador_id in selected_ids:
+        for index, senador_id in enumerate(selected_ids, start=1):
             stats["senadores_processados"] += 1
+            _log_item_progress(
+                run,
+                event="senado_senador_progress",
+                index=index,
+                total=len(selected_ids),
+                parlamentar_id=senador_id,
+            )
             for suffix, record_type in [
                 ("", "senado_senador_detalhe"),
                 ("/mandatos", "senado_senador_mandatos"),
@@ -367,19 +434,21 @@ def _collect_senado_endpoint(
     stats[record_type] += int(written)
 
 
-def discover_existing_parlamentar_ids(data_root: Path, source: str) -> list[str]:
+def discover_existing_parlamentar_ids(data_root: Path, source: str, *, run: CollectionRun | None = None) -> list[str]:
     ids: list[str] = []
     raw_root = data_root / "raw"
     if raw_root.exists():
-        for path in sorted(raw_root.rglob("*.jsonl")):
+        for file_index, path in enumerate(raw_root.rglob("*.jsonl"), start=1):
             for record in _iter_jsonl(path):
                 if record.get("source") != source:
                     continue
                 ids.extend(_ids_from_raw_record(record, source))
+            if run is not None and file_index % 250 == 0:
+                run.log("ids_existing_scan_progress", area="raw", arquivos_lidos=file_index, ids_encontrados=len(ids))
 
     processed_root = data_root / "processed" / "textos_parlamentares" / "v1"
     if processed_root.exists():
-        for path in sorted(processed_root.rglob("*.jsonl")):
+        for file_index, path in enumerate(processed_root.rglob("*.jsonl"), start=1):
             if "parquet" in path.parts:
                 continue
             for record in _iter_jsonl(path):
@@ -388,6 +457,13 @@ def discover_existing_parlamentar_ids(data_root: Path, source: str) -> list[str]
                 parlamentar_id = _string(record.get("parlamentar_id"))
                 if parlamentar_id:
                     ids.append(parlamentar_id)
+            if run is not None and file_index % 250 == 0:
+                run.log(
+                    "ids_existing_scan_progress",
+                    area="processed_textos",
+                    arquivos_lidos=file_index,
+                    ids_encontrados=len(ids),
+                )
     return _ordered_ids(ids)
 
 
@@ -536,6 +612,7 @@ def write_combined_manifest(
         "mode": runtime.mode,
         "sample": runtime.sample,
         "sample_limit": runtime.sample_limit,
+        "skip_existing_id_scan": runtime.skip_existing_id_scan,
         "output_dir": str(output_dir),
         "manifest_path": str(manifest_path),
         "autosave_path": str(autosave_path),
@@ -563,6 +640,18 @@ def _limit_ids(ids: Iterable[str], runtime: ParlamentaresRuntime) -> list[str]:
     if runtime.sample and runtime.sample_limit is not None:
         return ordered[: runtime.sample_limit]
     return ordered
+
+
+def _log_item_progress(
+    run: CollectionRun,
+    *,
+    event: str,
+    index: int,
+    total: int,
+    parlamentar_id: str,
+) -> None:
+    if index == 1 or index == total or index % 25 == 0:
+        run.log(event, processados=index, total=total, parlamentar_id=parlamentar_id)
 
 
 def _ordered_ids(ids: Iterable[str]) -> list[str]:

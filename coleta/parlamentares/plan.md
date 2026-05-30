@@ -54,6 +54,9 @@ Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
 - Para cada senador descoberto, baixar detalhe, mandatos e filiacoes.
 - Gravar todas as respostas oficiais como metadados brutos, sem criar particao
   mensal de corpus textual.
+- Emitir progresso no stdout/log durante descoberta, listagens e processamento
+  por lotes, porque a coleta de parlamentares pode ser a primeira etapa longa
+  do backfill e nao deve parecer travada no Colab.
 - Normalizar a camada bruta em uma dimensao processada
   `processed/parlamentares/v1`.
 - Gerar uma tabela de intervalos pronta para juncao temporal com
@@ -180,6 +183,10 @@ python -m coleta.parlamentares.collect \
 - Suportar `--source camara|senado|all`, com `all` como default.
 - Gravar JSONL linha a linha, checkpoint e autosave durante a execucao.
 - Com `--resume`, pular IDs e endpoints ja gravados para o mesmo `run_id`.
+- Permitir `--skip-existing-id-scan` para pular a varredura complementar de
+  `raw/` e `processed/textos_parlamentares/v1` quando a lista oficial por
+  periodo for suficiente, especialmente no preparo de `parlamentares/v1` antes
+  dos coletores historicos lentos da Camara.
 - Registrar cabecalhos de deprecacao, `Sunset`, `Retry-After` e `Link` no
   envelope bruto quando aparecerem.
 - Respeitar `Retry-After` e limitar a taxa do Senado para evitar HTTP 429.

@@ -45,6 +45,9 @@ pequena e tratada como amostra insuficiente.
 No caderno `coleta_backfill_historico_colab.ipynb`, a etapa de
 `parlamentares/v1` deve rodar antes dos coletores textuais lentos da Camara
 quando o backfill completo estiver ligado.
+Essa etapa usa `--skip-existing-id-scan` para evitar uma varredura inicial
+silenciosa de todo o Drive; o coletor ainda imprime progresso nas listagens e a
+cada lote de parlamentares.
 
 Depois da coleta raw de apartes, a geracao da tabela e do Parquet deve ser feita
 em `notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb`. Esse

@@ -23,6 +23,10 @@ exercicio.
 - `--resume`: pula endpoints ja concluidos no checkpoint para o mesmo `run_id`.
 - `--run-id`: identificador da execucao.
 - `--source camara|senado|all`: restringe a casa coletada quando necessario.
+- `--skip-existing-id-scan`: pula a varredura de `raw/` e
+  `processed/textos_parlamentares/v1` para complementar IDs. Recomendado na
+  etapa preparatoria de backfill historico, quando a lista oficial por periodo
+  basta e a varredura do Drive tornaria o inicio silencioso/lento.
 
 ## Separacao de dados
 
@@ -35,6 +39,9 @@ exercicio.
   `dataset`, `record_type`, `source_id`, `request`, `response`, `checksum` e
   `payload`.
 - O dataset raw e `parlamentares` para as duas casas.
+- O coletor deve imprimir progresso no stdout via log estruturado durante
+  descoberta de IDs, listagens oficiais e processamento por lotes de
+  parlamentares.
 
 ## Fontes oficiais
 

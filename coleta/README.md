@@ -250,6 +250,9 @@ No backfill historico geral, rode e processe `parlamentares/v1` antes dos
 coletores lentos da Camara. Isso permite que `camara/plenario_discursos` e
 `camara/plenario_apartes` usem mandatos oficiais para evitar consultas de
 deputados em anos em que eles nao estavam ativos.
+Nessa etapa preparatoria, o caderno de backfill passa
+`--skip-existing-id-scan` para evitar uma varredura pesada de todo o Drive antes
+do primeiro progresso; a descoberta vem das listas oficiais por periodo.
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 
