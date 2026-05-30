@@ -43,21 +43,26 @@ auditar cobertura.
 
 ## Fluxo
 
-1. Particionar o periodo em janelas controladas, preferencialmente anuais ou
-   menores quando a busca retornar muitas paginas.
-2. Carregar deputados e variantes de nome de `parlamentares/v1` quando existir
+1. Particionar o periodo por ano para fazer preflight de existencia.
+2. Se a busca anual retornar zero resultados, preservar a pagina anual em
+   `metadata/` e nao abrir meses.
+3. Se a busca anual retornar resultados, for inconclusiva ou falhar, abrir
+   aquele ano em trimestres.
+4. Se a busca trimestral retornar resultados, for inconclusiva ou falhar, abrir
+   aquele trimestre em meses e gravar as paginas mensais em `metadata/`.
+5. Carregar deputados e variantes de nome de `parlamentares/v1` quando existir
    no mesmo `data_root`; se nao existir, usar a API oficial de deputados como
    fallback.
-3. Para cada parlamentar e janela, consultar o Sitaq com `txAparteante`.
-4. Paginar resultados do Sitaq ate a ultima pagina disponivel.
-5. Gravar cada pagina em
+6. Para cada parlamentar e janela, consultar o Sitaq com `txAparteante`.
+7. Paginar resultados do Sitaq ate a ultima pagina disponivel.
+8. Gravar cada pagina em
    `data/raw/camara/plenario_apartes/metadata/{run_id}.jsonl` com
    `record_type=sitaq_apartes_search_page`.
-6. Preservar HTML bruto e parametros de busca no payload.
-7. Extrair, quando possivel, chaves de `TextoHTML.asp` apenas como metadados
+9. Preservar HTML bruto e parametros de busca no payload.
+10. Extrair, quando possivel, chaves de `TextoHTML.asp` apenas como metadados
    auxiliares: `nuSessao`, `nuQuarto`, `nuOrador`, `nuInsercao`, fase, data e
    apelido do orador.
-8. Em processamento posterior, reconciliar `txAparteante` com
+11. Em processamento posterior, reconciliar `txAparteante` com
    `parlamentares/v1` e marcar ambiguidades.
 
 ## Saidas

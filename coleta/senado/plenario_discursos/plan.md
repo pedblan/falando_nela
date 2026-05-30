@@ -47,6 +47,22 @@ Coletar pronunciamentos do Plenario do Senado Federal como unidade textual anali
 - `data/logs/{run_id}.jsonl`: eventos estruturados da execucao.
 - `data/manifests/{run_id}.json`: resumo auditavel de contagens, modo, periodo e amostra.
 
+## Otimizacao historica
+
+- O backfill de `1900-01-01` pode consultar o endpoint de lista por ano como
+  preflight antes de abrir em meses.
+- Anos sem `Pronunciamento` podem ser registrados em `metadata/` e marcados no
+  checkpoint sem disparar 12 consultas mensais vazias.
+- Anos com retorno podem ser expandidos para trimestres como segundo preflight.
+  Trimestres vazios param ali; trimestres positivos ou inconclusivos abrem
+  meses.
+- Requisicoes anuais ou trimestrais nunca devem ser gravadas no corpus
+  `ano=YYYY/mes=MM/`; elas sao somente descoberta em `metadata/`, porque podem
+  misturar meses diferentes.
+- So requisicoes mensais podem gerar `pronunciamento_texto`; se a resposta
+  anual ou trimestral for grande, incompleta ou instavel, a coleta deve cair
+  para janelas menores sem alterar os IDs deterministas dos pronunciamentos.
+
 ## Dev e Producao
 
 - `dev`: default. Usa amostra, grava em `data/dev` e aplica `--sample-limit 5` por default.

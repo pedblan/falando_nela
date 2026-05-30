@@ -54,6 +54,35 @@ def month_windows(data_inicio: date, data_fim: date) -> Iterator[tuple[str, date
         current = end + timedelta(days=1)
 
 
+def year_windows(data_inicio: date, data_fim: date) -> Iterator[tuple[str, date, date]]:
+    if data_inicio > data_fim:
+        raise ValueError("data_inicio nao pode ser posterior a data_fim")
+
+    current = data_inicio
+    while current <= data_fim:
+        end = min(data_fim, date(current.year, 12, 31))
+        yield f"{current.year:04d}", current, end
+        current = end + timedelta(days=1)
+
+
+def quarter_windows(data_inicio: date, data_fim: date) -> Iterator[tuple[str, date, date]]:
+    if data_inicio > data_fim:
+        raise ValueError("data_inicio nao pode ser posterior a data_fim")
+
+    current = data_inicio
+    while current <= data_fim:
+        quarter = ((current.month - 1) // 3) + 1
+        quarter_start_month = ((quarter - 1) * 3) + 1
+        if quarter == 4:
+            next_quarter = date(current.year + 1, 1, 1)
+        else:
+            next_quarter = date(current.year, quarter_start_month + 3, 1)
+
+        end = min(data_fim, next_quarter - timedelta(days=1))
+        yield f"{current.year:04d}-Q{quarter}", current, end
+        current = end + timedelta(days=1)
+
+
 def apply_sample_window(windows: list[tuple[str, date, date]], sample: bool) -> list[tuple[str, date, date]]:
     if not sample:
         return windows

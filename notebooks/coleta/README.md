@@ -16,7 +16,7 @@ Convencoes:
 Arquivos atuais:
 
 - `coleta_template.ipynb`: template geral para rodar todos os coletores, incluindo pareceres de PEC.
-- `coleta_backfill_historico_colab.ipynb`: orquestrador Colab para backfill historico longo de todas as bases, com `run_id`s fixos, `--resume`, validacao curta, processamento, Parquets e samples.
+- `coleta_backfill_historico_colab.ipynb`: orquestrador Colab para backfill historico longo de todas as bases, com `run_id`s fixos, `--resume`, validacao curta, auditoria de layout raw, processamento, Parquets e samples.
 - `coleta_senado_plenario.ipynb`: fluxo especifico para validar e rodar a coleta do Plenario do Senado.
 - `coleta_senado_ccj.ipynb`: fluxo especifico para validar e rodar a coleta de notas da CCJ do Senado.
 - `coleta_senado_ccj_complemento.ipynb`: fluxo especifico para complementar lacunas de notas da CCJ do Senado ate 2024.
@@ -30,3 +30,11 @@ Arquivos atuais:
 
 Os notebooks de apartes podem rodar antes do backfill historico completo de
 discursos, desde que usem `run_id`s distintos e gravem apenas em `metadata/`.
+Os coletores de apartes usam preflight anual e trimestral para evitar consultas
+mensais vazias no recorte historico amplo; trimestres positivos sao expandidos
+para meses.
+
+No backfill textual, consultas anuais ou trimestrais podem existir apenas como
+preflight em `metadata/`. O corpus textual em `ano=YYYY/mes=MM/` deve ser
+formado somente por requisicoes mensais; o caderno de backfill audita esse
+contrato antes do processamento.

@@ -10,7 +10,7 @@ if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from coleta.common.cli import build_parser, parse_runtime_args
-from coleta.common.config import apply_sample_window, format_senado_date, month_windows
+from coleta.common.config import apply_sample_window, format_senado_date, month_windows, quarter_windows, year_windows
 from coleta.common.http import OpenDataClient
 from coleta.common.io import CollectionRun, error_summary, listify
 from coleta.parlamentares.collect import extract_senado_parlamentar_ids, legislaturas_for_period
@@ -20,6 +20,8 @@ DATASET = "plenario_apartes"
 BASE_URL = "https://legis.senado.leg.br/"
 SIGLA_CASA = "SF"
 RECORD_TYPE = "senador_apartes_metadata"
+YEAR_PROBE_RECORD_TYPE = "senador_apartes_year_probe"
+QUARTER_PROBE_RECORD_TYPE = "senador_apartes_quarter_probe"
 
 
 def collect() -> None:
@@ -32,7 +34,7 @@ def collect() -> None:
         run_id=runtime.run_id,
         resume=runtime.resume,
     )
-    windows = apply_sample_window(list(month_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
+    windows = apply_sample_window(list(year_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
     periodo_total = {"data_inicio": runtime.data_inicio.isoformat(), "data_fim": runtime.data_fim.isoformat()}
     status = "completed"
     errors = 0
@@ -56,7 +58,7 @@ def collect() -> None:
                     run.log("partition_started", partition=partition, periodo=periodo, senadores=len(senador_ids))
                     for senador_id in senador_ids:
                         try:
-                            written, aparte_count = collect_senador_apartes(
+                            senador_stats = collect_senador_apartes_adaptive(
                                 client,
                                 run,
                                 senador_id=senador_id,
@@ -65,9 +67,11 @@ def collect() -> None:
                                 partition=partition,
                                 periodo=periodo,
                             )
+                            stats.update(senador_stats)
                             stats["senadores_processados"] += 1
-                            stats["requests_apartes"] += int(written)
-                            stats["apartes_payload"] += aparte_count
+                            if senador_stats.get("errors"):
+                                errors += int(senador_stats["errors"])
+                                status = "completed_with_errors"
                         except Exception as exc:
                             errors += 1
                             status = "completed_with_errors"
@@ -151,7 +155,7 @@ def discover_senadores(
     return ordered_ids(ids)
 
 
-def collect_senador_apartes(
+def collect_senador_apartes_adaptive(
     client: OpenDataClient,
     run: CollectionRun,
     *,
@@ -160,6 +164,152 @@ def collect_senador_apartes(
     end: date,
     partition: str,
     periodo: dict[str, str],
+) -> Counter[str]:
+    stats: Counter[str] = Counter()
+    try:
+        probe_written, annual_count = collect_senador_apartes(
+            client,
+            run,
+            senador_id=senador_id,
+            start=start,
+            end=end,
+            periodo=periodo,
+            record_type=YEAR_PROBE_RECORD_TYPE,
+            fetch_existing=True,
+        )
+        stats["year_probes"] += int(probe_written)
+        stats["year_probe_apartes_payload"] += annual_count
+        if annual_count == 0:
+            stats["year_probes_empty"] += 1
+            return stats
+        stats["year_probes_positive"] += 1
+    except Exception as exc:
+        stats["errors"] += 1
+        stats["year_probe_errors"] += 1
+        run.log(
+            "senador_apartes_year_probe_failed",
+            partition=partition,
+            senador_id=senador_id,
+            error=error_summary(exc),
+        )
+
+    stats.update(
+        collect_senador_apartes_quarters(
+            client,
+            run,
+            senador_id=senador_id,
+            start=start,
+            end=end,
+            partition=partition,
+        )
+    )
+    return stats
+
+
+def collect_senador_apartes_quarters(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    senador_id: str,
+    start: date,
+    end: date,
+    partition: str,
+) -> Counter[str]:
+    stats: Counter[str] = Counter()
+    for quarter_partition, quarter_start, quarter_end in quarter_windows(start, end):
+        quarter_periodo = {"data_inicio": quarter_start.isoformat(), "data_fim": quarter_end.isoformat()}
+        try:
+            probe_written, quarter_count = collect_senador_apartes(
+                client,
+                run,
+                senador_id=senador_id,
+                start=quarter_start,
+                end=quarter_end,
+                periodo=quarter_periodo,
+                record_type=QUARTER_PROBE_RECORD_TYPE,
+                fetch_existing=True,
+            )
+            stats["quarter_probes"] += int(probe_written)
+            stats["quarter_probe_apartes_payload"] += quarter_count
+            if quarter_count == 0:
+                stats["quarter_probes_empty"] += 1
+                continue
+            stats["quarter_probes_positive"] += 1
+        except Exception as exc:
+            stats["errors"] += 1
+            stats["quarter_probe_errors"] += 1
+            run.log(
+                "senador_apartes_quarter_probe_failed",
+                partition=partition,
+                quarter_partition=quarter_partition,
+                senador_id=senador_id,
+                error=error_summary(exc),
+            )
+
+        stats.update(
+            collect_senador_apartes_months(
+                client,
+                run,
+                senador_id=senador_id,
+                start=quarter_start,
+                end=quarter_end,
+                partition=partition,
+                parent_partition=quarter_partition,
+            )
+        )
+    return stats
+
+
+def collect_senador_apartes_months(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    senador_id: str,
+    start: date,
+    end: date,
+    partition: str,
+    parent_partition: str,
+) -> Counter[str]:
+    stats: Counter[str] = Counter()
+    for month_partition, month_start, month_end in month_windows(start, end):
+        month_periodo = {"data_inicio": month_start.isoformat(), "data_fim": month_end.isoformat()}
+        try:
+            written, aparte_count = collect_senador_apartes(
+                client,
+                run,
+                senador_id=senador_id,
+                start=month_start,
+                end=month_end,
+                periodo=month_periodo,
+                record_type=RECORD_TYPE,
+            )
+            stats["months_expanded"] += 1
+            stats["requests_apartes"] += int(written)
+            stats["apartes_payload"] += aparte_count
+        except Exception as exc:
+            stats["errors"] += 1
+            stats["month_errors"] += 1
+            run.log(
+                "senador_apartes_month_failed",
+                partition=partition,
+                parent_partition=parent_partition,
+                month_partition=month_partition,
+                senador_id=senador_id,
+                error=error_summary(exc),
+            )
+    return stats
+
+
+def collect_senador_apartes(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    senador_id: str,
+    start: date,
+    end: date,
+    periodo: dict[str, str],
+    record_type: str = RECORD_TYPE,
+    fetch_existing: bool = False,
 ) -> tuple[bool, int]:
     endpoint = f"dadosabertos/senador/{senador_id}/apartes"
     params = {
@@ -169,11 +319,15 @@ def collect_senador_apartes(
         "v": 5,
     }
     source_id = f"{SIGLA_CASA}:senador:{senador_id}:apartes:{params['dataInicio']}:{params['dataFim']}"
-    if run.has_record(source_id=source_id, record_type=RECORD_TYPE):
-        run.log("record_resume_skipped", source_id=source_id, record_type=RECORD_TYPE)
+    already_recorded = run.has_record(source_id=source_id, record_type=record_type)
+    if already_recorded and not fetch_existing:
+        run.log("record_resume_skipped", source_id=source_id, record_type=record_type)
         return False, 0
     result = client.get_json(endpoint, params=params)
     payload = result.data
+    if already_recorded:
+        run.log("record_resume_skipped", source_id=source_id, record_type=record_type)
+        return False, count_apartes(payload)
     written = run.write_record(
         partition="metadata",
         source_id=source_id,
@@ -181,7 +335,7 @@ def collect_senador_apartes(
         response=result.response_metadata,
         periodo=periodo,
         payload=payload,
-        record_type=RECORD_TYPE,
+        record_type=record_type,
     )
     return written, count_apartes(payload)
 

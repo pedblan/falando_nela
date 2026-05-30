@@ -23,7 +23,7 @@ subprocess.run([
     "--resume",
     "--run-id", "prod-camara-plenario-apartes-validacao-curta",
     "--data-inicio", "2025-01-01",
-    "--data-fim", "2025-01-31",
+    "--data-fim", "2025-12-31",
     "--sample",
     "--sample-limit", "10",
 ], check=False)
@@ -39,7 +39,12 @@ Depois da validacao curta, a coleta completa pode remover `--sample-limit`.
 - Todos os registros ficam em `metadata/{run_id}.jsonl`.
 - Nao existem particoes mensais `ano=YYYY/mes=MM/` para
   `camara/plenario_apartes`.
-- Cada linha tem `record_type=sitaq_apartes_search_page`.
+- O checkpoint usa particoes anuais, como `2025`, mesmo quando o raw fica em
+  `metadata/`.
+- O preflight anual tem `record_type=sitaq_apartes_year_probe`.
+- O preflight trimestral tem `record_type=sitaq_apartes_quarter_probe`.
+- Janelas mensais expandidas em trimestres positivos ou inconclusivos tem
+  `record_type=sitaq_apartes_search_page`.
 - Cada `source_id` e deterministico por aparteante, periodo e pagina.
 - O HTML bruto da pagina oficial e preservado.
 - Paginas com zero resultados sao preservadas.

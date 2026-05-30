@@ -51,6 +51,14 @@ discursos de Plenario com determinado aparteante, para alimentar
 - Nunca criar `data/raw/camara/plenario_apartes/ano=YYYY/mes=MM/`.
 - O dataset raw e `plenario_apartes`.
 - O `record_type` principal e `sitaq_apartes_search_page`.
+- As particoes de checkpoint sao anuais por default. A busca anual por
+  `txAparteante` serve para eliminar anos vazios antes de qualquer subdivisao
+  operacional futura.
+- O preflight anual deve usar `record_type=sitaq_apartes_year_probe`; anos
+  positivos, inconclusivos ou com falha de preflight devem abrir preflight
+  trimestral com `record_type=sitaq_apartes_quarter_probe`; trimestres
+  positivos, inconclusivos ou com falha de preflight devem gerar paginas
+  mensais com `record_type=sitaq_apartes_search_page`.
 
 ## Contrato do registro bruto
 

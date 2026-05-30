@@ -29,6 +29,10 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Orquestrar backfill historico de todas as bases existentes com `run_id`s
   fixos, `--resume`, validacao curta e inspecao de manifests antes do
   processamento.
+- Reduzir consultas vazias no backfill longo com janelas anuais de preflight:
+  apartes preservam anos e trimestres vazios em `metadata/` e expandem apenas
+  trimestres positivos para meses; discursos podem usar o mesmo preflight, mas
+  somente requisicoes mensais entram no corpus textual.
 - Registrar separadamente cobertura historica maxima e recorte analitico
   recomendado `2010-01-01` em diante.
 

@@ -9,6 +9,13 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
   historica maxima da fonte oficial, alinhada ao backfill historico do projeto,
   usando `1900-01-01` como inicio amplo quando a fonte aceitar a janela;
   lacunas ou anos sem retorno devem ficar preservados em manifests/logs.
+- Coletores metadata-only de apartes usam preflight anual e trimestral por
+  parlamentar. Ano vazio fica gravado em `metadata/`; ano positivo abre
+  trimestres; trimestre positivo ou inconclusivo abre meses. Tudo permanece em
+  `metadata/`.
+- No backfill textual de discursos, a particao mensal continua sendo o contrato
+  do corpus em `ano=YYYY/mes=MM/`. Consultas anuais ou trimestrais podem ser
+  usadas apenas como preflight em `metadata/`, nunca como corpus textual.
 - Para analises substantivas, o recorte recomendado continua sendo
   `2010-01-01` em diante, inclusive para apartes. Dados anteriores podem ser
   coletados para auditoria historica, mas devem ser tratados como cobertura de
@@ -119,6 +126,12 @@ parlamentares.
 `aparteante -> pronunciamento`. A coleta preserva os payloads oficiais em
 `metadata/` e o processamento posterior gera `apartes_parlamentares/v1` para
 contagens anuais por genero, partido e UF usando `parlamentares/v1`.
+
+Como a metrica inicial e anual, os coletores de apartes consultam primeiro por
+ano por parlamentar e depois por trimestre. Isso reduz o fan-out historico de
+periodos vazios sem mudar o raw: quando o trimestre tem retorno, a coleta abre
+os meses para manter janelas menores e cada resposta oficial continua em
+`metadata/`.
 
 O texto individual do aparte fica fora do escopo inicial. O coletor nao deve
 inferir genero, partido ou UF por nome; esses atributos entram apenas na

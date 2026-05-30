@@ -1,16 +1,46 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import httpx
 import pytest
 
 from coleta.common.cli import build_parser, parse_runtime_args, resolve_output_dir
-from coleta.common.config import PROD_DATA_ROOT_ENV
+from coleta.common.config import PROD_DATA_ROOT_ENV, quarter_windows, year_windows
 from coleta.common.documents import download_and_extract_document, extract_meta_refresh_url, extract_text_from_html_bytes
 from coleta.common.http import OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun
+
+
+def test_year_windows_preserve_requested_bounds() -> None:
+    assert list(year_windows(date(2024, 11, 15), date(2026, 2, 3))) == [
+        ("2024", date(2024, 11, 15), date(2024, 12, 31)),
+        ("2025", date(2025, 1, 1), date(2025, 12, 31)),
+        ("2026", date(2026, 1, 1), date(2026, 2, 3)),
+    ]
+
+
+def test_year_windows_reject_inverted_period() -> None:
+    with pytest.raises(ValueError, match="data_inicio"):
+        list(year_windows(date(2026, 1, 2), date(2026, 1, 1)))
+
+
+def test_quarter_windows_preserve_requested_bounds() -> None:
+    assert list(quarter_windows(date(2024, 2, 15), date(2025, 4, 3))) == [
+        ("2024-Q1", date(2024, 2, 15), date(2024, 3, 31)),
+        ("2024-Q2", date(2024, 4, 1), date(2024, 6, 30)),
+        ("2024-Q3", date(2024, 7, 1), date(2024, 9, 30)),
+        ("2024-Q4", date(2024, 10, 1), date(2024, 12, 31)),
+        ("2025-Q1", date(2025, 1, 1), date(2025, 3, 31)),
+        ("2025-Q2", date(2025, 4, 1), date(2025, 4, 3)),
+    ]
+
+
+def test_quarter_windows_reject_inverted_period() -> None:
+    with pytest.raises(ValueError, match="data_inicio"):
+        list(quarter_windows(date(2026, 1, 2), date(2026, 1, 1)))
 
 
 def test_open_data_client_retries_transient_status() -> None:

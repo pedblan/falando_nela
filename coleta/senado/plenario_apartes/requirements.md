@@ -45,6 +45,14 @@ alimentar o dataset relacional `apartes_parlamentares/v1`.
 - Nunca criar `data/raw/senado/plenario_apartes/ano=YYYY/mes=MM/`.
 - O dataset raw e `plenario_apartes`.
 - O `record_type` principal e `senador_apartes_metadata`.
+- As particoes de checkpoint sao anuais por default, pois o endpoint aceita
+  `dataInicio` e `dataFim` amplos e o objetivo inicial e detectar se houve
+  aparte no ano antes de qualquer subdivisao futura.
+- O preflight anual deve usar `record_type=senador_apartes_year_probe`; anos
+  positivos ou inconclusivos devem abrir preflight trimestral com
+  `record_type=senador_apartes_quarter_probe`; trimestres positivos ou
+  inconclusivos devem gerar respostas mensais com
+  `record_type=senador_apartes_metadata`.
 
 ## Contrato do registro bruto
 
@@ -77,7 +85,8 @@ como lista. Todos os formatos devem ser preservados sem perda.
 
 - Respeitar retries para `429`, `500`, `502`, `503` e `504`.
 - Respeitar `Retry-After`.
-- Checkpoint e `--resume` atuam por particao e por `source_id`.
+- Checkpoint e `--resume` atuam por particao anual, preflight trimestral,
+  janela mensal expandida e por `source_id`.
 - Em `prod`, falhar se nenhum destino externo for definido.
 
 ## Saida esperada para processamento

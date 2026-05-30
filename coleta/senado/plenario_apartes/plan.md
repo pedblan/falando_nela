@@ -39,19 +39,26 @@ cobertura, mas nao gera linha processada de aparte.
 
 ## Fluxo
 
-1. Particionar o periodo por mes.
-2. Carregar senadores de `parlamentares/v1` quando existir no mesmo
+1. Particionar o periodo por ano. Essa janela anual funciona como consulta de
+   existencia: se o endpoint retornar `Apartes=null`, o ano fica auditado em
+   `metadata/` e nao ha fan-out mensal.
+2. Se o ano tiver `Aparte` ou se o preflight anual falhar, abrir aquele ano em
+   trimestres.
+3. Se o trimestre tiver `Aparte` ou se o preflight trimestral falhar, abrir
+   aquele trimestre em meses e gravar as respostas mensais em `metadata/` como
+   raw principal.
+4. Carregar senadores de `parlamentares/v1` quando existir no mesmo
    `data_root`; se nao existir, descobrir senadores por legislatura usando os
    endpoints oficiais do Senado.
-3. Para cada senador e particao, requisitar
+5. Para cada senador e particao, requisitar
    `/dadosabertos/senador/{codigo}/apartes` com `casa=SF` e `v=5`.
-4. Gravar cada resposta em
+6. Gravar cada resposta em
    `data/raw/senado/plenario_apartes/metadata/{run_id}.jsonl` com
    `record_type=senador_apartes_metadata`.
-5. Usar `source_id` deterministico no formato
+7. Usar `source_id` deterministico no formato
    `SF:senador:{codigo}:apartes:{dataInicio}:{dataFim}`.
-6. Em `--sample`, limitar a primeira particao e poucos senadores.
-7. Marcar a particao como concluida somente depois de processar os senadores
+8. Em `--sample`, limitar a primeira particao e poucos senadores.
+9. Marcar a particao anual como concluida somente depois de processar os senadores
    selecionados para aquela particao.
 
 ## Saidas

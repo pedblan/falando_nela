@@ -13,7 +13,7 @@ if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from coleta.common.cli import build_parser, parse_runtime_args
-from coleta.common.config import apply_sample_window, month_windows
+from coleta.common.config import apply_sample_window, month_windows, quarter_windows, year_windows
 from coleta.common.http import OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun, error_summary
 
@@ -23,6 +23,8 @@ CAMARA_API_BASE_URL = "https://dadosabertos.camara.leg.br/"
 SITAQ_BASE_URL = "https://www.camara.leg.br/"
 SITAQ_PATH = "internet/SitaqWeb/ResultadoPesquisaDiscursos.asp"
 RECORD_TYPE = "sitaq_apartes_search_page"
+YEAR_PROBE_RECORD_TYPE = "sitaq_apartes_year_probe"
+QUARTER_PROBE_RECORD_TYPE = "sitaq_apartes_quarter_probe"
 PAGE_SIZE = 50
 
 
@@ -36,7 +38,7 @@ def collect() -> None:
         run_id=runtime.run_id,
         resume=runtime.resume,
     )
-    windows = apply_sample_window(list(month_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
+    windows = apply_sample_window(list(year_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
     periodo_total = {"data_inicio": runtime.data_inicio.isoformat(), "data_fim": runtime.data_fim.isoformat()}
     status = "completed"
     errors = 0
@@ -61,7 +63,7 @@ def collect() -> None:
                     run.log("partition_started", partition=partition, periodo=periodo, deputados=len(deputados))
                     for deputado in deputados:
                         try:
-                            page_stats = collect_apartes_deputado(
+                            page_stats = collect_apartes_deputado_adaptive(
                                 sitaq_client,
                                 run,
                                 deputado=deputado,
@@ -72,6 +74,9 @@ def collect() -> None:
                             )
                             stats.update(page_stats)
                             stats["deputados_processados"] += 1
+                            if page_stats.get("errors"):
+                                errors += int(page_stats["errors"])
+                                status = "completed_with_errors"
                         except Exception as exc:
                             errors += 1
                             status = "completed_with_errors"
@@ -176,6 +181,221 @@ def discover_deputados_atuais(
     return deputados
 
 
+def collect_apartes_deputado_adaptive(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    deputado: dict[str, Any],
+    start: date,
+    end: date,
+    partition: str,
+    periodo: dict[str, str],
+) -> Counter[str]:
+    stats: Counter[str] = Counter()
+    try:
+        probe_status, probe_written = collect_apartes_deputado_year_probe(
+            client,
+            run,
+            deputado=deputado,
+            start=start,
+            end=end,
+            periodo=periodo,
+        )
+        stats["year_probes"] += int(probe_written)
+        stats[f"year_probe_{probe_status}"] += 1
+        if probe_status == "zero":
+            return stats
+    except Exception as exc:
+        stats["errors"] += 1
+        stats["year_probe_errors"] += 1
+        run.log(
+            "deputado_apartes_year_probe_failed",
+            partition=partition,
+            deputado_id=deputado.get("id"),
+            deputado_nome=deputado.get("nome"),
+            error=error_summary(exc),
+        )
+
+    stats.update(
+        collect_apartes_deputado_quarters(
+            client,
+            run,
+            deputado=deputado,
+            start=start,
+            end=end,
+            partition=partition,
+        )
+    )
+    return stats
+
+
+def collect_apartes_deputado_quarters(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    deputado: dict[str, Any],
+    start: date,
+    end: date,
+    partition: str,
+) -> Counter[str]:
+    stats: Counter[str] = Counter()
+    for quarter_partition, quarter_start, quarter_end in quarter_windows(start, end):
+        quarter_periodo = {"data_inicio": quarter_start.isoformat(), "data_fim": quarter_end.isoformat()}
+        try:
+            probe_status, probe_written = collect_apartes_deputado_probe(
+                client,
+                run,
+                deputado=deputado,
+                start=quarter_start,
+                end=quarter_end,
+                periodo=quarter_periodo,
+                record_type=QUARTER_PROBE_RECORD_TYPE,
+                probe_label="quarter-probe",
+            )
+            stats["quarter_probes"] += int(probe_written)
+            stats[f"quarter_probe_{probe_status}"] += 1
+            if probe_status == "zero":
+                continue
+        except Exception as exc:
+            stats["errors"] += 1
+            stats["quarter_probe_errors"] += 1
+            run.log(
+                "deputado_apartes_quarter_probe_failed",
+                partition=partition,
+                quarter_partition=quarter_partition,
+                deputado_id=deputado.get("id"),
+                deputado_nome=deputado.get("nome"),
+                error=error_summary(exc),
+            )
+
+        stats.update(
+            collect_apartes_deputado_months(
+                client,
+                run,
+                deputado=deputado,
+                start=quarter_start,
+                end=quarter_end,
+                partition=partition,
+                parent_partition=quarter_partition,
+            )
+        )
+    return stats
+
+
+def collect_apartes_deputado_months(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    deputado: dict[str, Any],
+    start: date,
+    end: date,
+    partition: str,
+    parent_partition: str,
+) -> Counter[str]:
+    stats: Counter[str] = Counter()
+    for month_partition, month_start, month_end in month_windows(start, end):
+        month_periodo = {"data_inicio": month_start.isoformat(), "data_fim": month_end.isoformat()}
+        try:
+            page_stats = collect_apartes_deputado(
+                client,
+                run,
+                deputado=deputado,
+                start=month_start,
+                end=month_end,
+                partition=month_partition,
+                periodo=month_periodo,
+            )
+            stats.update(page_stats)
+            stats["months_expanded"] += 1
+        except Exception as exc:
+            stats["errors"] += 1
+            stats["month_errors"] += 1
+            run.log(
+                "deputado_apartes_month_failed",
+                partition=partition,
+                parent_partition=parent_partition,
+                month_partition=month_partition,
+                deputado_id=deputado.get("id"),
+                deputado_nome=deputado.get("nome"),
+                error=error_summary(exc),
+            )
+    return stats
+
+
+def collect_apartes_deputado_year_probe(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    deputado: dict[str, Any],
+    start: date,
+    end: date,
+    periodo: dict[str, str],
+) -> tuple[str, bool]:
+    return collect_apartes_deputado_probe(
+        client,
+        run,
+        deputado=deputado,
+        start=start,
+        end=end,
+        periodo=periodo,
+        record_type=YEAR_PROBE_RECORD_TYPE,
+        probe_label="year-probe",
+    )
+
+
+def collect_apartes_deputado_probe(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    deputado: dict[str, Any],
+    start: date,
+    end: date,
+    periodo: dict[str, str],
+    record_type: str,
+    probe_label: str,
+) -> tuple[str, bool]:
+    deputado_id = str(deputado.get("id") or "").strip()
+    nome = str(deputado.get("nome") or "").strip()
+    if not nome:
+        return "zero", False
+
+    params = build_sitaq_params(nome, start, end, page=1)
+    source_id = (
+        f"camara:aparteante:{deputado_id or normaliza_source_id(nome)}:"
+        f"{probe_label}:{start.isoformat()}:{end.isoformat()}:pagina:1"
+    )
+    already_recorded = run.has_record(source_id=source_id, record_type=record_type)
+    result = client.get_text(SITAQ_PATH, params=params)
+    total_pages = max(1, extract_total_pages(result.data))
+    parsed = parse_sitaq_result_page(result.data)
+    probe_status = classify_sitaq_probe(parsed, total_pages)
+    if already_recorded:
+        run.log("record_resume_skipped", source_id=source_id, record_type=record_type)
+        return probe_status, False
+
+    payload = {
+        "html": result.data,
+        "query": params,
+        "aparteante_consultado": nome,
+        "aparteante_id_consultado": deputado_id or None,
+        "page_number": 1,
+        "total_pages_detected": total_pages,
+        "probe_label": probe_label,
+        "probe_status": probe_status,
+        **parsed,
+    }
+    written = run.write_record(
+        partition="metadata",
+        source_id=source_id,
+        request={"method": "GET", "path": SITAQ_PATH, "params": params},
+        response=result.response_metadata,
+        periodo=periodo,
+        payload=payload,
+        record_type=record_type,
+    )
+    return probe_status, written
+
+
 def collect_apartes_deputado(
     client: OpenDataClient,
     run: CollectionRun,
@@ -231,6 +451,15 @@ def collect_apartes_deputado(
         stats["paginas_sitaq"] += int(written)
         stats["resultados_extraidos"] += len(parsed["chaves_extraidas"])
     return stats
+
+
+def classify_sitaq_probe(parsed: dict[str, Any], total_pages: int) -> str:
+    result_count_text = parsed.get("result_count_text")
+    if result_count_text == "Nenhum discurso encontrado.":
+        return "zero"
+    if total_pages > 1 or parsed.get("chaves_extraidas") or result_count_text:
+        return "positive"
+    return "unknown"
 
 
 def build_sitaq_params(nome: str, start: date, end: date, *, page: int) -> dict[str, Any]:

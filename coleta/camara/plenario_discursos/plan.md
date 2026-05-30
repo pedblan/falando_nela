@@ -24,6 +24,21 @@
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
 
+## Otimizacao historica
+
+- O backfill de `1900-01-01` pode consultar
+  `/api/v2/deputados/{id}/discursos` por ano como preflight por deputado.
+- Se a primeira pagina anual vier sem `dados`, o ano pode ser marcado como
+  vazio em `metadata/` sem abrir 12 janelas mensais para aquele deputado.
+- Se houver discursos, a coleta pode consultar trimestres como segundo
+  preflight. Trimestres vazios param ali; trimestres positivos ou
+  inconclusivos abrem meses.
+- Requisicoes anuais ou trimestrais nunca devem ser gravadas no corpus
+  `ano=YYYY/mes=MM/`; elas sao somente descoberta em `metadata/`, porque podem
+  misturar meses diferentes.
+- So paginas de requisicoes mensais podem ser gravadas em
+  `ano=YYYY/mes=MM/{run_id}.jsonl`.
+
 ## Dev e producao
 
 - `dev`: primeira particao mensal e ate tres deputados por default, gravada em `data/dev`.

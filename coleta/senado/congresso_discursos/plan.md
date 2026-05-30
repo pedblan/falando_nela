@@ -24,6 +24,19 @@
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
 
+## Otimizacao historica
+
+- O backfill historico pode usar consulta anual ao endpoint de lista como
+  preflight para pular anos vazios antes de abrir particoes mensais.
+- Anos com discursos podem ser expandidos para trimestres como segundo
+  preflight. Trimestres vazios param ali; trimestres positivos ou
+  inconclusivos abrem meses.
+- Requisicoes anuais ou trimestrais ficam somente em `metadata/`; registros
+  textuais continuam restritos a requisicoes mensais em `ano=YYYY/mes=MM/`,
+  mantendo o mesmo contrato de `senado/plenario_discursos`.
+- Se a resposta anual ou trimestral for grande ou instavel, a coleta deve cair
+  para meses sem alterar a semantica de `source_id`.
+
 ## Dev e producao
 
 - `dev`: amostra mensal por default, gravada em `data/dev`.
