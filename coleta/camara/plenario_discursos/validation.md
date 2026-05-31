@@ -50,6 +50,8 @@ Os testes devem cobrir:
 - fallback do probe para consulta sem ordenacao quando a API retorna 500;
 - fallback mensal para paginacao `itens=1` quando a pagina ordenada e a pagina
   sem ordenacao retornam 500;
+- garantia de que o 500 nos pontos com fallback conhecido nao consome todos os
+  retries antes de trocar de estrategia;
 - registro `discursos_page_error` em `metadata/` para paginas persistentes que
   continuam quebrando mesmo com `itens=1`;
 - preservacao de `transcricao` em paginas mensais;
@@ -75,6 +77,8 @@ Os testes devem cobrir:
 - Quando o fallback `itens=1` for acionado, paginas recuperadas podem aparecer
   com indices nao contiguos se uma pagina intermediaria persistir com 500; a
   lacuna deve estar registrada no erro correspondente em `metadata/`.
+- Testes de fallback devem conferir tambem o numero de tentativas da URL que
+  retornou 500, para evitar regressao para retries longos em erro persistente.
 - Registros preservam id do deputado, periodo, request, response, payload e
   checksum.
 - Quando `transcricao` estiver presente, ela e o texto prioritario para

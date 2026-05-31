@@ -30,6 +30,7 @@ YEAR_PROBE_RECORD_TYPE = "discursos_year_probe"
 QUARTER_PROBE_RECORD_TYPE = "discursos_quarter_probe"
 PAGE_ERROR_RECORD_TYPE = "discursos_page_error"
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+FAST_FALLBACK_STATUS_CODES = {500}
 
 
 def collect() -> None:
@@ -386,7 +387,7 @@ def _collect_discursos_probe(
     request_params = params
     strategy = "default"
     try:
-        result = client.get_json(path, params=params)
+        result = _get_json_fast_fallback(client, path, params=params)
     except httpx.HTTPStatusError as exc:
         if not _is_retryable_http_error(exc):
             raise
@@ -435,6 +436,7 @@ def _collect_discursos_deputado(
             params=default_params,
             strategy="default",
             retries=True,
+            fast_fallback=True,
         )
         return _write_discursos_pages(
             run,
@@ -463,6 +465,7 @@ def _collect_discursos_deputado(
             params=unordered_params,
             strategy="sem_ordenacao",
             retries=False,
+            fast_fallback=False,
         )
         return _write_discursos_pages(
             run,
@@ -500,13 +503,16 @@ def _fetch_discursos_pages_follow_next(
     params: dict[str, Any],
     strategy: str,
     retries: bool,
+    fast_fallback: bool,
 ) -> list[dict[str, Any]]:
     pages: list[dict[str, Any]] = []
     next_url: str | None = path
     next_params: dict[str, Any] | None = params
     page_index = 1
     while next_url:
-        if retries:
+        if fast_fallback:
+            result = _get_json_fast_fallback(client, next_url, params=next_params or {})
+        elif retries:
             result = client.get_json(next_url, params=next_params)
         else:
             result = _get_json_once(client, next_url, params=next_params or {})
@@ -675,6 +681,20 @@ def _get_json_once(client: OpenDataClient, path_or_url: str, *, params: dict[str
         params=params,
         headers={"Accept": "application/json"},
     )
+    response.raise_for_status()
+    return client._result(response, response_type="json")
+
+
+def _get_json_fast_fallback(client: OpenDataClient, path_or_url: str, *, params: dict[str, Any]) -> HttpResult:
+    response = client.client.get(
+        client._resolve_url(path_or_url),
+        params=params,
+        headers={"Accept": "application/json"},
+    )
+    if response.status_code in FAST_FALLBACK_STATUS_CODES:
+        response.raise_for_status()
+    if response.status_code in RETRYABLE_STATUS_CODES:
+        return client.get_json(path_or_url, params=params)
     response.raise_for_status()
     return client._result(response, response_type="json")
 

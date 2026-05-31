@@ -47,6 +47,11 @@
 - Se a API devolver `500`, `502`, `503`, `504` ou `429` no probe ordenado
   por `dataHoraInicio`, o coletor deve tentar novamente sem `ordem` e sem
   `ordenarPor`, registrando a estrategia em `request.fallback_strategy`.
+- Para `500 Internal Server Error` nos pontos com fallback conhecido, o
+  coletor deve fazer apenas uma tentativa antes de trocar de estrategia. Isso
+  evita gastar a politica completa de retry em erros historicos persistentes.
+  `429`, `502`, `503` e `504` continuam podendo usar retries normais quando
+  nao houver fallback imediato seguro.
 - Ano vazio nao abre trimestre nem mes.
 - Ano positivo abre probes trimestrais com `itens=1`.
 - Trimestre vazio nao abre mes.
@@ -69,6 +74,8 @@
   cair para paginacao explicita com `itens=1`, gravando as paginas recuperadas
   no corpus mensal e registrando paginas ainda quebradas como
   `discursos_page_error` em `metadata/`.
+- A primeira tentativa mensal ordenada que receber `500` deve acionar fallback
+  rapido sem aguardar todos os retries do cliente HTTP padrao.
 - `transcricao` deve ser preservada como texto prioritario quando estiver
   disponivel.
 - URL final, status HTTP, payload e checksum.

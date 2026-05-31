@@ -39,6 +39,8 @@
    Se o endpoint devolver erro de servidor/limite no probe ordenado por
    `dataHoraInicio`, repetir o probe sem parametros de ordenacao antes de
    considerar a janela falha.
+   Para `500 Internal Server Error`, cair no fallback apos uma tentativa, sem
+   esperar a sequencia completa de retries.
 6. Se o preflight anual vier sem `dados`, gravar o probe em `metadata/` e nao
    abrir trimestres nem meses para aquele deputado/ano.
 7. Se o ano for positivo, consultar trimestres com `itens=1`.
@@ -50,6 +52,8 @@
     tentar a mesma janela sem ordenacao. Se ainda falhar, paginar
     explicitamente com `itens=1`, gravando paginas recuperadas no corpus
     mensal e paginas persistentes quebradas como erro auditavel em `metadata/`.
+    O erro `500` aciona esse fallback rapidamente, porque nos anos historicos
+    ele costuma ser persistente e ligado a registros/paginas especificos.
 11. Preservar `transcricao` como texto oficial quando entregue pela API.
 12. Quando houver endpoint oficial mais granular para texto integral do discurso
    ou sessao, esse texto deve ter prioridade sobre metadados, `sumario` e
@@ -106,8 +110,8 @@
 - Capturar falhas de deputado/particao com `try/except`, registrar log
   estruturado e continuar quando possivel.
 - Para erros 500 historicos da API de discursos, reduzir a granularidade da
-  pagina antes de desistir da janela: ordenado mensal, mensal sem ordenacao,
-  pagina mensal `itens=1`.
+  pagina antes de desistir da janela: uma tentativa ordenada, mensal sem
+  ordenacao, pagina mensal `itens=1`.
 - Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular
   particoes/registros existentes desse `run_id`.
 - Pode rodar em paralelo com os coletores `senado/ccj_notas` e

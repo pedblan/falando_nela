@@ -203,7 +203,10 @@ def test_collect_discursos_adaptive_expands_positive_quarter_to_months(tmp_path:
 
 
 def test_collect_discursos_probe_falls_back_without_ordering_on_server_error(tmp_path: Path) -> None:
+    requests: list[str] = []
+
     def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
         if "ordenarPor" in request.url.params:
             return httpx.Response(500, json={"status": 500, "title": "Erro no servidor"})
         return httpx.Response(200, json={"dados": [{"dataHoraInicio": "1979-04-26T00:00"}], "links": []})
@@ -231,16 +234,25 @@ def test_collect_discursos_probe_falls_back_without_ordering_on_server_error(tmp
     assert written is True
     assert records[0]["request"]["fallback_strategy"] == "sem_ordenacao"
     assert "ordenarPor" not in records[0]["request"]["params"]
+    assert len(requests) == 2
 
 
 def test_collect_discursos_deputado_falls_back_to_single_item_pages_on_legacy_500(
     tmp_path: Path,
 ) -> None:
+    ordered_100_requests = 0
+    unordered_100_requests = 0
+
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal ordered_100_requests, unordered_100_requests
         params = request.url.params
         itens = params.get("itens")
         pagina = int(params.get("pagina", "1"))
         if itens == "100":
+            if "ordenarPor" in params:
+                ordered_100_requests += 1
+            else:
+                unordered_100_requests += 1
             return httpx.Response(500, json={"status": 500, "title": "Erro no servidor"})
         if itens == "1" and pagina == 3:
             return httpx.Response(500, json={"status": 500, "title": "Erro no servidor"})
@@ -305,3 +317,5 @@ def test_collect_discursos_deputado_falls_back_to_single_item_pages_on_legacy_50
     assert metadata_records[0]["record_type"] == "discursos_page_error"
     assert metadata_records[0]["source_id"] == "deputado:74854:discursos:1979-04:pagina:3:erro:itens_1"
     assert metadata_records[0]["response"]["status_code"] == 500
+    assert ordered_100_requests == 1
+    assert unordered_100_requests == 1
