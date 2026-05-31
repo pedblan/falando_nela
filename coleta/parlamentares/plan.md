@@ -47,6 +47,9 @@ Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
 
 - Descobrir IDs oficiais de parlamentares a partir das listas oficiais de cada
   casa para as legislaturas que interceptam `--data-inicio` e `--data-fim`.
+- Na Camara, preferir `/api/v2/legislaturas` + `/api/v2/deputados?idLegislatura=...`
+  em vez de uma consulta unica ampla com `dataInicio`/`dataFim`, para evitar
+  milhares de paginas sem noção de progresso.
 - Complementar a lista de IDs com os IDs ja encontrados em `raw/` e em
   `processed/textos_parlamentares/v1`, quando houver dados disponiveis no mesmo
   `data_root`.
@@ -187,6 +190,9 @@ python -m coleta.parlamentares.collect \
   `raw/` e `processed/textos_parlamentares/v1` quando a lista oficial por
   periodo for suficiente, especialmente no preparo de `parlamentares/v1` antes
   dos coletores historicos lentos da Camara.
+- Permitir `--skip-detail-endpoints` para coletar apenas listas oficiais e
+  gerar rapidamente `parlamentares_periodos` de planejamento por legislatura.
+  Esse modo nao substitui a coleta completa de atributos como genero.
 - Registrar cabecalhos de deprecacao, `Sunset`, `Retry-After` e `Link` no
   envelope bruto quando aparecerem.
 - Respeitar `Retry-After` e limitar a taxa do Senado para evitar HTTP 429.

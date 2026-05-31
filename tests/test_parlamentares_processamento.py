@@ -173,6 +173,60 @@ def test_process_parlamentares_refuses_to_overwrite_existing_outputs(tmp_path: P
         raise AssertionError("expected FileExistsError")
 
 
+def test_process_parlamentares_builds_camara_periodos_from_legislature_lists(tmp_path: Path) -> None:
+    _write_raw(
+        tmp_path,
+        "camara",
+        "run-camara-list",
+        [
+            _raw_record(
+                "camara",
+                "camara_legislaturas_page",
+                "camara:legislaturas:pagina:1",
+                {
+                    "dados": [
+                        {
+                            "id": 57,
+                            "uri": "https://dadosabertos.camara.leg.br/api/v2/legislaturas/57",
+                            "dataInicio": "2023-02-01",
+                            "dataFim": "2027-01-31",
+                        }
+                    ]
+                },
+            ),
+            _raw_record(
+                "camara",
+                "camara_deputados_page",
+                "camara:deputados:legislatura:57:pagina:1",
+                {
+                    "dados": [
+                        {
+                            "id": 204379,
+                            "nome": "Ana Silva",
+                            "siglaPartido": "ABC",
+                            "siglaUf": "SP",
+                            "idLegislatura": 57,
+                            "uri": "https://dadosabertos.camara.leg.br/api/v2/deputados/204379",
+                        }
+                    ]
+                },
+            ),
+        ],
+    )
+
+    process_parlamentares_data_root(tmp_path, run_id="processed-camara-list", overwrite=True)
+
+    periodos = _read_jsonl(tmp_path / "processed" / "parlamentares" / "v1" / "parlamentares_periodos.jsonl")
+
+    assert any(
+        row["parlamentar_key"] == "camara:204379"
+        and row["vigencia_inicio"] == "2023-02-01"
+        and row["vigencia_fim"] == "2027-01-31"
+        and row["partido_sigla"] == "ABC"
+        for row in periodos
+    )
+
+
 def _raw_record(source: str, record_type: str, source_id: str, payload: dict[str, object]) -> dict[str, object]:
     return {
         "run_id": f"raw-{source}",

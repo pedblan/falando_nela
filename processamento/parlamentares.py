@@ -273,6 +273,8 @@ def build_processed_tables(
     seen_filiacoes: set[tuple[Any, ...]] = set()
     camara_history: dict[str, tuple[dict[str, Any], dict[str, Any], Path]] = {}
     camara_detail_records: dict[str, tuple[dict[str, Any], dict[str, Any], Path]] = {}
+    camara_legislaturas: dict[str, dict[str, Any]] = {}
+    camara_list_records: list[tuple[dict[str, Any], dict[str, Any], Path]] = []
     senado_mandate_records: dict[str, tuple[dict[str, Any], dict[str, Any], Path]] = {}
     senado_filiation_records: dict[str, tuple[dict[str, Any], dict[str, Any], Path]] = {}
     senado_list_records: list[tuple[dict[str, Any], Path]] = []
@@ -290,7 +292,10 @@ def build_processed_tables(
             deputado_id = _camara_id_from_source_id(_string(raw_record.get("source_id")))
             if deputado_id and deputado_id not in camara_history:
                 camara_history[deputado_id] = (payload, raw_record, raw_path)
+        elif source == "camara" and record_type == "camara_legislaturas_page":
+            camara_legislaturas.update(extract_camara_legislaturas(payload))
         elif source == "camara" and record_type == "camara_deputados_page":
+            camara_list_records.append((payload, raw_record, raw_path))
             for item in _list(payload.get("dados")):
                 if not isinstance(item, dict):
                     continue
@@ -341,6 +346,22 @@ def build_processed_tables(
             continue
         row = normalize_camara_ultimo_status(payload, raw_record, raw_path=raw_path, data_root=data_root)
         if row:
+            key = _mandato_key(row)
+            if key not in seen_mandatos:
+                mandatos.append(row)
+                seen_mandatos.add(key)
+
+    camara_ids_with_mandatos = {row["parlamentar_id"] for row in mandatos if row.get("source") == "camara"}
+    for payload, raw_record, raw_path in camara_list_records:
+        for row in normalize_camara_list_mandatos(
+            payload,
+            raw_record,
+            raw_path=raw_path,
+            data_root=data_root,
+            legislaturas=camara_legislaturas,
+        ):
+            if row["parlamentar_id"] in camara_ids_with_mandatos:
+                continue
             key = _mandato_key(row)
             if key not in seen_mandatos:
                 mandatos.append(row)
@@ -587,6 +608,53 @@ def normalize_camara_ultimo_status(
     )
 
 
+def normalize_camara_list_mandatos(
+    payload: dict[str, Any],
+    raw_record: dict[str, Any],
+    *,
+    raw_path: Path,
+    data_root: Path,
+    legislaturas: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows = []
+    seen: set[tuple[str, str]] = set()
+    for item in _list(payload.get("dados")):
+        if not isinstance(item, dict):
+            continue
+        deputado_id = _string(item.get("id"))
+        legislatura = _string(item.get("idLegislatura"))
+        if not deputado_id or not legislatura or (deputado_id, legislatura) in seen:
+            continue
+        leg = legislaturas.get(legislatura, {})
+        data_inicio = _date_part(leg.get("dataInicio"))
+        data_fim = _date_part(leg.get("dataFim"))
+        if not data_inicio or not data_fim:
+            continue
+        seen.add((deputado_id, legislatura))
+        rows.append(
+            _base_mandato_row(
+                source="camara",
+                casa="Camara dos Deputados",
+                parlamentar_id=deputado_id,
+                mandato_id=f"{deputado_id}:lista_legislatura:{legislatura}",
+                legislatura=legislatura,
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                uf=_string(item.get("siglaUf")),
+                partido_sigla=_string(item.get("siglaPartido")),
+                situacao=None,
+                condicao=None,
+                participacao=None,
+                cargo="Deputado(a)",
+                titular_key=None,
+                raw_record=raw_record,
+                raw_path=raw_path,
+                data_root=data_root,
+            )
+        )
+    return rows
+
+
 def normalize_senado_mandatos(
     payload: dict[str, Any],
     raw_record: dict[str, Any],
@@ -827,6 +895,18 @@ def extract_senado_parlamentares(payload: Any) -> list[dict[str, Any]]:
             if isinstance(item, dict):
                 items.append(item)
     return items
+
+
+def extract_camara_legislaturas(payload: Any) -> dict[str, dict[str, Any]]:
+    legislaturas: dict[str, dict[str, Any]] = {}
+    root = _dict(payload)
+    for item in _list(root.get("dados")):
+        if not isinstance(item, dict):
+            continue
+        legislatura = _string(item.get("id"))
+        if legislatura:
+            legislaturas[legislatura] = item
+    return legislaturas
 
 
 def extract_mandatos(payload: Any) -> list[dict[str, Any]]:

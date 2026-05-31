@@ -252,7 +252,10 @@ coletores lentos da Camara. Isso permite que `camara/plenario_discursos` e
 deputados em anos em que eles nao estavam ativos.
 Nessa etapa preparatoria, o caderno de backfill passa
 `--skip-existing-id-scan` para evitar uma varredura pesada de todo o Drive antes
-do primeiro progresso; a descoberta vem das listas oficiais por periodo.
+do primeiro progresso e `--skip-detail-endpoints` para montar rapidamente
+`parlamentares_periodos` a partir das listas oficiais por legislatura. Rode a
+coleta completa de parlamentares depois, sem `--skip-detail-endpoints`, quando
+precisar de atributos enriquecidos como genero.
 
 O conector Google Drive pode ajudar a localizar e verificar arquivos/pastas, mas a escrita pesada deve ser feita pelo runtime do Colab com Drive montado.
 

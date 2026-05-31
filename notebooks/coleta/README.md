@@ -48,6 +48,9 @@ quando o backfill completo estiver ligado.
 Essa etapa usa `--skip-existing-id-scan` para evitar uma varredura inicial
 silenciosa de todo o Drive; o coletor ainda imprime progresso nas listagens e a
 cada lote de parlamentares.
+Ela tambem usa `--skip-detail-endpoints` para gerar rapidamente o plano de
+mandatos por legislatura. Depois, rode a coleta completa de parlamentares sem
+essa flag quando precisar dos metadados enriquecidos de genero/detalhe.
 
 Depois da coleta raw de apartes, a geracao da tabela e do Parquet deve ser feita
 em `notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb`. Esse

@@ -70,8 +70,12 @@ subprocess.run([
   impedir a coleta dos demais IDs.
 - O stdout/log deve mostrar progresso em eventos como `source_started`,
   `ids_existing_scan_started`, `ids_existing_scan_skipped`,
-  `camara_deputado_progress` e `senado_senador_progress`, evitando celulas
-  longas sem sinal de vida.
+  `camara_deputados_legislatura_page_loaded`, `camara_deputado_progress` e
+  `senado_senador_progress`, evitando celulas longas sem sinal de vida.
+- Em modo rapido com `--skip-detail-endpoints`, a camada processed deve gerar
+  `parlamentares_periodos` da Camara a partir das paginas oficiais de
+  legislatura e deputados por legislatura, ainda que `genero` fique
+  `nao_informado`.
 
 ## Criterios da camada processed
 

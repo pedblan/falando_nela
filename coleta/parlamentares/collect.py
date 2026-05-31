@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+from urllib.parse import parse_qs, urlparse
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -39,6 +40,7 @@ class ParlamentaresRuntime:
     source: str
     ids_from_textos_only: bool
     skip_existing_id_scan: bool
+    skip_detail_endpoints: bool
     textos_root: Path | None
 
 
@@ -119,6 +121,14 @@ def parse_args(argv: Sequence[str] | None = None) -> ParlamentaresRuntime:
         ),
     )
     parser.add_argument(
+        "--skip-detail-endpoints",
+        action="store_true",
+        help=(
+            "Coleta apenas listas oficiais de parlamentares/legislaturas, sem endpoints individuais "
+            "de detalhe, historico, mandatos ou filiacoes. Use para gerar rapidamente um plano de mandatos."
+        ),
+    )
+    parser.add_argument(
         "--textos-root",
         default=None,
         help="Raiz de textos processed/textos_parlamentares/v1 ou de seus Parquets. Default tenta samples locais em dev.",
@@ -156,6 +166,7 @@ def parse_args(argv: Sequence[str] | None = None) -> ParlamentaresRuntime:
         source=args.source,
         ids_from_textos_only=bool(args.ids_from_textos_only),
         skip_existing_id_scan=bool(args.skip_existing_id_scan),
+        skip_detail_endpoints=bool(args.skip_detail_endpoints),
         textos_root=Path(args.textos_root).expanduser() if args.textos_root else None,
     )
 
@@ -182,41 +193,48 @@ def collect_camara(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
 
     with OpenDataClient(CAMARA_BASE_URL) as client:
         if not runtime.ids_from_textos_only:
-            params = {
-                "dataInicio": runtime.data_inicio.isoformat(),
-                "dataFim": runtime.data_fim.isoformat(),
-                "itens": 100,
-                "ordem": "ASC",
-                "ordenarPor": "nome",
-            }
-            run.log("camara_deputados_list_started", periodo=periodo)
-            for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
-                source_id = f"camara:deputados:periodo:{runtime.data_inicio.isoformat()}:{runtime.data_fim.isoformat()}:pagina:{page_index}"
-                written = run.write_record(
-                    partition="metadata",
-                    source_id=source_id,
-                    request={"method": "GET", "path": "api/v2/deputados", "params": params if page_index == 1 else {}},
-                    response=page.response_metadata,
-                    periodo=periodo,
-                    payload=page.data,
-                    record_type="camara_deputados_page",
-                )
-                stats["paginas_deputados"] += int(written)
-                discovered_ids.extend(_extract_camara_ids_from_page(page.data))
+            legislaturas = _collect_camara_legislaturas(client, run, runtime, periodo, stats)
+            if legislaturas:
+                for index, legislatura in enumerate(legislaturas, start=1):
+                    if runtime.sample and runtime.sample_limit is not None and len(discovered_ids) >= runtime.sample_limit:
+                        break
+                    run.log(
+                        "camara_deputados_legislatura_started",
+                        legislatura=legislatura["id"],
+                        legislatura_index=index,
+                        legislaturas_total=len(legislaturas),
+                    )
+                    discovered_ids.extend(
+                        _collect_camara_deputados_legislatura(
+                            client,
+                            run,
+                            runtime,
+                            periodo,
+                            legislatura_id=int(legislatura["id"]),
+                            stats=stats,
+                        )
+                    )
+                    discovered_ids = _ordered_ids(discovered_ids)
+                    run.log(
+                        "camara_deputados_legislatura_completed",
+                        legislatura=legislatura["id"],
+                        legislatura_index=index,
+                        legislaturas_total=len(legislaturas),
+                        ids_descobertos=len(discovered_ids),
+                    )
+            else:
+                discovered_ids.extend(_collect_camara_deputados_periodo(client, run, runtime, periodo, stats))
                 discovered_ids = _ordered_ids(discovered_ids)
-                run.log(
-                    "camara_deputados_page_loaded",
-                    pagina=page_index,
-                    written=written,
-                    ids_descobertos=len(discovered_ids),
-                )
-                if runtime.sample and runtime.sample_limit is not None and len(discovered_ids) >= runtime.sample_limit:
-                    break
 
         selected_ids = _limit_ids(discovered_ids, runtime)
         stats["ids_descobertos"] = len(discovered_ids)
         stats["ids_selecionados"] = len(selected_ids)
         run.log("camara_deputados_selected", ids_descobertos=len(discovered_ids), ids_selecionados=len(selected_ids))
+        if runtime.skip_detail_endpoints:
+            stats["skip_detail_endpoints"] = 1
+            run.log("camara_detail_endpoints_skipped", ids_selecionados=len(selected_ids))
+            return dict(stats)
+
         for index, deputado_id in enumerate(selected_ids, start=1):
             stats["deputados_processados"] += 1
             _log_item_progress(
@@ -249,6 +267,132 @@ def collect_camara(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
             )
 
     return dict(stats)
+
+
+def _collect_camara_legislaturas(
+    client: OpenDataClient,
+    run: CollectionRun,
+    runtime: ParlamentaresRuntime,
+    periodo: dict[str, str],
+    stats: Counter[str],
+) -> list[dict[str, Any]]:
+    params = {"itens": 100, "ordem": "ASC", "ordenarPor": "id"}
+    selected: list[dict[str, Any]] = []
+    run.log("camara_legislaturas_list_started", periodo=periodo)
+    try:
+        for page_index, page in enumerate(iter_camara_pages(client, "api/v2/legislaturas", params=params), start=1):
+            written = run.write_record(
+                partition="metadata",
+                source_id=f"camara:legislaturas:pagina:{page_index}",
+                request={"method": "GET", "path": "api/v2/legislaturas", "params": params if page_index == 1 else {}},
+                response=page.response_metadata,
+                periodo=periodo,
+                payload=page.data,
+                record_type="camara_legislaturas_page",
+            )
+            stats["paginas_legislaturas"] += int(written)
+            for item in _dados(page.data):
+                if _camara_legislatura_intersects(item, runtime.data_inicio, runtime.data_fim):
+                    selected.append(item)
+            run.log(
+                "camara_legislaturas_page_loaded",
+                pagina=page_index,
+                paginas_estimadas=_last_page_from_links(page.data),
+                legislaturas_selecionadas=len(selected),
+                written=written,
+            )
+    except Exception as exc:
+        stats["camara_legislaturas_errors"] += 1
+        run.log("camara_legislaturas_list_failed", error=error_summary(exc))
+        return []
+
+    selected.sort(key=lambda item: int(item.get("id") or 0))
+    stats["legislaturas_selecionadas"] = len(selected)
+    run.log("camara_legislaturas_selected", total=len(selected), ids=[item.get("id") for item in selected[:20]])
+    return selected
+
+
+def _collect_camara_deputados_legislatura(
+    client: OpenDataClient,
+    run: CollectionRun,
+    runtime: ParlamentaresRuntime,
+    periodo: dict[str, str],
+    *,
+    legislatura_id: int,
+    stats: Counter[str],
+) -> list[str]:
+    params = {
+        "idLegislatura": legislatura_id,
+        "itens": 100,
+        "ordem": "ASC",
+        "ordenarPor": "nome",
+    }
+    discovered_ids: list[str] = []
+    for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
+        source_id = f"camara:deputados:legislatura:{legislatura_id}:pagina:{page_index}"
+        written = run.write_record(
+            partition="metadata",
+            source_id=source_id,
+            request={"method": "GET", "path": "api/v2/deputados", "params": params if page_index == 1 else {}},
+            response=page.response_metadata,
+            periodo=periodo,
+            payload=page.data,
+            record_type="camara_deputados_page",
+        )
+        stats["paginas_deputados"] += int(written)
+        discovered_ids.extend(_extract_camara_ids_from_page(page.data))
+        run.log(
+            "camara_deputados_legislatura_page_loaded",
+            legislatura=legislatura_id,
+            pagina=page_index,
+            paginas_estimadas=_last_page_from_links(page.data),
+            written=written,
+            ids_descobertos=len(_ordered_ids(discovered_ids)),
+        )
+        if runtime.sample and runtime.sample_limit is not None and len(_ordered_ids(discovered_ids)) >= runtime.sample_limit:
+            break
+    return _ordered_ids(discovered_ids)
+
+
+def _collect_camara_deputados_periodo(
+    client: OpenDataClient,
+    run: CollectionRun,
+    runtime: ParlamentaresRuntime,
+    periodo: dict[str, str],
+    stats: Counter[str],
+) -> list[str]:
+    params = {
+        "dataInicio": runtime.data_inicio.isoformat(),
+        "dataFim": runtime.data_fim.isoformat(),
+        "itens": 100,
+        "ordem": "ASC",
+        "ordenarPor": "nome",
+    }
+    discovered_ids: list[str] = []
+    run.log("camara_deputados_list_started", periodo=periodo, fallback="periodo_amplo")
+    for page_index, page in enumerate(iter_camara_pages(client, "api/v2/deputados", params=params), start=1):
+        source_id = f"camara:deputados:periodo:{runtime.data_inicio.isoformat()}:{runtime.data_fim.isoformat()}:pagina:{page_index}"
+        written = run.write_record(
+            partition="metadata",
+            source_id=source_id,
+            request={"method": "GET", "path": "api/v2/deputados", "params": params if page_index == 1 else {}},
+            response=page.response_metadata,
+            periodo=periodo,
+            payload=page.data,
+            record_type="camara_deputados_page",
+        )
+        stats["paginas_deputados"] += int(written)
+        discovered_ids.extend(_extract_camara_ids_from_page(page.data))
+        run.log(
+            "camara_deputados_page_loaded",
+            pagina=page_index,
+            paginas_estimadas=_last_page_from_links(page.data),
+            written=written,
+            ids_descobertos=len(_ordered_ids(discovered_ids)),
+        )
+        if runtime.sample and runtime.sample_limit is not None and len(_ordered_ids(discovered_ids)) >= runtime.sample_limit:
+            break
+    return _ordered_ids(discovered_ids)
 
 
 def _collect_camara_endpoint(
@@ -361,6 +505,10 @@ def collect_senado(run: CollectionRun, runtime: ParlamentaresRuntime) -> dict[st
         stats["ids_descobertos"] = len(discovered_ids)
         stats["ids_selecionados"] = len(selected_ids)
         run.log("senado_senadores_selected", ids_descobertos=len(discovered_ids), ids_selecionados=len(selected_ids))
+        if runtime.skip_detail_endpoints:
+            stats["skip_detail_endpoints"] = 1
+            run.log("senado_detail_endpoints_skipped", ids_selecionados=len(selected_ids))
+            return dict(stats)
 
         for index, senador_id in enumerate(selected_ids, start=1):
             stats["senadores_processados"] += 1
@@ -558,6 +706,35 @@ def _extract_camara_ids_from_page(payload: Any) -> list[str]:
     return ids
 
 
+def _dados(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+    return [item for item in listify(payload.get("dados")) if isinstance(item, dict)]
+
+
+def _camara_legislatura_intersects(item: dict[str, Any], data_inicio: date, data_fim: date) -> bool:
+    start = _parse_date(item.get("dataInicio"))
+    end = _parse_date(item.get("dataFim"))
+    if start is None or end is None:
+        return False
+    return start <= data_fim and end >= data_inicio
+
+
+def _last_page_from_links(payload: Any) -> int | None:
+    if not isinstance(payload, dict):
+        return None
+    for link in listify(payload.get("links")):
+        if not isinstance(link, dict) or link.get("rel") != "last":
+            continue
+        href = _string(link.get("href"))
+        if not href:
+            continue
+        values = parse_qs(urlparse(href).query).get("pagina")
+        if values and values[-1].isdigit():
+            return int(values[-1])
+    return None
+
+
 def extract_senado_parlamentar_ids(payload: Any) -> list[str]:
     ids = []
     for value in _find_values(payload, "CodigoParlamentar"):
@@ -613,6 +790,7 @@ def write_combined_manifest(
         "sample": runtime.sample,
         "sample_limit": runtime.sample_limit,
         "skip_existing_id_scan": runtime.skip_existing_id_scan,
+        "skip_detail_endpoints": runtime.skip_detail_endpoints,
         "output_dir": str(output_dir),
         "manifest_path": str(manifest_path),
         "autosave_path": str(autosave_path),
@@ -706,6 +884,16 @@ def _string(value: Any) -> str | None:
         stripped = value.strip()
         return stripped or None
     return str(value)
+
+
+def _parse_date(value: Any) -> date | None:
+    text = _string(value)
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
 
 
 if __name__ == "__main__":

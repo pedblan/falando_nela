@@ -27,6 +27,10 @@ exercicio.
   `processed/textos_parlamentares/v1` para complementar IDs. Recomendado na
   etapa preparatoria de backfill historico, quando a lista oficial por periodo
   basta e a varredura do Drive tornaria o inicio silencioso/lento.
+- `--skip-detail-endpoints`: pula endpoints individuais de detalhe, historico,
+  mandatos e filiacoes. Recomendado apenas para gerar rapidamente um plano de
+  mandatos por legislatura antes dos coletores historicos; nao substitui a
+  coleta completa de genero/detalhes.
 
 ## Separacao de dados
 
@@ -42,11 +46,15 @@ exercicio.
 - O coletor deve imprimir progresso no stdout via log estruturado durante
   descoberta de IDs, listagens oficiais e processamento por lotes de
   parlamentares.
+- Na Camara, o progresso deve indicar legislatura corrente e
+  `paginas_estimadas` quando a API trouxer link `last`.
 
 ## Fontes oficiais
 
 - Usar somente APIs ou arquivos oficiais da Camara e do Senado.
 - Camara:
+  - `GET /api/v2/legislaturas`;
+  - `GET /api/v2/deputados?idLegislatura={id}` como descoberta preferencial;
   - `GET /api/v2/deputados`;
   - `GET /api/v2/deputados/{id}`;
   - `GET /api/v2/deputados/{id}/historico`;
@@ -160,6 +168,10 @@ Para planejamento de coleta, `camara/plenario_discursos` e
 clipando a janela da requisicao ao intervalo de mandato que intercepta o ano.
 Em execucoes completas, amostras pequenas de `parlamentares_periodos` nao devem
 ser usadas como plano suficiente.
+Quando `parlamentares/v1` for gerado em modo rapido com
+`--skip-detail-endpoints`, a Camara deve construir esses intervalos a partir das
+listas oficiais por legislatura. Campos como genero podem ficar
+`nao_informado` ate a coleta completa de detalhes.
 
 ## Parquets
 
