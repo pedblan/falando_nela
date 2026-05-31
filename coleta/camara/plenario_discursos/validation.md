@@ -47,6 +47,11 @@ Os testes devem cobrir:
 - escrita de `deputados_page` em `metadata/`;
 - probe anual vazio sem abertura de meses;
 - probe anual/trimestral positivo abrindo meses;
+- fallback do probe para consulta sem ordenacao quando a API retorna 500;
+- fallback mensal para paginacao `itens=1` quando a pagina ordenada e a pagina
+  sem ordenacao retornam 500;
+- registro `discursos_page_error` em `metadata/` para paginas persistentes que
+  continuam quebrando mesmo com `itens=1`;
 - preservacao de `transcricao` em paginas mensais;
 - escrita mensal exclusivamente em `ano=YYYY/mes=MM/`.
 
@@ -64,7 +69,12 @@ Os testes devem cobrir:
 - `discursos_year_probe` e `discursos_quarter_probe` nunca aparecem em
   `ano=YYYY/mes=MM/`.
 - `discursos_page` e gravado apenas para requisicoes mensais.
+- `discursos_page_error` aparece somente em `metadata/` e nao bloqueia a
+  gravacao de outras paginas recuperaveis do mesmo mes.
 - Paginacao mensal segue links `rel=next`.
+- Quando o fallback `itens=1` for acionado, paginas recuperadas podem aparecer
+  com indices nao contiguos se uma pagina intermediaria persistir com 500; a
+  lacuna deve estar registrada no erro correspondente em `metadata/`.
 - Registros preservam id do deputado, periodo, request, response, payload e
   checksum.
 - Quando `transcricao` estiver presente, ela e o texto prioritario para

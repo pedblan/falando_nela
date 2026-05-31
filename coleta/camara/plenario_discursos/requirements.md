@@ -44,6 +44,9 @@
   coletada por ano pela API, para evitar consultar parlamentares que nao
   estavam ativos naquele intervalo.
 - Para cada deputado/ano, o coletor deve fazer probe anual com `itens=1`.
+- Se a API devolver `500`, `502`, `503`, `504` ou `429` no probe ordenado
+  por `dataHoraInicio`, o coletor deve tentar novamente sem `ordem` e sem
+  `ordenarPor`, registrando a estrategia em `request.fallback_strategy`.
 - Ano vazio nao abre trimestre nem mes.
 - Ano positivo abre probes trimestrais com `itens=1`.
 - Trimestre vazio nao abre mes.
@@ -58,13 +61,21 @@
 - Periodo consultado.
 - `record_type` coerente com a granularidade:
   `deputados_page`, `discursos_year_probe`, `discursos_quarter_probe` ou
-  `discursos_page`.
+  `discursos_page`; falhas persistentes de pagina mensal usam
+  `discursos_page_error` em `metadata/`.
 - Pagina de discursos retornada pela API nos registros mensais.
+- Quando uma pagina mensal ordenada falhar com erro temporario/servidor, o
+  coletor deve tentar a mesma janela sem ordenacao. Se continuar falhando, deve
+  cair para paginacao explicita com `itens=1`, gravando as paginas recuperadas
+  no corpus mensal e registrando paginas ainda quebradas como
+  `discursos_page_error` em `metadata/`.
 - `transcricao` deve ser preservada como texto prioritario quando estiver
   disponivel.
 - URL final, status HTTP, payload e checksum.
 - O manifest deve registrar `deputados_periodos_carregados` quando o plano por
   mandato for usado.
+- O manifest deve terminar como `completed_with_errors` quando houver paginas
+  mensais persistentes registradas como `discursos_page_error`.
 
 ## Limites
 

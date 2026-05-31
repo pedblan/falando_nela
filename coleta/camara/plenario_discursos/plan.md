@@ -36,6 +36,9 @@
    Camara como metadado auxiliar.
 5. Para cada deputado ativo no ano, consultar
    `/api/v2/deputados/{id}/discursos` com `itens=1` como preflight anual.
+   Se o endpoint devolver erro de servidor/limite no probe ordenado por
+   `dataHoraInicio`, repetir o probe sem parametros de ordenacao antes de
+   considerar a janela falha.
 6. Se o preflight anual vier sem `dados`, gravar o probe em `metadata/` e nao
    abrir trimestres nem meses para aquele deputado/ano.
 7. Se o ano for positivo, consultar trimestres com `itens=1`.
@@ -43,8 +46,12 @@
    mensais daquele trimestre.
 9. Apenas requisicoes mensais completas sao paginadas e gravadas em
    `ano=YYYY/mes=MM/{run_id}.jsonl`.
-10. Preservar `transcricao` como texto oficial quando entregue pela API.
-11. Quando houver endpoint oficial mais granular para texto integral do discurso
+10. Se uma requisicao mensal falhar com `500`, `502`, `503`, `504` ou `429`,
+    tentar a mesma janela sem ordenacao. Se ainda falhar, paginar
+    explicitamente com `itens=1`, gravando paginas recuperadas no corpus
+    mensal e paginas persistentes quebradas como erro auditavel em `metadata/`.
+11. Preservar `transcricao` como texto oficial quando entregue pela API.
+12. Quando houver endpoint oficial mais granular para texto integral do discurso
    ou sessao, esse texto deve ter prioridade sobre metadados, `sumario` e
    palavras-chave.
 
@@ -58,6 +65,8 @@
 - `discursos_quarter_probe`: primeira pagina trimestral com `itens=1`, em
   `metadata/`.
 - `discursos_page`: pagina mensal de discursos, em `ano=YYYY/mes=MM/`.
+- `discursos_page_error`: erro persistente de pagina mensal apos fallback,
+  em `metadata/`, com status HTTP, periodo e estrategia de fallback.
 
 ## Saidas
 
@@ -96,6 +105,9 @@
   execucao.
 - Capturar falhas de deputado/particao com `try/except`, registrar log
   estruturado e continuar quando possivel.
+- Para erros 500 historicos da API de discursos, reduzir a granularidade da
+  pagina antes de desistir da janela: ordenado mensal, mensal sem ordenacao,
+  pagina mensal `itens=1`.
 - Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular
   particoes/registros existentes desse `run_id`.
 - Pode rodar em paralelo com os coletores `senado/ccj_notas` e

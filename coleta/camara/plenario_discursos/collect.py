@@ -5,13 +5,16 @@ from collections import Counter
 from datetime import date
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
 
+import httpx
+
 from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, month_windows, quarter_windows, year_windows
-from coleta.common.http import OpenDataClient, iter_camara_pages
+from coleta.common.http import HttpResult, OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun, error_summary
 from coleta.common.parlamentares import (
     active_parlamentares_for_window,
@@ -25,6 +28,8 @@ BASE_URL = "https://dadosabertos.camara.leg.br/"
 RECORD_TYPE = "discursos_page"
 YEAR_PROBE_RECORD_TYPE = "discursos_year_probe"
 QUARTER_PROBE_RECORD_TYPE = "discursos_quarter_probe"
+PAGE_ERROR_RECORD_TYPE = "discursos_page_error"
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def collect() -> None:
@@ -127,6 +132,9 @@ def collect() -> None:
                             status = "completed_with_errors"
                             run.log("deputy_discourses_failed", deputado_id=deputado_id, error=error_summary(exc))
                             continue
+                        if stats.get("page_errors", 0):
+                            errors += int(stats["page_errors"])
+                            status = "completed_with_errors"
                         preflight_stats.update(stats["preflight"])
                         processed_deputados += 1
                         processed_discourse_pages += stats["pages"]
@@ -236,7 +244,13 @@ def _collect_discursos_deputado_adaptive(
     partition: str,
     periodo: dict[str, str],
 ) -> dict[str, Any]:
-    stats: dict[str, Any] = {"pages": 0, "discursos": 0, "transcricoes": 0, "preflight": Counter()}
+    stats: dict[str, Any] = {
+        "pages": 0,
+        "discursos": 0,
+        "transcricoes": 0,
+        "page_errors": 0,
+        "preflight": Counter(),
+    }
     try:
         status, written = _collect_discursos_probe(
             client,
@@ -305,7 +319,9 @@ def _collect_discursos_deputado_adaptive(
         stats["pages"] += month_stats["pages"]
         stats["discursos"] += month_stats["discursos"]
         stats["transcricoes"] += month_stats["transcricoes"]
+        stats["page_errors"] += month_stats["page_errors"]
         stats["preflight"]["months_expanded"] += month_stats["months"]
+        stats["preflight"]["monthly_page_errors"] += month_stats["page_errors"]
     return stats
 
 
@@ -317,13 +333,36 @@ def _collect_discursos_deputado_months(
     start: date,
     end: date,
 ) -> dict[str, int]:
-    stats = {"pages": 0, "discursos": 0, "transcricoes": 0, "months": 0}
+    stats = {"pages": 0, "discursos": 0, "transcricoes": 0, "months": 0, "page_errors": 0}
     for month_partition, month_start, month_end in month_windows(start, end):
         periodo = {"data_inicio": month_start.isoformat(), "data_fim": month_end.isoformat()}
-        month_stats = _collect_discursos_deputado(client, run, month_partition, periodo, deputado_id)
+        try:
+            month_stats = _collect_discursos_deputado(client, run, month_partition, periodo, deputado_id)
+        except Exception as exc:
+            stats["page_errors"] += 1
+            run.log(
+                "discursos_month_failed",
+                partition=month_partition,
+                deputado_id=deputado_id,
+                periodo=periodo,
+                error=error_summary(exc),
+            )
+            _write_discursos_error_record(
+                run,
+                partition=month_partition,
+                periodo=periodo,
+                deputado_id=deputado_id,
+                page_index=None,
+                request={"method": "GET", "path": f"api/v2/deputados/{deputado_id}/discursos", "params": {}},
+                error=exc,
+                strategy="month_failed",
+            )
+            stats["months"] += 1
+            continue
         stats["pages"] += month_stats["pages"]
         stats["discursos"] += month_stats["discursos"]
         stats["transcricoes"] += month_stats["transcricoes"]
+        stats["page_errors"] += month_stats["page_errors"]
         stats["months"] += 1
     return stats
 
@@ -341,16 +380,28 @@ def _collect_discursos_probe(
     probe_label: str,
 ) -> tuple[str, bool]:
     path = f"api/v2/deputados/{deputado_id}/discursos"
-    params = {
-        "dataInicio": start.isoformat(),
-        "dataFim": end.isoformat(),
-        "itens": 1,
-        "ordem": "ASC",
-        "ordenarPor": "dataHoraInicio",
-    }
+    params = _discursos_params(start.isoformat(), end.isoformat(), itens=1, ordered=True)
     source_id = f"deputado:{deputado_id}:discursos:{probe_label}:{partition}"
     already_recorded = run.has_record(source_id=source_id, record_type=record_type)
-    result = client.get_json(path, params=params)
+    request_params = params
+    strategy = "default"
+    try:
+        result = client.get_json(path, params=params)
+    except httpx.HTTPStatusError as exc:
+        if not _is_retryable_http_error(exc):
+            raise
+        request_params = _discursos_params(start.isoformat(), end.isoformat(), itens=1, ordered=False)
+        strategy = "sem_ordenacao"
+        run.log(
+            "discursos_probe_fallback_started",
+            partition=partition,
+            deputado_id=deputado_id,
+            periodo=periodo,
+            record_type=record_type,
+            fallback_strategy=strategy,
+            error=error_summary(exc),
+        )
+        result = _get_json_once(client, path, params=request_params)
     discursos = _dados(result.data)
     status = "positive" if discursos else "zero"
     if already_recorded:
@@ -359,7 +410,7 @@ def _collect_discursos_probe(
     written = run.write_record(
         partition="metadata",
         source_id=source_id,
-        request={"method": "GET", "path": path, "params": params},
+        request=_request_payload(path, request_params, strategy=strategy),
         response=result.response_metadata,
         periodo=periodo,
         payload=result.data,
@@ -376,16 +427,182 @@ def _collect_discursos_deputado(
     deputado_id: int,
 ) -> dict[str, int]:
     path = f"api/v2/deputados/{deputado_id}/discursos"
-    params = {
-        "dataInicio": periodo["data_inicio"],
-        "dataFim": periodo["data_fim"],
-        "itens": 100,
-        "ordem": "ASC",
-        "ordenarPor": "dataHoraInicio",
-    }
-    stats = {"pages": 0, "discursos": 0, "transcricoes": 0}
+    default_params = _discursos_params(periodo["data_inicio"], periodo["data_fim"], itens=100, ordered=True)
+    try:
+        pages = _fetch_discursos_pages_follow_next(
+            client,
+            path,
+            params=default_params,
+            strategy="default",
+            retries=True,
+        )
+        return _write_discursos_pages(
+            run,
+            partition=partition,
+            periodo=periodo,
+            deputado_id=deputado_id,
+            pages=pages,
+        )
+    except httpx.HTTPStatusError as exc:
+        if not _is_retryable_http_error(exc):
+            raise
+        run.log(
+            "discursos_month_fallback_started",
+            partition=partition,
+            deputado_id=deputado_id,
+            periodo=periodo,
+            fallback_strategy="sem_ordenacao",
+            error=error_summary(exc),
+        )
 
-    for page_index, result in enumerate(iter_camara_pages(client, path, params=params), start=1):
+    unordered_params = _discursos_params(periodo["data_inicio"], periodo["data_fim"], itens=100, ordered=False)
+    try:
+        pages = _fetch_discursos_pages_follow_next(
+            client,
+            path,
+            params=unordered_params,
+            strategy="sem_ordenacao",
+            retries=False,
+        )
+        return _write_discursos_pages(
+            run,
+            partition=partition,
+            periodo=periodo,
+            deputado_id=deputado_id,
+            pages=pages,
+        )
+    except httpx.HTTPStatusError as exc:
+        if not _is_retryable_http_error(exc):
+            raise
+        run.log(
+            "discursos_month_fallback_started",
+            partition=partition,
+            deputado_id=deputado_id,
+            periodo=periodo,
+            fallback_strategy="itens_1",
+            error=error_summary(exc),
+        )
+
+    return _collect_discursos_deputado_explicit_pages(
+        client,
+        run,
+        partition=partition,
+        periodo=periodo,
+        deputado_id=deputado_id,
+        itens=1,
+    )
+
+
+def _fetch_discursos_pages_follow_next(
+    client: OpenDataClient,
+    path: str,
+    *,
+    params: dict[str, Any],
+    strategy: str,
+    retries: bool,
+) -> list[dict[str, Any]]:
+    pages: list[dict[str, Any]] = []
+    next_url: str | None = path
+    next_params: dict[str, Any] | None = params
+    page_index = 1
+    while next_url:
+        if retries:
+            result = client.get_json(next_url, params=next_params)
+        else:
+            result = _get_json_once(client, next_url, params=next_params or {})
+        request_path = next_url
+        request_params = next_params or {}
+        pages.append(
+            {
+                "page_index": page_index,
+                "result": result,
+                "request": _request_payload(request_path, request_params, strategy=strategy),
+            }
+        )
+        next_url = _next_link(result.data)
+        next_params = None
+        page_index += 1
+    return pages
+
+
+def _collect_discursos_deputado_explicit_pages(
+    client: OpenDataClient,
+    run: CollectionRun,
+    *,
+    partition: str,
+    periodo: dict[str, str],
+    deputado_id: int,
+    itens: int,
+) -> dict[str, int]:
+    path = f"api/v2/deputados/{deputado_id}/discursos"
+    first_params = _discursos_params(periodo["data_inicio"], periodo["data_fim"], itens=itens, ordered=False)
+    first_request = _request_payload(path, first_params, strategy=f"itens_{itens}")
+    first_result = _get_json_once(client, path, params=first_params)
+    last_page = _last_page_from_links(first_result.data) or 1
+    stats = _write_discursos_pages(
+        run,
+        partition=partition,
+        periodo=periodo,
+        deputado_id=deputado_id,
+        pages=[{"page_index": 1, "result": first_result, "request": first_request}],
+    )
+
+    for page_index in range(2, last_page + 1):
+        params = {**first_params, "pagina": page_index}
+        request = _request_payload(path, params, strategy=f"itens_{itens}")
+        try:
+            result = _get_json_once(client, path, params=params)
+        except Exception as exc:
+            stats["page_errors"] += 1
+            run.log(
+                "discursos_page_failed",
+                partition=partition,
+                deputado_id=deputado_id,
+                page_index=page_index,
+                last_page=last_page,
+                periodo=periodo,
+                fallback_strategy=f"itens_{itens}",
+                error=error_summary(exc),
+            )
+            _write_discursos_error_record(
+                run,
+                partition=partition,
+                periodo=periodo,
+                deputado_id=deputado_id,
+                page_index=page_index,
+                request=request,
+                error=exc,
+                strategy=f"itens_{itens}",
+            )
+            continue
+
+        page_stats = _write_discursos_pages(
+            run,
+            partition=partition,
+            periodo=periodo,
+            deputado_id=deputado_id,
+            pages=[{"page_index": page_index, "result": result, "request": request}],
+        )
+        stats["pages"] += page_stats["pages"]
+        stats["discursos"] += page_stats["discursos"]
+        stats["transcricoes"] += page_stats["transcricoes"]
+        stats["page_errors"] += page_stats["page_errors"]
+    return stats
+
+
+def _write_discursos_pages(
+    run: CollectionRun,
+    *,
+    partition: str,
+    periodo: dict[str, str],
+    deputado_id: int,
+    pages: list[dict[str, Any]],
+) -> dict[str, int]:
+    stats = {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0}
+    for page in pages:
+        page_index = int(page["page_index"])
+        result = page["result"]
+        request = page["request"]
         source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
         discursos = _dados(result.data)
         if run.has_record(source_id=source_id, record_type=RECORD_TYPE):
@@ -397,13 +614,126 @@ def _collect_discursos_deputado(
         run.write_record(
             partition=partition,
             source_id=source_id,
-            request={"method": "GET", "path": path, "params": params},
+            request=request,
             response=result.response_metadata,
             periodo=periodo,
             payload=result.data,
             record_type=RECORD_TYPE,
         )
     return stats
+
+
+def _write_discursos_error_record(
+    run: CollectionRun,
+    *,
+    partition: str,
+    periodo: dict[str, str],
+    deputado_id: int,
+    page_index: int | None,
+    request: dict[str, Any],
+    error: BaseException,
+    strategy: str,
+) -> None:
+    page_label = f"pagina:{page_index}" if page_index is not None else "mes"
+    source_id = f"deputado:{deputado_id}:discursos:{partition}:{page_label}:erro:{strategy}"
+    if run.has_record(source_id=source_id, record_type=PAGE_ERROR_RECORD_TYPE):
+        run.log("record_resume_skipped", source_id=source_id, record_type=PAGE_ERROR_RECORD_TYPE)
+        return
+    run.write_record(
+        partition="metadata",
+        source_id=source_id,
+        request=request,
+        response=_response_from_error(error),
+        periodo=periodo,
+        payload={"error": error_summary(error), "fallback_strategy": strategy, "page_index": page_index},
+        record_type=PAGE_ERROR_RECORD_TYPE,
+    )
+
+
+def _discursos_params(data_inicio: str, data_fim: str, *, itens: int, ordered: bool) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "dataInicio": data_inicio,
+        "dataFim": data_fim,
+        "itens": itens,
+    }
+    if ordered:
+        params["ordem"] = "ASC"
+        params["ordenarPor"] = "dataHoraInicio"
+    return params
+
+
+def _request_payload(path: str, params: dict[str, Any], *, strategy: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {"method": "GET", "path": path, "params": params}
+    if strategy != "default":
+        payload["fallback_strategy"] = strategy
+    return payload
+
+
+def _get_json_once(client: OpenDataClient, path_or_url: str, *, params: dict[str, Any]) -> HttpResult:
+    response = client.client.get(
+        client._resolve_url(path_or_url),
+        params=params,
+        headers={"Accept": "application/json"},
+    )
+    response.raise_for_status()
+    return client._result(response, response_type="json")
+
+
+def _is_retryable_http_error(exc: httpx.HTTPStatusError) -> bool:
+    return exc.response.status_code in RETRYABLE_STATUS_CODES
+
+
+def _response_from_error(error: BaseException) -> dict[str, Any]:
+    if isinstance(error, httpx.HTTPStatusError):
+        return {
+            "url": str(error.request.url),
+            "status_code": error.response.status_code,
+            "headers": {
+                key: value
+                for key, value in error.response.headers.items()
+                if key.lower()
+                in {
+                    "content-disposition",
+                    "content-length",
+                    "content-type",
+                    "date",
+                    "link",
+                    "location",
+                    "retry-after",
+                    "x-total-count",
+                }
+            },
+        }
+    return {"url": None, "status_code": None, "headers": {}}
+
+
+def _next_link(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    for link in payload.get("links", []):
+        if isinstance(link, dict) and link.get("rel") == "next":
+            href = link.get("href")
+            return href if isinstance(href, str) else None
+    return None
+
+
+def _last_page_from_links(payload: Any) -> int | None:
+    if not isinstance(payload, dict):
+        return None
+    for link in payload.get("links", []):
+        if not isinstance(link, dict) or link.get("rel") != "last":
+            continue
+        href = link.get("href")
+        if not isinstance(href, str):
+            continue
+        page_values = parse_qs(urlparse(href).query).get("pagina", [])
+        if not page_values:
+            continue
+        try:
+            return int(page_values[0])
+        except ValueError:
+            return None
+    return None
 
 
 def _dados(payload: Any) -> list[dict[str, Any]]:
