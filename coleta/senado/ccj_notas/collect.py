@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +14,7 @@ import httpx
 from coleta.common.cli import build_parser, parse_runtime_args
 from coleta.common.config import apply_sample_window, format_senado_date, month_windows
 from coleta.common.documents import extract_text_from_html_bytes
-from coleta.common.http import OpenDataClient
+from coleta.common.http import HttpResult, OpenDataClient
 from coleta.common.io import CollectionRun, error_summary, listify
 
 SOURCE = "senado"
@@ -56,25 +56,9 @@ def collect() -> None:
 
                 periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
                 try:
-                    endpoint = (
-                        "dadosabertos/comissao/agenda/"
-                        f"{format_senado_date(start)}/{format_senado_date(end)}.json"
-                    )
-                    params = {"v": 2}
-
                     run.log("partition_started", partition=partition, periodo=periodo)
-                    agenda = client.get_json(endpoint, params=params)
-                    run.write_record(
-                        partition="metadata",
-                        source_id=f"agenda:{format_senado_date(start)}:{format_senado_date(end)}",
-                        request={"method": "GET", "path": endpoint, "params": params},
-                        response=agenda.response_metadata,
-                        periodo=periodo,
-                        payload=agenda.data,
-                        record_type="agenda_periodo",
-                    )
-
-                    ccj_reunioes = _ccj_reunioes(agenda.data)
+                    agenda_segments = _fetch_agenda_segments(client, run, partition, start, end)
+                    ccj_reunioes = _collect_agenda_records(run, agenda_segments)
                     for reuniao in ccj_reunioes:
                         if runtime.sample_limit is not None and processed_reunioes >= runtime.sample_limit:
                             run.log(
@@ -102,10 +86,16 @@ def collect() -> None:
                             continue
                         processed_reunioes += 1
 
-                    run.mark_partition_complete(partition, periodo=periodo, reunioes_ccj=len(ccj_reunioes))
+                    run.mark_partition_complete(
+                        partition,
+                        periodo=periodo,
+                        agenda_segmentos=len(agenda_segments),
+                        reunioes_ccj=len(ccj_reunioes),
+                    )
                     run.log(
                         "partition_completed",
                         partition=partition,
+                        agenda_segmentos=len(agenda_segments),
                         reunioes_ccj=len(ccj_reunioes),
                         reunioes_processadas=processed_reunioes,
                     )
@@ -136,6 +126,75 @@ def collect() -> None:
             errors=errors,
         )
         print(run.manifest_path)
+
+
+def _fetch_agenda_segments(
+    client: OpenDataClient,
+    run: CollectionRun,
+    partition: str,
+    start: date,
+    end: date,
+) -> list[tuple[date, date, str, dict[str, int], HttpResult]]:
+    endpoint = (
+        "dadosabertos/comissao/agenda/"
+        f"{format_senado_date(start)}/{format_senado_date(end)}.json"
+    )
+    params = {"v": 2}
+    try:
+        agenda = client.get_json(endpoint, params=params)
+    except httpx.TransportError as exc:
+        if start >= end:
+            raise
+        midpoint = start + timedelta(days=(end - start).days // 2)
+        run.log(
+            "agenda_range_split",
+            partition=partition,
+            periodo={"data_inicio": start.isoformat(), "data_fim": end.isoformat()},
+            esquerda={"data_inicio": start.isoformat(), "data_fim": midpoint.isoformat()},
+            direita={
+                "data_inicio": (midpoint + timedelta(days=1)).isoformat(),
+                "data_fim": end.isoformat(),
+            },
+            error=error_summary(exc),
+        )
+        return [
+            *_fetch_agenda_segments(client, run, partition, start, midpoint),
+            *_fetch_agenda_segments(
+                client,
+                run,
+                partition,
+                midpoint + timedelta(days=1),
+                end,
+            ),
+        ]
+    return [(start, end, endpoint, params, agenda)]
+
+
+def _collect_agenda_records(
+    run: CollectionRun,
+    segments: list[tuple[date, date, str, dict[str, int], HttpResult]],
+) -> list[dict[str, Any]]:
+    reunioes: list[dict[str, Any]] = []
+    codigos_vistos: set[str] = set()
+    for start, end, endpoint, params, agenda in segments:
+        periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
+        run.write_record(
+            partition="metadata",
+            source_id=f"agenda:{format_senado_date(start)}:{format_senado_date(end)}",
+            request={"method": "GET", "path": endpoint, "params": params},
+            response=agenda.response_metadata,
+            periodo=periodo,
+            payload=agenda.data,
+            record_type="agenda_periodo",
+        )
+        for reuniao in _ccj_reunioes(agenda.data):
+            codigo = _codigo_reuniao(reuniao)
+            if codigo and codigo in codigos_vistos:
+                continue
+            if codigo:
+                codigos_vistos.add(codigo)
+            reunioes.append(reuniao)
+    return reunioes
 
 
 def _collect_reuniao(

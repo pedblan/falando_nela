@@ -68,6 +68,11 @@ subprocess.run([
 - Pode rodar em paralelo com `camara/plenario_discursos` e `camara/ccjc_eventos` quando os `run_id`s forem distintos.
 - Falhas de detalhe ou notas aparecem em log estruturado.
 - O checkpoint so marca a particao apos processar a agenda e as reunioes encontradas.
+- Simular `httpx.RemoteProtocolError` na agenda de um mes e confirmar que o
+  coletor consulta duas subjanelas contiguas, grava dois `agenda_periodo` com
+  periodos exatos e processa uma unica vez reunioes repetidas nas respostas.
+- Confirmar que uma falha de transporte em janela de um dia nao e mascarada e
+  deixa a particao disponivel para nova retomada.
 
 ## Validacao de resiliencia
 
@@ -75,3 +80,6 @@ subprocess.run([
 - O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular particoes/registros de corpus/status ja gravados desse `run_id`, sem pular particoes concluidas por outro `run_id`.
+- A recuperacao nao deve apagar `failed_partitions`: uma falha historica fica
+  resolvida quando o mesmo `run_id` registra conclusao posterior da particao em
+  `completed_partitions`.

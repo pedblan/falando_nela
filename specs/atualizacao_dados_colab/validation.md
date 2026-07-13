@@ -35,6 +35,13 @@ configuracao, sem apagar dados.
   posteriores do mesmo run, e vazio.
 - Logs e autosave continuam acessiveis e as ultimas linhas sao exibidas.
 - JSONLs tocados pela faixa sao parseaveis.
+- Para `prod-historico-senado-ccj`, as particoes `2013-10` e `2015-05` devem
+  aparecer em `completed_partitions` depois da retomada; suas entradas
+  historicas em `failed_partitions` podem permanecer, desde que
+  `unresolved_failed_partitions` seja vazio e o manifest termine em
+  `completed`.
+- O log da recuperacao pode conter `agenda_range_split`; cada evento deve
+  descrever metades contiguas e sem sobreposicao da janela que falhou.
 
 ## Gate de parlamentares
 

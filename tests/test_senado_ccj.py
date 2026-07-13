@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import httpx
+import pytest
 
 from coleta.common.http import OpenDataClient
 from coleta.common.io import CollectionRun
 from coleta.senado.ccj_notas.collect import (
     _ccj_reunioes,
+    _collect_agenda_records,
     _collect_reuniao,
+    _fetch_agenda_segments,
     build_notas_payload,
     extract_texto_notas_html,
     extract_texto_notas,
@@ -50,6 +54,122 @@ def test_ccj_reunioes_reads_real_agenda_shape_and_filters_ccj() -> None:
     reunioes = _ccj_reunioes(payload)
 
     assert [item["codigo"] for item in reunioes] == ["14657", "14658"]
+
+
+def test_agenda_transport_failure_splits_range_and_deduplicates_meetings(tmp_path: Path) -> None:
+    requested_ranges: list[tuple[str, str]] = []
+
+    def agenda(*codes: str) -> dict[str, object]:
+        return {
+            "AgendaReuniao": {
+                "reunioes": {
+                    "reuniao": [
+                        {
+                            "codigo": codigo,
+                            "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"},
+                        }
+                        for codigo in codes
+                    ]
+                }
+            }
+        }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        start, end_with_suffix = request.url.path.rstrip("/").split("/")[-2:]
+        end = end_with_suffix.removesuffix(".json")
+        requested_ranges.append((start, end))
+        if (start, end) == ("20131001", "20131031"):
+            raise httpx.RemoteProtocolError(
+                "peer closed connection without sending complete message body",
+                request=request,
+            )
+        if (start, end) == ("20131001", "20131016"):
+            return httpx.Response(200, json=agenda("100", "duplicada"))
+        if (start, end) == ("20131017", "20131031"):
+            return httpx.Response(200, json=agenda("duplicada", "200"))
+        return httpx.Response(404)
+
+    client = OpenDataClient("https://example.test", retries=0, sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-agenda-split",
+        resume=True,
+    )
+
+    segments = _fetch_agenda_segments(
+        client,
+        run,
+        "2013-10",
+        date(2013, 10, 1),
+        date(2013, 10, 31),
+    )
+    reunioes = _collect_agenda_records(run, segments)
+
+    assert requested_ranges == [
+        ("20131001", "20131031"),
+        ("20131001", "20131016"),
+        ("20131017", "20131031"),
+    ]
+    assert [(start, end) for start, end, *_ in segments] == [
+        (date(2013, 10, 1), date(2013, 10, 16)),
+        (date(2013, 10, 17), date(2013, 10, 31)),
+    ]
+    assert [item["codigo"] for item in reunioes] == ["100", "duplicada", "200"]
+
+    metadata_path = (
+        tmp_path
+        / "raw"
+        / "senado"
+        / "ccj_notas"
+        / "metadata"
+        / "run-ccj-agenda-split.jsonl"
+    )
+    metadata = [json.loads(line) for line in metadata_path.read_text(encoding="utf-8").splitlines()]
+    assert [record["source_id"] for record in metadata] == [
+        "agenda:20131001:20131016",
+        "agenda:20131017:20131031",
+    ]
+    assert [record["periodo"] for record in metadata] == [
+        {"data_inicio": "2013-10-01", "data_fim": "2013-10-16"},
+        {"data_inicio": "2013-10-17", "data_fim": "2013-10-31"},
+    ]
+    log_entries = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "run-ccj-agenda-split.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert log_entries[-1]["event"] == "agenda_range_split"
+    assert log_entries[-1]["partition"] == "2013-10"
+
+
+def test_agenda_transport_failure_on_single_day_remains_retriable(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.RemoteProtocolError("incomplete chunked read", request=request)
+
+    client = OpenDataClient("https://example.test", retries=0, sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-agenda-single-day",
+        resume=True,
+    )
+
+    with pytest.raises(httpx.RemoteProtocolError, match="incomplete chunked read"):
+        _fetch_agenda_segments(
+            client,
+            run,
+            "2015-05",
+            date(2015, 5, 1),
+            date(2015, 5, 1),
+        )
+
+    assert not (tmp_path / "raw" / "senado" / "ccj_notas").exists()
 
 
 def test_extract_texto_notas_joins_quarter_texts() -> None:

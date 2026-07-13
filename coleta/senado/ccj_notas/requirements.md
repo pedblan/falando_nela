@@ -56,3 +56,12 @@
 - Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
 - `try/except` deve isolar falhas de reuniao, endpoint ou particao sem derrubar o fluxo inteiro.
 - Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo `run_id` e registros ja presentes no JSONL do mesmo `run_id`.
+- `httpx.TransportError` na agenda mensal, depois dos retries do cliente, deve
+  dividir a janela ao meio recursivamente, sem sobreposicao entre as metades.
+- Cada subjanela bem-sucedida deve usar seu intervalo real em `source_id`,
+  `request` e `periodo`; reunioes repetidas entre respostas devem ser
+  deduplicadas pelo codigo.
+- A particao mensal so deve entrar em `completed_partitions` depois que todas
+  as subjanelas e reunioes forem percorridas. Se uma janela de um dia ainda
+  falhar, a excecao deve chegar ao controle da particao e manter o mes em
+  `failed_partitions` para nova retomada.
