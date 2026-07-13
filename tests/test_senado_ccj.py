@@ -146,7 +146,143 @@ def test_agenda_transport_failure_splits_range_and_deduplicates_meetings(tmp_pat
     assert log_entries[-1]["partition"] == "2013-10"
 
 
-def test_agenda_transport_failure_on_single_day_remains_retriable(tmp_path: Path) -> None:
+def test_agenda_http_5xx_splits_to_xml_day_and_sanitizes_control_bytes(tmp_path: Path) -> None:
+    requested_paths: list[str] = []
+
+    def agenda(*codes: str) -> dict[str, object]:
+        return {
+            "AgendaReuniao": {
+                "reunioes": {
+                    "reuniao": [
+                        {
+                            "codigo": codigo,
+                            "colegiadoCriador": {"codigo": "34", "sigla": "CCJ"},
+                        }
+                        for codigo in codes
+                    ]
+                }
+            }
+        }
+
+    xml = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b"<AgendaReuniao><reunioes><reuniao>"
+        b"<codigo>200</codigo><descricao>texto\x1finvalido</descricao>"
+        b"<colegiadoCriador><codigo>34</codigo><sigla>CCJ</sigla></colegiadoCriador>"
+        b"</reuniao></reunioes></AgendaReuniao>"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_paths.append(request.url.path)
+        if request.url.path in {
+            "/dadosabertos/comissao/agenda/20131017/20131020.json",
+            "/dadosabertos/comissao/agenda/20131017/20131018.json",
+            "/dadosabertos/comissao/agenda/20131018/20131018.json",
+        }:
+            return httpx.Response(500, json={"status": 500})
+        if request.url.path == "/dadosabertos/comissao/agenda/20131017/20131017.json":
+            return httpx.Response(200, json=agenda("100"))
+        if request.url.path == "/dadosabertos/comissao/agenda/20131018.xml":
+            return httpx.Response(200, content=xml, headers={"Content-Type": "application/xml"})
+        if request.url.path == "/dadosabertos/comissao/agenda/20131019/20131020.json":
+            return httpx.Response(200, json=agenda("300"))
+        return httpx.Response(404)
+
+    client = OpenDataClient("https://example.test", retries=0, sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-agenda-xml",
+        resume=True,
+    )
+
+    segments = _fetch_agenda_segments(
+        client,
+        run,
+        "2013-10",
+        date(2013, 10, 17),
+        date(2013, 10, 20),
+    )
+    reunioes = _collect_agenda_records(run, segments)
+
+    assert [item["codigo"] for item in reunioes] == ["100", "200", "300"]
+    assert [endpoint for _, _, endpoint, _, _ in segments] == [
+        "dadosabertos/comissao/agenda/20131017/20131017.json",
+        "dadosabertos/comissao/agenda/20131018.xml",
+        "dadosabertos/comissao/agenda/20131019/20131020.json",
+    ]
+    assert "/dadosabertos/comissao/agenda/20131018.xml" in requested_paths
+    assert segments[1][-1].data["AgendaReuniao"]["reunioes"]["reuniao"]["descricao"] == (
+        "textoinvalido"
+    )
+
+    log_entries = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "run-ccj-agenda-xml.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    xml_event = next(entry for entry in log_entries if entry["event"] == "agenda_xml_fallback")
+    assert xml_event["data_referencia"] == "2013-10-18"
+    assert xml_event["removed_control_bytes"] == 1
+    assert xml_event["json_error"]["type"] == "HTTPStatusError"
+
+
+def test_agenda_transport_failure_uses_xml_day_without_ccj_meetings(tmp_path: Path) -> None:
+    xml = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b"<AgendaReuniao><reunioes><reuniao>"
+        b"<codigo>3384</codigo>"
+        b"<colegiadoCriador><codigo>1905</codigo><sigla>CPIADJ</sigla></colegiadoCriador>"
+        b"</reuniao></reunioes></AgendaReuniao>"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith(".json"):
+            raise httpx.RemoteProtocolError("incomplete chunked read", request=request)
+        if request.url.path == "/dadosabertos/comissao/agenda/20150525.xml":
+            return httpx.Response(200, content=xml, headers={"Content-Type": "application/xml"})
+        return httpx.Response(404)
+
+    client = OpenDataClient("https://example.test", retries=0, sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(
+        tmp_path,
+        source="senado",
+        dataset="ccj_notas",
+        run_id="run-ccj-agenda-xml-no-ccj",
+        resume=True,
+    )
+
+    segments = _fetch_agenda_segments(
+        client,
+        run,
+        "2015-05",
+        date(2015, 5, 25),
+        date(2015, 5, 25),
+    )
+    reunioes = _collect_agenda_records(run, segments)
+
+    assert reunioes == []
+    assert segments[0][2] == "dadosabertos/comissao/agenda/20150525.xml"
+    metadata_path = (
+        tmp_path
+        / "raw"
+        / "senado"
+        / "ccj_notas"
+        / "metadata"
+        / "run-ccj-agenda-xml-no-ccj.jsonl"
+    )
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["request"]["path"] == "dadosabertos/comissao/agenda/20150525.xml"
+    assert metadata["response"]["headers"]["content-type"] == "application/xml"
+
+
+def test_agenda_transport_failure_on_single_day_remains_retriable_when_xml_fails(
+    tmp_path: Path,
+) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.RemoteProtocolError("incomplete chunked read", request=request)
 

@@ -5,6 +5,7 @@
 - Portal: Dados Abertos Legislativos do Senado Federal.
 - Colegiado alvo: CCJ, codigo `34`.
 - Agenda: `GET /dadosabertos/comissao/agenda/{dataInicio}/{dataFim}.json`.
+- Fallback diario da agenda: `GET /dadosabertos/comissao/agenda/{dataReferencia}.xml`.
 - Detalhe: `GET /dadosabertos/comissao/reuniao/{codigo}.json`.
 - Metadado de notas: `GET /dadosabertos/comissao/reuniao/notas/{codigo}.json`.
 - Texto das notas: `GET /dadosabertos/taquigrafia/notas/reuniao/{codigo}.json`.
@@ -14,10 +15,15 @@
 
 - Particionar o periodo por mes.
 - Coletar a agenda de comissoes para a particao e grava-la em `metadata/{run_id}.jsonl`.
-- Se a resposta mensal da agenda terminar com erro de transporte depois dos
-  retries HTTP, subdividir recursivamente a janela em intervalos contiguos
-  menores. Preservar cada request bem-sucedido como `agenda_periodo`, reunir as
-  respostas e deduplicar reunioes pelo codigo antes de processa-las.
+- Se a resposta JSON da agenda terminar com erro de transporte ou HTTP
+  `500`, `502`, `503` ou `504` depois dos retries, subdividir recursivamente a
+  janela em intervalos contiguos menores.
+- Se o mesmo erro persistir no JSON de um unico dia, consultar o endpoint XML
+  diario. Remover somente bytes de controle proibidos por XML 1.0 antes do
+  parse, converter a arvore para a estrutura equivalente do JSON e registrar
+  `agenda_xml_fallback` no log.
+- Preservar cada request bem-sucedido, JSON ou XML, como `agenda_periodo`,
+  reunir as respostas e deduplicar reunioes pelo codigo antes de processa-las.
 - Filtrar reunioes cujo colegiado seja `CCJ` ou codigo `34`.
 - Para cada reuniao CCJ, coletar detalhe e metadado de notas como metadados.
 - Tentar transferir o texto integral por `/dadosabertos/taquigrafia/notas/reuniao/{codigo}.json`.
@@ -56,7 +62,7 @@
 - Capturar falhas de reuniao/particao com `try/except`, registrar log estruturado e continuar quando possivel.
 - Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular particoes/registros existentes desse `run_id`.
 - Uma particao cuja agenda tenha sido subdividida so pode ser marcada como
-  concluida depois que todas as subjanelas responderem; falha de transporte ate
-  em um unico dia mantem o mes como falho e retomavel.
+  concluida depois que todas as subjanelas responderem. Se o JSON e o XML do
+  mesmo dia falharem, o mes permanece falho e retomavel.
 - Em run complementar, `--resume` deve pular notas/status ja gravados no mesmo `run_id`, mas nao deve considerar um metadado `IndicadorNotasTaquigraficas=N` como prova de ausencia textual.
 - Pode rodar em paralelo com os coletores `camara/plenario_discursos` e `camara/ccjc_eventos` se cada execucao tiver `run_id` distinto.

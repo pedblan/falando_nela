@@ -25,9 +25,10 @@ todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
 2. Atualizar e processar `parlamentares/v1`.
 3. Rodar, em paralelo ou em ondas, quatro faixas sem colisao de dataset:
    Senado, Congresso, demais bases da Camara e Plenario da Camara.
-   A faixa Senado retoma `prod-historico-senado-ccj` e subdivide
-   automaticamente respostas mensais de agenda interrompidas, mantendo o
-   mesmo `run_id --resume`, checkpoint e raw cumulativo.
+   A faixa Senado retoma `prod-historico-senado-ccj`, subdivide
+   automaticamente respostas JSON de agenda interrompidas ou com HTTP 5xx e,
+   no ultimo dia ainda problematico, usa a agenda XML diaria. O mesmo
+   `run_id --resume`, checkpoint e raw cumulativo sao preservados.
 4. Bloquear o processamento final ate todos os manifests obrigatorios estarem
    completos e sem particoes falhas ainda nao concluidas.
 5. Regerar as fotografias canonicas `current`, Parquets, auditorias e samples.

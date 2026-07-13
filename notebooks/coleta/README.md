@@ -21,8 +21,9 @@ Arquivos atuais:
   regenera `parlamentares/v1` antes das faixas da Camara.
 - `02_atualizacao_senado_colab.ipynb`: recupera a CCJ historica e atualiza
   Plenario, CCJ, pareceres de PEC e apartes do Senado. A recuperacao preserva
-  o mesmo `run_id --resume`; respostas mensais interrompidas da agenda da CCJ
-  sao subdivididas pelo coletor, sem edicao manual do checkpoint ou do raw.
+  o mesmo `run_id --resume`; respostas JSON interrompidas ou com HTTP 5xx sao
+  subdivididas pelo coletor e, se necessario, o ultimo dia usa a agenda XML.
+  Nao edite manualmente checkpoint ou raw.
 - `03_backfill_congresso_textos_colab.ipynb`: valida e executa o backfill
   textual mensal do Congresso desde `1996-05-01`.
 - `04_atualizacao_camara_demais_bases_colab.ipynb`: recupera a CCJC historica e

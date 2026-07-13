@@ -42,6 +42,14 @@ configuracao, sem apagar dados.
   `completed`.
 - O log da recuperacao pode conter `agenda_range_split`; cada evento deve
   descrever metades contiguas e sem sobreposicao da janela que falhou.
+- Para os dias problematicos alcancados pela subdivisao, o log pode conter
+  `agenda_xml_fallback`; o `agenda_periodo` correspondente deve preservar o
+  endpoint `.xml`, `Content-Type`, periodo de um dia e payload convertido.
+- Os casos observados em `2013-10-18` e `2015-05-25` devem ser resolvidos pelo
+  XML diario mesmo quando ele nao contiver reuniao da CCJ; ausencia de CCJ e
+  resultado valido, nao falha de particao.
+- Se JSON e XML falharem para o mesmo dia, a particao deve continuar em
+  `unresolved_failed_partitions` e bloquear o processamento final.
 
 ## Gate de parlamentares
 

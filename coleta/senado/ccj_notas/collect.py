@@ -5,6 +5,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
@@ -28,6 +29,10 @@ NOTES_ENDPOINT = "dadosabertos/taquigrafia/notas/reuniao/{codigo}.json"
 NOTES_PUBLIC_URL = "https://www25.senado.leg.br/web/atividade/notas-taquigraficas/-/notas/r/{codigo}"
 NOTES_NOT_FOUND_MESSAGE = "reuniao nao encontrada ou texto nao produzido pelo senado federal."
 COMPLEMENT_TEXT_PROBE_END = date(2024, 12, 31)
+AGENDA_RETRYABLE_STATUS_CODES = {500, 502, 503, 504}
+INVALID_XML_CONTROL_BYTES = bytes(
+    [*range(0x00, 0x09), 0x0B, 0x0C, *range(0x0E, 0x20)]
+)
 
 
 def collect() -> None:
@@ -142,9 +147,11 @@ def _fetch_agenda_segments(
     params = {"v": 2}
     try:
         agenda = client.get_json(endpoint, params=params)
-    except httpx.TransportError as exc:
-        if start >= end:
+    except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+        if not _is_retryable_agenda_error(exc):
             raise
+        if start >= end:
+            return [_fetch_agenda_xml_day(client, run, partition, start, exc)]
         midpoint = start + timedelta(days=(end - start).days // 2)
         run.log(
             "agenda_range_split",
@@ -168,6 +175,70 @@ def _fetch_agenda_segments(
             ),
         ]
     return [(start, end, endpoint, params, agenda)]
+
+
+def _is_retryable_agenda_error(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.TransportError):
+        return True
+    return (
+        isinstance(exc, httpx.HTTPStatusError)
+        and exc.response.status_code in AGENDA_RETRYABLE_STATUS_CODES
+    )
+
+
+def _fetch_agenda_xml_day(
+    client: OpenDataClient,
+    run: CollectionRun,
+    partition: str,
+    day: date,
+    json_error: BaseException,
+) -> tuple[date, date, str, dict[str, int], HttpResult]:
+    endpoint = f"dadosabertos/comissao/agenda/{format_senado_date(day)}.xml"
+    params = {"v": 2}
+    xml_result = client.get_bytes(endpoint, params=params)
+    content = xml_result.data if isinstance(xml_result.data, bytes) else b""
+    payload, removed_control_bytes = _parse_agenda_xml(content)
+    run.log(
+        "agenda_xml_fallback",
+        partition=partition,
+        data_referencia=day.isoformat(),
+        endpoint=endpoint,
+        removed_control_bytes=removed_control_bytes,
+        json_error=error_summary(json_error),
+    )
+    agenda = HttpResult(
+        url=xml_result.url,
+        status_code=xml_result.status_code,
+        headers=xml_result.headers,
+        data=payload,
+    )
+    return day, day, endpoint, params, agenda
+
+
+def _parse_agenda_xml(content: bytes) -> tuple[dict[str, Any], int]:
+    translation = bytes.maketrans(b"", b"")
+    sanitized = content.translate(translation, INVALID_XML_CONTROL_BYTES)
+    removed_control_bytes = len(content) - len(sanitized)
+    root = ElementTree.fromstring(sanitized)
+    return {_xml_local_name(root.tag): _xml_element_value(root)}, removed_control_bytes
+
+
+def _xml_element_value(element: ElementTree.Element) -> Any:
+    children = list(element)
+    if not children:
+        return (element.text or "").strip()
+
+    grouped: dict[str, list[Any]] = {}
+    for child in children:
+        grouped.setdefault(_xml_local_name(child.tag), []).append(_xml_element_value(child))
+    return {
+        key: values[0] if len(values) == 1 else values
+        for key, values in grouped.items()
+    }
+
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
 
 
 def _collect_agenda_records(

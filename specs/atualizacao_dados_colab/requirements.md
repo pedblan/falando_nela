@@ -70,9 +70,13 @@ Processamento:
 - Clone/pull, instalacao e imports do projeto ocorrem somente depois do mount.
 - Toda coleta usa `--mode prod --resume --no-sample`, datas explicitas e um
   `run_id` da configuracao.
-- Na retomada `prod-historico-senado-ccj`, erro de transporte após os retries
-  da agenda mensal deve acionar subdivisao recursiva da janela; o mesmo
-  `run_id`, o raw cumulativo e o checkpoint existente devem ser preservados.
+- Na retomada `prod-historico-senado-ccj`, erro de transporte ou HTTP
+  `500`, `502`, `503` ou `504` apos os retries da agenda JSON deve acionar
+  subdivisao recursiva da janela.
+- Se a falha persistir no JSON de um dia, a retomada deve usar a agenda XML
+  diaria, higienizar somente controles invalidos para XML 1.0 e preservar no
+  raw e no log a proveniencia do fallback. O mesmo `run_id`, o raw cumulativo
+  e o checkpoint existente devem ser preservados.
 - Celulas de producao ficam protegidas por flags `RODAR_* = False` por default.
 - Processos longos transmitem stdout, usam `check=False` e preservam a etapa de
   inspecao mesmo quando retornam codigo diferente de zero.

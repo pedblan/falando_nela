@@ -71,8 +71,15 @@ subprocess.run([
 - Simular `httpx.RemoteProtocolError` na agenda de um mes e confirmar que o
   coletor consulta duas subjanelas contiguas, grava dois `agenda_periodo` com
   periodos exatos e processa uma unica vez reunioes repetidas nas respostas.
-- Confirmar que uma falha de transporte em janela de um dia nao e mascarada e
-  deixa a particao disponivel para nova retomada.
+- Simular HTTP 500 no JSON ate uma janela de um dia e confirmar que o XML
+  diario e consultado, seu request fica preservado em `agenda_periodo` e o log
+  recebe `agenda_xml_fallback`.
+- Incluir um byte de controle invalido no XML simulado e confirmar que apenas
+  esse byte e removido antes do parse, sem perder reunioes CCJ.
+- Simular um XML diario valido sem reunioes CCJ e confirmar conclusao normal
+  com lista vazia, preservando URL e `Content-Type` no raw.
+- Confirmar que falhas no JSON e no XML do mesmo dia nao sao mascaradas e
+  deixam a particao disponivel para nova retomada.
 
 ## Validacao de resiliencia
 

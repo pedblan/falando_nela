@@ -56,12 +56,20 @@
 - Cada registro deve ser gravado imediatamente em JSONL; checkpoint e `manifest.autosave.json` devem ser atualizados durante a execucao.
 - `try/except` deve isolar falhas de reuniao, endpoint ou particao sem derrubar o fluxo inteiro.
 - Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo `run_id` e registros ja presentes no JSONL do mesmo `run_id`.
-- `httpx.TransportError` na agenda mensal, depois dos retries do cliente, deve
-  dividir a janela ao meio recursivamente, sem sobreposicao entre as metades.
+- `httpx.TransportError` ou resposta HTTP `500`, `502`, `503` ou `504` na
+  agenda JSON, depois dos retries do cliente, deve dividir a janela ao meio
+  recursivamente, sem sobreposicao entre as metades.
+- Quando uma janela JSON de um dia ainda falhar, o coletor deve consultar
+  `/dadosabertos/comissao/agenda/{dataReferencia}.xml?v=2`, remover somente
+  bytes de controle invalidos para XML 1.0 e converter o documento para a
+  mesma estrutura logica usada pelo filtro da CCJ.
 - Cada subjanela bem-sucedida deve usar seu intervalo real em `source_id`,
   `request` e `periodo`; reunioes repetidas entre respostas devem ser
   deduplicadas pelo codigo.
+- O fallback deve preservar no raw a URL, o `Content-Type`, o periodo e o
+  payload XML convertido, e registrar `agenda_xml_fallback`, o erro do JSON e
+  a quantidade de bytes de controle removidos no log.
 - A particao mensal so deve entrar em `completed_partitions` depois que todas
-  as subjanelas e reunioes forem percorridas. Se uma janela de um dia ainda
-  falhar, a excecao deve chegar ao controle da particao e manter o mes em
+  as subjanelas e reunioes forem percorridas. Se JSON e XML falharem no mesmo
+  dia, a excecao deve chegar ao controle da particao e manter o mes em
   `failed_partitions` para nova retomada.
