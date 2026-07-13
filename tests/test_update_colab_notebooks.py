@@ -78,3 +78,13 @@ def test_control_and_final_notebooks_cover_expected_outputs() -> None:
     assert "build_gradio_app" in final
     assert "JSONL_GATE_OK" in final
     assert "texto_id" in final
+
+
+def test_camara_plenario_recovery_uses_safe_boundary_and_local_mandate_cache() -> None:
+    source = "\n".join(_code_cells(_load(NOTEBOOKS[5])))
+
+    assert '"--skip-existing-record-scan"' in source
+    assert '"--parlamentares-periodos-path"' in source
+    assert "cache_parlamentares_periodos" in source
+    assert 'Path("/content/falando_nela_runtime")' in source
+    assert "shutil.copyfile" in source

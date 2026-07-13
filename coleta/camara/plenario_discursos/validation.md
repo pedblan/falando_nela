@@ -34,6 +34,11 @@ python -m coleta.camara.plenario_discursos.collect \
   --no-sample
 ```
 
+O caderno 05 acrescenta `--parlamentares-periodos-path` com uma copia local
+do Parquet. Ele acrescenta `--skip-existing-record-scan` somente quando o
+preflight e o proprio coletor confirmam uma fronteira limpa; particao parcial
+mantem a retomada normal.
+
 ## Testes Automatizados
 
 ```bash
@@ -56,6 +61,12 @@ Os testes devem cobrir:
   continuam quebrando mesmo com `itens=1`;
 - preservacao de `transcricao` em paginas mensais;
 - escrita mensal exclusivamente em `ano=YYYY/mes=MM/`.
+- aceite da retomada rapida quando o ultimo `partition_started` possui
+  `partition_completed`, e recusa quando uma particao da janela permanece
+  aberta ou falha;
+- uso de um `parlamentares_periodos` explicito fora do `data_root`;
+- progresso visivel da varredura de registros existentes e heartbeats por
+  lote de deputados.
 
 ## Criterios
 
@@ -99,6 +110,14 @@ Os testes devem cobrir:
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular
   particoes/registros ja gravados desse `run_id`, sem pular particoes
   concluidas por outro `run_id`.
+- Em retomada parcial, o stdout deve mostrar `resume_record_scan_started`,
+  `resume_record_scan_progress`, `resume_record_scan_completed` e depois
+  `deputy_progress`; o autosave deve indicar `existing_record_scan=filtered`,
+  `existing_record_scan_years` com os anos parciais e `active_partition`.
+- Se checkpoint e log nao permitirem provar o escopo parcial, o autosave deve
+  indicar `existing_record_scan=loaded` e a retomada deve ler todo o run.
+- Em fronteira limpa validada, o manifest deve indicar
+  `skip_existing_record_scan=true` e `existing_record_scan=skipped`.
 
 ## Checks Manuais
 

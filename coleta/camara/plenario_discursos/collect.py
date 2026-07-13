@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 import sys
 from collections import Counter
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 from urllib.parse import parse_qs, urlparse
 
 if __package__ in {None, ""}:
@@ -12,7 +13,7 @@ if __package__ in {None, ""}:
 
 import httpx
 
-from coleta.common.cli import build_parser, parse_runtime_args
+from coleta.common.cli import build_parser, runtime_config_from_namespace
 from coleta.common.config import apply_sample_window, month_windows, quarter_windows, year_windows
 from coleta.common.http import HttpResult, OpenDataClient, iter_camara_pages
 from coleta.common.io import CollectionRun, error_summary
@@ -33,16 +34,96 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 FAST_FALLBACK_STATUS_CODES = {500}
 
 
-def collect() -> None:
+def collect(argv: Sequence[str] | None = None) -> None:
     parser = build_parser("Coleta discursos de deputados pela API de Dados Abertos da Camara.")
-    runtime = parse_runtime_args(parser)
+    parser.add_argument(
+        "--skip-existing-record-scan",
+        action="store_true",
+        help=(
+            "Pula a varredura inicial dos JSONLs do run. Exige --resume e uma fronteira "
+            "limpa comprovada por checkpoint e log; particoes concluidas continuam sendo puladas."
+        ),
+    )
+    parser.add_argument(
+        "--parlamentares-periodos-path",
+        default=None,
+        help=(
+            "Caminho explicito para parlamentares_periodos.parquet ou .jsonl. "
+            "Use uma copia local no runtime Colab para evitar leitura aleatoria pelo Drive FUSE."
+        ),
+    )
+    args = parser.parse_args(argv)
+    runtime = runtime_config_from_namespace(parser, args)
+    if args.skip_existing_record_scan and not runtime.resume:
+        parser.error("--skip-existing-record-scan exige --resume")
+    periodos_path = (
+        Path(args.parlamentares_periodos_path).expanduser()
+        if args.parlamentares_periodos_path
+        else None
+    )
+    if periodos_path is not None:
+        if periodos_path.suffix not in {".parquet", ".jsonl"}:
+            parser.error("--parlamentares-periodos-path deve terminar em .parquet ou .jsonl")
+        if not periodos_path.is_file():
+            parser.error(f"Arquivo de periodos ausente: {periodos_path}")
+
+    requested_partitions = {
+        partition for partition, _, _ in year_windows(runtime.data_inicio, runtime.data_fim)
+    }
+    resume_state = None
+    resume_state_error = None
+    if runtime.resume:
+        try:
+            resume_state = inspect_checkpoint_resume_state(
+                runtime.output_dir,
+                run_id=runtime.run_id,
+                requested_partitions=requested_partitions,
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            resume_state_error = error_summary(exc)
+
+    boundary = None
+    if args.skip_existing_record_scan:
+        boundary = validate_clean_checkpoint_boundary(
+            runtime.output_dir,
+            run_id=runtime.run_id,
+            requested_partitions=requested_partitions,
+        )
+    partial_scan_years = _partial_resume_scan_years(resume_state)
+    if partial_scan_years:
+        print(
+            "Retomada parcial comprovada; o indice de duplicatas sera reconstruido "
+            f"somente para os anos {sorted(partial_scan_years)}.",
+            flush=True,
+        )
+    elif runtime.resume and not args.skip_existing_record_scan:
+        print(
+            "Escopo parcial nao comprovado; o indice de duplicatas sera reconstruido "
+            "a partir de todo o raw do run.",
+            flush=True,
+        )
     run = CollectionRun(
         runtime.output_dir,
         source=SOURCE,
         dataset=DATASET,
         run_id=runtime.run_id,
         resume=runtime.resume,
+        load_existing_records=not args.skip_existing_record_scan,
+        existing_record_years=partial_scan_years,
     )
+    if boundary is not None:
+        run.log("resume_record_scan_skipped", **boundary)
+    elif partial_scan_years:
+        run.log(
+            "resume_record_scan_filtered",
+            years=sorted(partial_scan_years),
+            open_partitions=resume_state["open_partitions"] if resume_state else [],
+            unresolved_failed_partitions=(
+                resume_state["unresolved_failed_partitions"] if resume_state else []
+            ),
+        )
+    elif resume_state_error is not None:
+        run.log("resume_state_inspection_failed", error=resume_state_error)
     windows = apply_sample_window(list(year_windows(runtime.data_inicio, runtime.data_fim)), runtime.sample)
     processed_deputados = 0
     processed_discourse_pages = 0
@@ -51,12 +132,22 @@ def collect() -> None:
     preflight_stats: Counter[str] = Counter()
     status = "completed"
     errors = 0
+    run.log(
+        "parlamentares_periodos_loading",
+        path=str(periodos_path) if periodos_path else "processed/parlamentares/v1",
+    )
     periodos_by_deputado = load_parlamentares_periodos(
         runtime.output_dir,
         source=SOURCE,
         data_inicio=runtime.data_inicio,
         data_fim=runtime.data_fim,
         min_ids=1 if runtime.sample else 100,
+        periodos_path=periodos_path,
+    )
+    run.log(
+        "parlamentares_periodos_loaded",
+        path=str(periodos_path) if periodos_path else "processed/parlamentares/v1",
+        deputados=len(periodos_by_deputado),
     )
 
     try:
@@ -97,50 +188,73 @@ def collect() -> None:
                         planejamento="parlamentares_periodos" if periodos_by_deputado else "api_deputados_periodo",
                     )
 
-                    for deputado in deputados:
-                        if (
-                            runtime.sample_limit is not None
-                            and not runtime.sample
-                            and processed_deputados >= runtime.sample_limit
-                        ):
-                            run.log(
-                                "sample_limit_reached",
-                                sample_limit=runtime.sample_limit,
-                                processed_deputados=processed_deputados,
-                            )
-                            break
-
-                        deputado_id = deputado.get("id")
-                        if deputado_id is None:
-                            continue
-                        request_start, request_end = parlamentar_active_period(deputado, start, end)
-                        request_periodo = {
-                            "data_inicio": request_start.isoformat(),
-                            "data_fim": request_end.isoformat(),
-                        }
+                    for deputado_index, deputado in enumerate(deputados, start=1):
                         try:
-                            stats = _collect_discursos_deputado_adaptive(
-                                client,
-                                run,
-                                deputado_id=int(deputado_id),
-                                start=request_start,
-                                end=request_end,
-                                partition=partition,
-                                periodo=request_periodo,
-                            )
-                        except Exception as exc:
-                            errors += 1
-                            status = "completed_with_errors"
-                            run.log("deputy_discourses_failed", deputado_id=deputado_id, error=error_summary(exc))
-                            continue
-                        if stats.get("page_errors", 0):
-                            errors += int(stats["page_errors"])
-                            status = "completed_with_errors"
-                        preflight_stats.update(stats["preflight"])
-                        processed_deputados += 1
-                        processed_discourse_pages += stats["pages"]
-                        processed_discourses += stats["discursos"]
-                        processed_transcricoes += stats["transcricoes"]
+                            if (
+                                runtime.sample_limit is not None
+                                and not runtime.sample
+                                and processed_deputados >= runtime.sample_limit
+                            ):
+                                run.log(
+                                    "sample_limit_reached",
+                                    sample_limit=runtime.sample_limit,
+                                    processed_deputados=processed_deputados,
+                                )
+                                break
+
+                            deputado_id = deputado.get("id")
+                            if deputado_id is None:
+                                continue
+                            request_start, request_end = parlamentar_active_period(deputado, start, end)
+                            request_periodo = {
+                                "data_inicio": request_start.isoformat(),
+                                "data_fim": request_end.isoformat(),
+                            }
+                            try:
+                                stats = _collect_discursos_deputado_adaptive(
+                                    client,
+                                    run,
+                                    deputado_id=int(deputado_id),
+                                    start=request_start,
+                                    end=request_end,
+                                    partition=partition,
+                                    periodo=request_periodo,
+                                )
+                            except Exception as exc:
+                                errors += 1
+                                status = "completed_with_errors"
+                                run.log(
+                                    "deputy_discourses_failed",
+                                    deputado_id=deputado_id,
+                                    error=error_summary(exc),
+                                )
+                                continue
+                            if stats.get("page_errors", 0):
+                                errors += int(stats["page_errors"])
+                                status = "completed_with_errors"
+                            preflight_stats.update(stats["preflight"])
+                            processed_deputados += 1
+                            processed_discourse_pages += stats["pages"]
+                            processed_discourses += stats["discursos"]
+                            processed_transcricoes += stats["transcricoes"]
+                        finally:
+                            if (
+                                deputado_index == 1
+                                or deputado_index % 25 == 0
+                                or deputado_index == len(deputados)
+                            ):
+                                progress = {
+                                    "partition": partition,
+                                    "deputados_visitados": deputado_index,
+                                    "deputados_total": len(deputados),
+                                    "deputados_processados": processed_deputados,
+                                    "paginas_discursos": processed_discourse_pages,
+                                    "discursos": processed_discourses,
+                                    "discursos_com_transcricao": processed_transcricoes,
+                                    "errors": errors,
+                                }
+                                run.log("deputy_progress", **progress)
+                                run.write_autosave(status="running", active_partition=partition, **progress)
 
                     run.mark_partition_complete(
                         partition,
@@ -185,10 +299,123 @@ def collect() -> None:
             discursos=processed_discourses,
             discursos_com_transcricao=processed_transcricoes,
             preflight=dict(preflight_stats),
+            skip_existing_record_scan=bool(args.skip_existing_record_scan),
+            parlamentares_periodos_path=str(periodos_path) if periodos_path else None,
             status=status,
             errors=errors,
         )
         print(run.manifest_path)
+
+
+def validate_clean_checkpoint_boundary(
+    output_dir: Path,
+    *,
+    run_id: str,
+    requested_partitions: set[str] | None = None,
+) -> dict[str, Any]:
+    state = inspect_checkpoint_resume_state(
+        output_dir,
+        run_id=run_id,
+        requested_partitions=requested_partitions,
+    )
+    if not state["completed_partitions"]:
+        raise RuntimeError(
+            f"Retomada rapida recusada: o run {run_id} nao possui particoes concluidas."
+        )
+    if state["unresolved_failed_partitions"]:
+        raise RuntimeError(
+            "Retomada rapida recusada: particoes falhas nao resolvidas: "
+            f"{state['unresolved_failed_partitions'][:20]}"
+        )
+    if state["open_partitions"]:
+        raise RuntimeError(
+            "Retomada rapida recusada: ha particao iniciada sem conclusao no log: "
+            f"{state['open_partitions'][:20]}. Use --resume sem pular a varredura."
+        )
+    if state["checkpoint_completions_missing_in_log"]:
+        raise RuntimeError(
+            "Retomada rapida recusada: checkpoint e log divergem nas particoes: "
+            f"{state['checkpoint_completions_missing_in_log'][:20]}"
+        )
+    if not state["relevant_events"]:
+        raise RuntimeError("Retomada rapida recusada: o log nao contem eventos de particao.")
+
+    return {
+        "checkpoint_boundary": "clean",
+        "completed_partitions": len(state["completed_partitions"]),
+        "unresolved_failed_partitions": [],
+    }
+
+
+def inspect_checkpoint_resume_state(
+    output_dir: Path,
+    *,
+    run_id: str,
+    requested_partitions: set[str] | None = None,
+) -> dict[str, Any]:
+    checkpoint_path = output_dir / "checkpoints" / SOURCE / f"{DATASET}.json"
+    log_path = output_dir / "logs" / f"{run_id}.jsonl"
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"Checkpoint ausente para retomada: {checkpoint_path}")
+    if not log_path.is_file():
+        raise FileNotFoundError(f"Log ausente para retomada: {log_path}")
+
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    current = (checkpoint.get("runs") or {}).get(run_id, {}) or {}
+    completed = set((current.get("completed_partitions") or {}).keys())
+    failed = set((current.get("failed_partitions") or {}).keys())
+    if requested_partitions is not None:
+        completed &= requested_partitions
+        failed &= requested_partitions
+    unresolved = failed - completed
+
+    open_partitions: set[str] = set()
+    completed_in_log: set[str] = set()
+    relevant_events = 0
+    with log_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("run_id") != run_id:
+                continue
+            partition = event.get("partition")
+            event_name = event.get("event")
+            if not isinstance(partition, str):
+                continue
+            if requested_partitions is not None and partition not in requested_partitions:
+                continue
+            if event_name == "partition_started":
+                relevant_events += 1
+                open_partitions.add(partition)
+            elif event_name == "partition_completed":
+                relevant_events += 1
+                completed_in_log.add(partition)
+                open_partitions.discard(partition)
+            elif event_name == "partition_failed":
+                relevant_events += 1
+                open_partitions.discard(partition)
+
+    missing_log_completion = completed - completed_in_log
+    return {
+        "completed_partitions": sorted(completed),
+        "unresolved_failed_partitions": sorted(unresolved),
+        "open_partitions": sorted(open_partitions),
+        "checkpoint_completions_missing_in_log": sorted(missing_log_completion),
+        "relevant_events": relevant_events,
+    }
+
+
+def _partial_resume_scan_years(state: dict[str, Any] | None) -> set[str] | None:
+    if not state or not state["completed_partitions"] or not state["relevant_events"]:
+        return None
+    if state["checkpoint_completions_missing_in_log"]:
+        return None
+    partial = set(state["open_partitions"]) | set(state["unresolved_failed_partitions"])
+    if not partial or any(len(partition) != 4 or not partition.isdigit() for partition in partial):
+        return None
+    return partial
 
 
 def _collect_deputados(

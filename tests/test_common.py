@@ -113,6 +113,46 @@ def test_load_parlamentares_periodos_filters_and_clips_mandates(tmp_path) -> Non
     )
 
 
+def test_load_parlamentares_periodos_accepts_explicit_local_jsonl(tmp_path) -> None:
+    local_path = tmp_path / "runtime" / "parlamentares_periodos.jsonl"
+    local_path.parent.mkdir(parents=True)
+    local_path.write_text(
+        json.dumps(
+            {
+                "source": "camara",
+                "parlamentar_id": "10",
+                "nome_parlamentar": "Deputada Local",
+                "vigencia_inicio": "2026-01-01",
+                "vigencia_fim": "2026-12-31",
+                "intervalo_fonte": "mandato",
+                "intervalo_inferido": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    periodos = load_parlamentares_periodos(
+        tmp_path / "drive-indisponivel",
+        source="camara",
+        data_inicio=date(2026, 5, 1),
+        data_fim=date(2026, 7, 13),
+        periodos_path=local_path,
+    )
+
+    assert list(periodos) == ["10"]
+    assert periodos["10"][0].nome == "Deputada Local"
+
+    with pytest.raises(FileNotFoundError, match="Arquivo de periodos ausente"):
+        load_parlamentares_periodos(
+            tmp_path,
+            source="camara",
+            data_inicio=date(2026, 5, 1),
+            data_fim=date(2026, 7, 13),
+            periodos_path=tmp_path / "ausente.parquet",
+        )
+
+
 def test_open_data_client_retries_transient_status() -> None:
     calls = {"count": 0}
     urls: list[str] = []
@@ -461,6 +501,105 @@ def test_collection_run_resume_reads_existing_records_and_skips_duplicates(tmp_p
     assert resumed.has_record(source_id="fonte:1", record_type="response")
     assert second_write is False
     assert len(raw_path.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_collection_run_can_skip_existing_record_scan_at_validated_boundary(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def fail_scan(_self):
+        raise AssertionError("raw nao deveria ser varrido")
+
+    monkeypatch.setattr(CollectionRun, "_load_existing_record_keys", fail_scan)
+
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-boundary",
+        resume=True,
+        load_existing_records=False,
+    )
+
+    autosave = json.loads(run.autosave_path.read_text(encoding="utf-8"))
+    assert run.processed_record_keys == set()
+    assert autosave["existing_record_scan"] == "skipped"
+    assert autosave["processed_records_loaded"] == 0
+
+
+def test_collection_run_reports_resume_record_scan_progress(tmp_path, capsys) -> None:
+    seed = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-progress",
+        resume=False,
+    )
+    seed.write_record(
+        partition="2026-05",
+        source_id="fonte:1",
+        request={"method": "GET", "path": "/x", "params": {}},
+        response={"status_code": 200, "url": "https://example.test/x", "headers": {}},
+        periodo={"data_inicio": "2026-05-01", "data_fim": "2026-05-31"},
+        payload={"dados": [1]},
+    )
+    capsys.readouterr()
+
+    resumed = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-progress",
+        resume=True,
+    )
+
+    output = capsys.readouterr().out
+    assert resumed.processed_record_keys
+    assert "resume_record_scan_started" in output
+    assert "resume_record_scan_completed" in output
+    assert "records_seen=1" in output
+
+
+def test_collection_run_can_limit_resume_index_to_partial_years(tmp_path) -> None:
+    seed = CollectionRun(
+        tmp_path,
+        source="camara",
+        dataset="plenario_discursos",
+        run_id="run-filtered",
+        resume=False,
+    )
+    for partition, source_id, data_inicio, record_type in [
+        ("1998-12", "discurso:1998", "1998-12-01", "response"),
+        ("1999-01", "discurso:1999", "1999-01-01", "response"),
+        ("metadata", "probe:1998", "1998-01-01", "year_probe"),
+        ("metadata", "probe:1999", "1999-01-01", "year_probe"),
+    ]:
+        seed.write_record(
+            partition=partition,
+            source_id=source_id,
+            request={"method": "GET", "path": "/x", "params": {}},
+            response={"status_code": 200, "url": "https://example.test/x", "headers": {}},
+            periodo={"data_inicio": data_inicio, "data_fim": data_inicio},
+            payload={"dados": []},
+            record_type=record_type,
+        )
+
+    resumed = CollectionRun(
+        tmp_path,
+        source="camara",
+        dataset="plenario_discursos",
+        run_id="run-filtered",
+        resume=True,
+        existing_record_years={"1999"},
+    )
+
+    assert resumed.has_record(source_id="discurso:1999", record_type="response")
+    assert resumed.has_record(source_id="probe:1999", record_type="year_probe")
+    assert not resumed.has_record(source_id="discurso:1998", record_type="response")
+    assert not resumed.has_record(source_id="probe:1998", record_type="year_probe")
+    autosave = json.loads(resumed.autosave_path.read_text(encoding="utf-8"))
+    assert autosave["existing_record_scan"] == "filtered"
+    assert autosave["existing_record_scan_years"] == ["1999"]
 
 
 def test_collection_run_appends_after_partial_jsonl_line_on_resume(tmp_path) -> None:

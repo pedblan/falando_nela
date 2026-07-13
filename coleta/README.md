@@ -49,9 +49,9 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
 - `prod`: usa `--no-sample` por default e exige destino externo via `--output-dir` ou `FALANDO_NELA_DATA_ROOT`.
 - Em `prod`, o coletor recusa diretorios dentro do repositorio para evitar gravar uma coleta completa no Git local.
 - Precedencia do destino: `--output-dir`, depois `FALANDO_NELA_DATA_ROOT`, depois `data/dev` apenas em `dev`.
-- Progresso: os scripts imprimem eventos simples no stdout (`partition_started`, `partition_completed`, falhas e skips), alem de gravarem o log JSONL.
+- Progresso: os scripts imprimem eventos simples no stdout (`partition_started`, `partition_completed`, falhas e skips), alem de gravarem o log JSONL. A retomada do Plenario da Camara tambem mostra a varredura do indice raw e `deputy_progress` por lote.
 - Autosave: registros JSONL sao gravados linha a linha; checkpoints e `manifests/{run_id}.autosave.json` sao atualizados durante a execucao.
-- Retomada: com `--resume`, o coletor pula particoes concluidas pelo mesmo `run_id` e tambem le JSONLs existentes do mesmo `run_id` para nao baixar novamente registros ja gravados.
+- Retomada: com `--resume`, o coletor pula particoes concluidas pelo mesmo `run_id` e tambem le JSONLs existentes do mesmo `run_id` para nao baixar novamente registros ja gravados. No Plenario da Camara, checkpoint e log coerentes permitem restringir esse indice aos anos parciais.
 - Falhas: erros de item ou particao devem ser capturados, registrados no log/checkpoint e nao devem impedir a continuacao das demais particoes quando houver caminho seguro.
 
 ## Concorrencia operacional
@@ -233,7 +233,7 @@ Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_sena
 
 Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
 
-Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados e probes em `metadata/`, paginas mensais de discursos no JSONL de corpus e a presenca de `transcricao` quando a API entregar texto. A producao desse fluxo deve iniciar em `1946-01-01`.
+Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados e probes em `metadata/`, paginas mensais de discursos no JSONL de corpus e a presenca de `transcricao` quando a API entregar texto. A producao desse fluxo deve iniciar em `1946-01-01`. No caderno operacional 05, uma particao parcial obriga a retomada fina pelo raw; o atalho de fronteira de checkpoint nunca e aplicado sem validacao de checkpoint e log.
 
 Para apartes de Plenario, use
 `notebooks/coleta/coleta_senado_plenario_apartes.ipynb` e

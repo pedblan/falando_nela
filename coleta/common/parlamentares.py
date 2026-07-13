@@ -25,10 +25,13 @@ def load_parlamentares_periodos(
     data_fim: date,
     allow_inferred: bool = False,
     min_ids: int = 1,
+    periodos_path: Path | None = None,
 ) -> dict[str, list[ParlamentarPeriodo]]:
     """Carrega periodos de mandato normalizados, se `parlamentares/v1` existir."""
+    if periodos_path is not None and not periodos_path.is_file():
+        raise FileNotFoundError(f"Arquivo de periodos ausente: {periodos_path}")
     output_root = data_root / "processed" / "parlamentares" / "v1"
-    rows = list(_iter_periodo_rows(output_root))
+    rows = list(_iter_periodo_rows(output_root, periodos_path=periodos_path))
     if not rows:
         return {}
 
@@ -110,7 +113,22 @@ def parlamentar_active_period(deputado: dict[str, Any], fallback_start: date, fa
     return fallback_start, fallback_end
 
 
-def _iter_periodo_rows(output_root: Path) -> Iterator[dict[str, Any]]:
+def _iter_periodo_rows(
+    output_root: Path,
+    *,
+    periodos_path: Path | None = None,
+) -> Iterator[dict[str, Any]]:
+    if periodos_path is not None:
+        if periodos_path.suffix == ".parquet":
+            yield from _iter_parquet_rows(periodos_path, strict=True)
+            return
+        if periodos_path.suffix == ".jsonl":
+            yield from _iter_jsonl_rows(periodos_path)
+            return
+        raise ValueError(
+            "periodos_path deve apontar para parlamentares_periodos.parquet ou .jsonl"
+        )
+
     parquet_path = output_root / "parquet" / "parlamentares_periodos.parquet"
     if parquet_path.exists():
         parquet_rows = list(_iter_parquet_rows(parquet_path))
@@ -123,15 +141,19 @@ def _iter_periodo_rows(output_root: Path) -> Iterator[dict[str, Any]]:
         yield from _iter_jsonl_rows(jsonl_path)
 
 
-def _iter_parquet_rows(path: Path) -> Iterator[dict[str, Any]]:
+def _iter_parquet_rows(path: Path, *, strict: bool = False) -> Iterator[dict[str, Any]]:
     try:
         import pyarrow.parquet as pq
     except ImportError:
+        if strict:
+            raise
         return
 
     try:
         table = pq.read_table(path)
     except Exception:
+        if strict:
+            raise
         return
     for row in table.to_pylist():
         if isinstance(row, dict):

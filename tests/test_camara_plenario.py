@@ -5,15 +5,112 @@ from datetime import date
 from pathlib import Path
 
 import httpx
+import pytest
 
 from coleta.camara.plenario_discursos.collect import (
     _collect_deputados,
     _collect_discursos_deputado,
     _collect_discursos_deputado_adaptive,
     _collect_discursos_probe,
+    _partial_resume_scan_years,
+    inspect_checkpoint_resume_state,
+    validate_clean_checkpoint_boundary,
 )
 from coleta.common.http import OpenDataClient
 from coleta.common.io import CollectionRun
+
+
+def _write_checkpoint_boundary(
+    root: Path,
+    *,
+    log_events: list[dict[str, str]],
+    failed: list[str] | None = None,
+) -> None:
+    run_id = "prod-historico-camara-plenario"
+    checkpoint_path = root / "checkpoints" / "camara" / "plenario_discursos.json"
+    checkpoint_path.parent.mkdir(parents=True)
+    checkpoint_path.write_text(
+        json.dumps(
+            {
+                "runs": {
+                    run_id: {
+                        "completed_partitions": {"1998": {"run_id": run_id}},
+                        "failed_partitions": {
+                            partition: {"run_id": run_id}
+                            for partition in (failed or [])
+                        },
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    log_path = root / "logs" / f"{run_id}.jsonl"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(
+        "\n".join(json.dumps({"run_id": run_id, **event}) for event in log_events) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_checkpoint_boundary_allows_fast_resume_only_between_partitions(tmp_path: Path) -> None:
+    run_id = "prod-historico-camara-plenario"
+    _write_checkpoint_boundary(
+        tmp_path,
+        log_events=[
+            {"event": "partition_started", "partition": "1900-11"},
+            {"event": "partition_started", "partition": "1998"},
+            {"event": "partition_completed", "partition": "1998"},
+        ],
+    )
+
+    boundary = validate_clean_checkpoint_boundary(
+        tmp_path,
+        run_id=run_id,
+        requested_partitions={"1998", "1999"},
+    )
+
+    assert boundary == {
+        "checkpoint_boundary": "clean",
+        "completed_partitions": 1,
+        "unresolved_failed_partitions": [],
+    }
+
+    log_path = tmp_path / "logs" / f"{run_id}.jsonl"
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"run_id": run_id, "event": "partition_started", "partition": "1999"}) + "\n")
+
+    state = inspect_checkpoint_resume_state(
+        tmp_path,
+        run_id=run_id,
+        requested_partitions={"1998", "1999"},
+    )
+    assert state["open_partitions"] == ["1999"]
+    assert _partial_resume_scan_years(state) == {"1999"}
+
+    with pytest.raises(RuntimeError, match="particao iniciada sem conclusao"):
+        validate_clean_checkpoint_boundary(
+            tmp_path,
+            run_id=run_id,
+            requested_partitions={"1998", "1999"},
+        )
+
+
+def test_checkpoint_boundary_rejects_unresolved_failure(tmp_path: Path) -> None:
+    run_id = "prod-historico-camara-plenario"
+    _write_checkpoint_boundary(
+        tmp_path,
+        failed=["1999"],
+        log_events=[
+            {"event": "partition_started", "partition": "1998"},
+            {"event": "partition_completed", "partition": "1998"},
+            {"event": "partition_started", "partition": "1999"},
+            {"event": "partition_failed", "partition": "1999"},
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="particoes falhas nao resolvidas"):
+        validate_clean_checkpoint_boundary(tmp_path, run_id=run_id)
 
 
 def test_collect_deputados_paginates_metadata_with_stable_page_ids(tmp_path: Path) -> None:

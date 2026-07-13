@@ -594,19 +594,109 @@ def build_03() -> nbformat.NotebookNode:
 def build_05() -> nbformat.NotebookNode:
     return notebook(
         "05 - Atualizacao do Plenario da Camara",
-        "Retoma primeiro `prod-historico-camara-plenario`. A faixa incremental so e liberada depois do manifest historico final.",
+        "Retoma primeiro `prod-historico-camara-plenario`. A retomada historica rapida exige uma fronteira limpa de checkpoint e usa uma copia local do plano de mandatos. A faixa incremental so e liberada depois do manifest historico final.",
         [
             CONTROL_CELL,
             HELPERS_CELL,
+            md(
+                """
+                ## Preparacao da retomada historica
+
+                O run historico possui centenas de milhares de registros ja gravados. Se houver
+                uma particao parcial, o coletor restringe o indice de duplicatas aos anos abertos
+                ou com falha, sem reler os anos ja concluidos. Em uma fronteira limpa, ele so
+                aceita `--skip-existing-record-scan` quando checkpoint e log concordam. O Parquet
+                pequeno de periodos e copiado para o disco local efemero do runtime; o raw continua
+                no Drive, imutavel e cumulativo.
+                """
+            ),
+            code(
+                """
+                import shutil
+
+                historical = RUNS["camara_plenario_historico"]
+                incremental = RUNS["camara_plenario"]
+                LOCAL_RUNTIME_ROOT = Path("/content/falando_nela_runtime")
+
+                def cache_parlamentares_periodos():
+                    source = DATA_ROOT / "processed" / "parlamentares" / "v1" / "parquet" / "parlamentares_periodos.parquet"
+                    target = LOCAL_RUNTIME_ROOT / "parlamentares_periodos.parquet"
+                    assert source.is_file(), source
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(source, target)
+                    assert target.is_file() and target.stat().st_size == source.stat().st_size, (source, target)
+                    print("Plano de mandatos copiado para o runtime local:", target, target.stat().st_size, "bytes")
+                    return target
+
+                def inspect_resume_boundary(run):
+                    checkpoint = read_json(checkpoint_for(run)) or {}
+                    current = (checkpoint.get("runs") or {}).get(run["run_id"], {}) or {}
+                    requested_partitions = {
+                        str(year)
+                        for year in range(int(run["data_inicio"][:4]), int(run["data_fim"][:4]) + 1)
+                    }
+                    completed = set((current.get("completed_partitions") or {}).keys()) & requested_partitions
+                    failed = set((current.get("failed_partitions") or {}).keys()) & requested_partitions
+                    unresolved = failed - completed
+                    open_partitions = set()
+                    completed_in_log = set()
+                    log_path = DATA_ROOT / "logs" / f"{run['run_id']}.jsonl"
+                    if log_path.exists():
+                        with log_path.open("r", encoding="utf-8") as handle:
+                            for line in handle:
+                                try:
+                                    event = json.loads(line)
+                                except json.JSONDecodeError:
+                                    continue
+                                if event.get("run_id") != run["run_id"] or not isinstance(event.get("partition"), str):
+                                    continue
+                                partition = event["partition"]
+                                if partition not in requested_partitions:
+                                    continue
+                                if event.get("event") == "partition_started":
+                                    open_partitions.add(partition)
+                                elif event.get("event") == "partition_completed":
+                                    completed_in_log.add(partition)
+                                    open_partitions.discard(partition)
+                                elif event.get("event") == "partition_failed":
+                                    open_partitions.discard(partition)
+                    missing_log_completion = completed - completed_in_log
+                    clean = bool(completed) and not unresolved and not open_partitions and not missing_log_completion
+                    state = {
+                        "run_id": run["run_id"],
+                        "completed_partitions": len(completed),
+                        "unresolved": sorted(unresolved),
+                        "open_partitions": sorted(open_partitions),
+                        "checkpoint_completions_missing_in_log": sorted(missing_log_completion),
+                        "fast_boundary": clean,
+                    }
+                    print("Estado da retomada:", state)
+                    return state
+
+                HISTORICAL_RESUME_STATE = inspect_resume_boundary(historical)
+                """
+            ),
             code(
                 """
                 RODAR_RECUPERACAO_HISTORICA = False
                 CONFIRMAR_CICLO = ""
                 require_explicit_confirmation(RODAR_RECUPERACAO_HISTORICA, CONFIRMAR_CICLO)
-                historical = RUNS["camara_plenario_historico"]
                 if RODAR_RECUPERACAO_HISTORICA:
                     assert_parlamentares_ready()
-                    rc = run_collector(historical)
+                    local_periodos = cache_parlamentares_periodos()
+                    recovery_extra = ["--parlamentares-periodos-path", local_periodos]
+                    if HISTORICAL_RESUME_STATE["fast_boundary"]:
+                        recovery_extra.append("--skip-existing-record-scan")
+                        print("Fronteira limpa: a varredura integral do raw sera pulada.")
+                    else:
+                        print(
+                            "Particao parcial detectada: o coletor reconstruira o indice apenas "
+                            "para os anos abertos ou com falha e exibira o progresso."
+                        )
+                    rc = run_collector(
+                        historical,
+                        *recovery_extra,
+                    )
                     assert rc == 0
                     assert_collection_complete(historical)
                 else:
@@ -618,11 +708,14 @@ def build_05() -> nbformat.NotebookNode:
                 RODAR_FAIXA_INCREMENTAL = False
                 CONFIRMAR_CICLO = ""
                 require_explicit_confirmation(RODAR_FAIXA_INCREMENTAL, CONFIRMAR_CICLO)
-                incremental = RUNS["camara_plenario"]
                 if RODAR_FAIXA_INCREMENTAL:
                     assert_parlamentares_ready()
                     assert_collection_complete(historical)  # gate obrigatorio
-                    rc = run_collector(incremental)
+                    local_periodos = cache_parlamentares_periodos()
+                    rc = run_collector(
+                        incremental,
+                        "--parlamentares-periodos-path", local_periodos,
+                    )
                     assert rc == 0
                     assert_collection_complete(incremental)
                 else:

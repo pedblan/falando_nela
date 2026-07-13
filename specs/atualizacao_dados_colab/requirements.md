@@ -86,6 +86,17 @@ Processamento:
   `vigencia_fim < vigencia_inicio`.
 - Faixas 02 a 05 podem rodar simultaneamente, pois nao compartilham datasets.
 - Duas instancias do mesmo dataset nunca podem rodar ao mesmo tempo.
+- O caderno 05 deve copiar somente
+  `processed/parlamentares/v1/parquet/parlamentares_periodos.parquet` para o
+  disco local efemero do runtime e passa-lo explicitamente ao coletor; todas
+  as saidas permanecem na raiz ativa do Drive.
+- Antes da recuperacao historica do Plenario da Camara, o caderno deve cruzar
+  checkpoint e log. Se houver particao iniciada sem conclusao, deve manter o
+  scan de registros do `run_id`, restrito aos anos parciais quando o escopo
+  puder ser provado; somente fronteira limpa pode usar
+  `--skip-existing-record-scan`. Divergencia deve provocar scan integral.
+- A retomada do Plenario da Camara deve imprimir progresso durante o scan do
+  raw e durante a particao, com heartbeat a cada 25 deputados no autosave.
 
 ## Congresso textual
 

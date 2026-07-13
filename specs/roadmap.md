@@ -55,6 +55,12 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   `camara/plenario_discursos` e `camara/plenario_apartes`, evitando consultas de
   deputados em anos fora do exercicio oficial. A descoberta via API permanece
   como fallback quando a tabela ainda nao existir.
+- Nas retomadas extensas do Plenario da Camara, tornar a inicializacao
+  observavel e proporcional: copiar o pequeno plano de mandatos para o runtime
+  Colab, imprimir o scan do raw e heartbeats por deputado. Pular o scan apenas
+  quando checkpoint e log comprovarem uma fronteira entre particoes; particao
+  parcial usa indice restrito aos anos afetados quando o escopo for comprovado,
+  sem duplicar raw nem reler particoes concluidas.
 - Registrar separadamente cobertura historica maxima e recorte analitico
   recomendado `2010-01-01` em diante.
 

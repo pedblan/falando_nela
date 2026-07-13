@@ -28,6 +28,9 @@
 2. Antes de abrir requisicoes por deputado, tentar carregar
    `processed/parlamentares/v1/parquet/parlamentares_periodos.parquet` ou,
    como fallback local, `processed/parlamentares/v1/parlamentares_periodos.jsonl`.
+   No Colab, o caderno operacional pode copiar o Parquet para o disco efemero
+   do runtime e passa-lo por `--parlamentares-periodos-path`; raw, checkpoint,
+   log e manifest continuam no Drive.
 3. Quando `parlamentares_periodos` existir, montar o plano anual apenas com
    deputados cujos mandatos oficiais interceptam o ano e clipar a janela de
    cada deputado ao intervalo efetivo do mandato naquele ano.
@@ -114,5 +117,18 @@
   ordenacao, pagina mensal `itens=1`.
 - Em `--resume`, ler progresso ja gravado no mesmo `run_id` e pular
   particoes/registros existentes desse `run_id`.
+- Durante a varredura dos JSONLs existentes, imprimir inicio, progresso por
+  arquivo/50 mil registros e conclusao, para que a indexacao do Drive nao
+  pareca uma execucao travada.
+- Se checkpoint e log concordarem sobre as particoes concluidas e identificarem
+  anos abertos ou com falha, reconstruir o indice somente para esses anos,
+  incluindo o arquivo compartilhado de `metadata`; diante de divergencia,
+  voltar automaticamente ao scan integral.
+- Dentro de cada ano, registrar `deputy_progress` no primeiro deputado, a cada
+  25 e no ultimo, atualizando tambem o autosave com a particao ativa.
+- `--skip-existing-record-scan` so pode ser usado com `--resume` quando
+  checkpoint e log comprovarem que, dentro da janela pedida, toda particao
+  iniciada foi concluida e nao houver falha nao resolvida. Se houver particao
+  parcial, manter a varredura completa para evitar duplicatas.
 - Pode rodar em paralelo com os coletores `senado/ccj_notas` e
   `camara/ccjc_eventos` se cada execucao tiver `run_id` distinto.

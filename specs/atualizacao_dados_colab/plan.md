@@ -29,10 +29,20 @@ todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
    automaticamente respostas JSON de agenda interrompidas ou com HTTP 5xx e,
    no ultimo dia ainda problematico, usa a agenda XML diaria. O mesmo
    `run_id --resume`, checkpoint e raw cumulativo sao preservados.
+   A faixa do Plenario da Camara copia `parlamentares_periodos.parquet` para o
+   disco efemero do Colab e escolhe a estrategia de retomada pelo estado real:
+   particao parcial restringe o indice de duplicatas aos anos afetados;
+   fronteira limpa pode pula-lo.
 4. Bloquear o processamento final ate todos os manifests obrigatorios estarem
    completos e sem particoes falhas ainda nao concluidas.
 5. Regerar as fotografias canonicas `current`, Parquets, auditorias e samples.
 6. Validar a nova janela no visualizador Gradio.
+
+Na execucao de `2026-07-13`, o log de `prod-historico-camara-plenario`
+registrou `partition_started` para `1999` antes da interrupcao. Portanto a
+proxima retomada deve reconstruir o indice do raw e nao pode usar o atalho ate
+essa particao ser concluida. Como checkpoint e log identificam `1999` de forma
+coerente, nao e necessario reler os anos historicos ja concluidos.
 
 ## Cadernos
 

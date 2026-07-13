@@ -50,6 +50,17 @@ configuracao, sem apagar dados.
   resultado valido, nao falha de particao.
 - Se JSON e XML falharem para o mesmo dia, a particao deve continuar em
   `unresolved_failed_partitions` e bloquear o processamento final.
+- Para `prod-historico-camara-plenario`, o preflight deve detectar a particao
+  parcial `1999` observada no log e registrar
+  `existing_record_scan=filtered`, `existing_record_scan_years=["1999"]` na
+  primeira retomada. O stdout deve progredir durante a indexacao e depois
+  emitir `deputy_progress`.
+- Depois que nenhuma particao da janela estiver aberta, uma nova retomada pode
+  usar o atalho; checkpoint e log divergentes devem faze-lo falhar antes de
+  qualquer escrita raw.
+- O caminho registrado em `parlamentares_periodos_path` deve apontar para
+  `/content/falando_nela_runtime/parlamentares_periodos.parquet`, enquanto
+  `output_dir` permanece `/content/drive/MyDrive/falando_nela/data`.
 
 ## Gate de parlamentares
 

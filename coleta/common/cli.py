@@ -34,6 +34,13 @@ def parse_runtime_args(
     argv: Sequence[str] | None = None,
 ) -> RuntimeConfig:
     args = parser.parse_args(argv)
+    return runtime_config_from_namespace(parser, args)
+
+
+def runtime_config_from_namespace(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> RuntimeConfig:
     data_inicio = parse_iso_date(args.data_inicio)
     data_fim = parse_iso_date(args.data_fim)
     if data_inicio > data_fim:

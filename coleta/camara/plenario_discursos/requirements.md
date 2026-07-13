@@ -11,6 +11,11 @@
 - `--sample-limit N`: limita deputados em validacoes/amostras.
 - `--resume`: pula particoes concluidas no checkpoint para o mesmo `run_id` e
   registros ja existentes desse `run_id`.
+- `--skip-existing-record-scan`: evita a varredura integral do raw somente em
+  uma retomada situada entre particoes; exige `--resume`, checkpoint/log
+  coerentes, nenhuma particao aberta na janela e zero falhas nao resolvidas.
+- `--parlamentares-periodos-path`: caminho explicito para uma copia local de
+  `parlamentares_periodos.parquet` ou `.jsonl`; nao altera o `output-dir`.
 - `--run-id`: identificador da execucao.
 
 ## Recorte
@@ -111,3 +116,16 @@
   inteiro.
 - Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo
   `run_id` e registros ja presentes no JSONL do mesmo `run_id`.
+- A varredura de registros existentes deve emitir progresso no stdout no
+  inicio, a cada 50 mil linhas ou 25 arquivos e no fim.
+- Quando checkpoint e log forem coerentes e houver particao anual parcial, o
+  indice de duplicatas deve ler somente os anos abertos ou com falha e os
+  respectivos registros de `metadata`. Se esse escopo nao puder ser provado,
+  deve usar todo o raw do `run_id`.
+- O processamento anual deve emitir `deputy_progress` no primeiro deputado, a
+  cada 25 deputados e no ultimo; cada evento deve atualizar o autosave com
+  `active_partition`, visitados, total, paginas, discursos e erros.
+- Se o log contiver `partition_started` sem conclusao posterior para uma
+  particao da janela, `--skip-existing-record-scan` deve ser recusado. A
+  retomada normal continua permitida e deve reconstruir o indice a partir do
+  raw cumulativo.
