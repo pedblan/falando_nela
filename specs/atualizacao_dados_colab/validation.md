@@ -36,6 +36,17 @@ configuracao, sem apagar dados.
 - Logs e autosave continuam acessiveis e as ultimas linhas sao exibidas.
 - JSONLs tocados pela faixa sao parseaveis.
 
+## Gate de parlamentares
+
+- Mudancas da Camara no mesmo dia sao consolidadas pelo ultimo `dataHora`;
+  timestamps identicos respeitam a ultima ocorrencia da resposta oficial.
+- `mandatos` nao contem `data_fim < data_inicio` e
+  `parlamentares_periodos` nao contem `vigencia_fim < vigencia_inicio`.
+- JSONL e Parquet preservam o schema `parlamentares/v1` e a proveniencia do
+  estado diario escolhido.
+- Os cadernos 02 a 05 permanecem bloqueados ate aparecer
+  `Gate aprovado: ... periodos de mandato` no caderno 01.
+
 ## Congresso
 
 - O smoke de `2000-03-01` a `2000-03-31` produz pelo menos um

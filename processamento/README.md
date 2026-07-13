@@ -25,6 +25,15 @@ A saida e gravada em `processed/textos_parlamentares/v1`, com um manifest em
 Para uma descricao analitica das bases processadas, use
 `notebooks/processamento/descricao_analitica_bases_colab.ipynb`.
 
+## Parlamentares
+
+`processamento.parlamentares` gera `parlamentares/v1`, incluindo mandatos e
+periodos de juncao temporal. No historico da Camara, mudancas intradiarias sao
+ordenadas pelo `dataHora` completo e consolidadas em uma unica linha diaria; o
+ultimo estado cronologico do dia prevalece. O processador recusa intervalos em
+que o fim seja anterior ao inicio, sem corrigir silenciosamente JSONLs ou
+Parquets. O gate do caderno 01 deve passar antes das faixas 02 a 05.
+
 ## Apartes parlamentares
 
 `apartes_parlamentares/v1` e uma tabela relacional separada de

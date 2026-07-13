@@ -74,6 +74,9 @@ Processamento:
 - Processos longos transmitem stdout, usam `check=False` e preservam a etapa de
   inspecao mesmo quando retornam codigo diferente de zero.
 - O caderno 01 deve terminar antes das faixas 02 a 05.
+- O caderno 01 deve bloquear as faixas seguintes se algum mandato tiver
+  `data_fim < data_inicio` ou algum periodo tiver
+  `vigencia_fim < vigencia_inicio`.
 - Faixas 02 a 05 podem rodar simultaneamente, pois nao compartilham datasets.
 - Duas instancias do mesmo dataset nunca podem rodar ao mesmo tempo.
 

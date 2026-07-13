@@ -130,6 +130,20 @@ oficial de mandato ou exercicio:
 - `titular_key`, quando o registro representar suplente;
 - `raw_*` de proveniencia.
 
+No historico da Camara:
+
+- preservar `dataHora` completo para ordenacao, reduzindo para `AAAA-MM-DD`
+  somente na tabela diaria;
+- agrupar mudancas ocorridas na mesma data e conservar o ultimo estado
+  cronologico do dia;
+- quando dois itens tiverem exatamente o mesmo timestamp, conservar o ultimo
+  na ordem estavel da resposta oficial;
+- calcular `data_fim` como o dia anterior ao proximo `data_inicio` somente
+  depois da consolidacao diaria;
+- preservar no estado escolhido os campos `raw_run_id`, `raw_source_id`,
+  `raw_checksum`, `raw_path` e `raw_response_url`;
+- nunca emitir `data_fim < data_inicio`.
+
 ## Campos processed: filiacoes
 
 `processed/parlamentares/v1/filiacoes.jsonl` deve conter historico partidario
@@ -161,6 +175,11 @@ preferencial para cruzar textos com metadados:
 Os intervalos devem ser fechados no inicio e abertos no fim para juncao
 computacional (`data >= vigencia_inicio` e `data < vigencia_fim_exclusivo`), mas
 tambem devem expor `vigencia_fim` legivel para auditoria.
+
+`vigencia_fim` nunca pode ser anterior a `vigencia_inicio`. Se uma fonte ainda
+produzir limites invalidos depois de suas regras de normalizacao, o
+processamento deve falhar de forma explicita antes de escrever as tabelas, em
+vez de filtrar ou corrigir silenciosamente o Parquet.
 
 Para planejamento de coleta, `camara/plenario_discursos` e
 `camara/plenario_apartes` podem ler essa tabela e filtrar somente linhas com

@@ -4,11 +4,14 @@ import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 
 from processamento.parlamentares import (
     DATASET_VERSION,
+    MANDATOS_FIELDS,
     PARLAMENTARES_FIELDS,
     PERIODOS_FIELDS,
+    build_periodos,
     process_parlamentares_data_root,
 )
 
@@ -171,6 +174,140 @@ def test_process_parlamentares_refuses_to_overwrite_existing_outputs(tmp_path: P
         assert "use --overwrite" in str(exc)
     else:
         raise AssertionError("expected FileExistsError")
+
+
+def test_camara_historico_consolidates_same_day_changes_without_negative_periods(tmp_path: Path) -> None:
+    last_same_day_state = {
+        "dataHora": "2023-02-01T18:00:00-03:00",
+        "siglaPartido": "BBB",
+        "siglaUf": "SP",
+        "idLegislatura": 57,
+        "situacao": "Exercicio",
+        "condicaoEleitoral": "Titular",
+    }
+    _write_raw(
+        tmp_path,
+        "camara",
+        "run-camara-same-day",
+        [
+            _raw_record(
+                "camara",
+                "camara_deputado_detalhe",
+                "camara:deputado:100689:detalhe",
+                {
+                    "dados": {
+                        "id": 100689,
+                        "nomeCivil": "DEPUTADA TESTE",
+                        "sexo": "F",
+                        "ultimoStatus": {"id": 100689, "nome": "Deputada Teste"},
+                    }
+                },
+            ),
+            _raw_record(
+                "camara",
+                "camara_deputado_historico",
+                "camara:deputado:100689:historico",
+                {
+                    "dados": [
+                        {
+                            "dataHora": "2023-02-01T08:00:00-03:00",
+                            "siglaPartido": "AAA",
+                            "siglaUf": "SP",
+                            "idLegislatura": 57,
+                            "situacao": "Exercicio",
+                            "condicaoEleitoral": "Titular",
+                        },
+                        {
+                            "dataHora": "2023-02-01T18:00:00-03:00",
+                            "siglaPartido": "BBA",
+                            "siglaUf": "SP",
+                            "idLegislatura": 57,
+                            "situacao": "Exercicio",
+                            "condicaoEleitoral": "Titular",
+                        },
+                        last_same_day_state,
+                        dict(last_same_day_state),
+                        {
+                            "dataHora": "2023-03-01T09:00:00-03:00",
+                            "siglaPartido": "CCC",
+                            "siglaUf": "SP",
+                            "idLegislatura": 57,
+                            "situacao": "Exercicio",
+                            "condicaoEleitoral": "Titular",
+                        },
+                    ]
+                },
+            ),
+        ],
+    )
+
+    process_parlamentares_data_root(
+        tmp_path,
+        run_id="processed-camara-same-day",
+        overwrite=True,
+        data_fim=None,
+    )
+
+    output_root = tmp_path / "processed" / "parlamentares" / "v1"
+    mandatos = _read_jsonl(output_root / "mandatos.jsonl")
+    periodos = _read_jsonl(output_root / "parlamentares_periodos.jsonl")
+    camara_mandatos = [row for row in mandatos if row["parlamentar_key"] == "camara:100689"]
+    camara_periodos = [row for row in periodos if row["parlamentar_key"] == "camara:100689"]
+
+    assert len(camara_mandatos) == 2
+    assert len(camara_periodos) == 2
+    assert [row["data_inicio"] for row in camara_mandatos] == ["2023-02-01", "2023-03-01"]
+    assert camara_mandatos[0]["partido_sigla"] == "BBB"
+    assert camara_mandatos[0]["data_fim"] == "2023-02-28"
+    assert camara_periodos[0]["partido_sigla"] == "BBB"
+    assert camara_periodos[0]["vigencia_fim"] == "2023-02-28"
+    assert all(
+        not row.get("data_fim") or not row.get("data_inicio") or row["data_inicio"] <= row["data_fim"]
+        for row in camara_mandatos
+    )
+    assert all(row["vigencia_inicio"] <= row["vigencia_fim"] for row in camara_periodos)
+
+    for row in camara_mandatos:
+        assert row["raw_run_id"] == "raw-camara"
+        assert row["raw_source_id"] == "camara:deputado:100689:historico"
+        assert row["raw_checksum"] == "camara:deputado:100689:historico"
+        assert row["raw_path"].endswith("raw/camara/parlamentares/metadata/run-camara-same-day.jsonl")
+        assert row["raw_response_url"].endswith("camara:deputado:100689:historico")
+
+    assert all(list(row) == MANDATOS_FIELDS and row["dataset_version"] == DATASET_VERSION for row in mandatos)
+    assert all(list(row) == PERIODOS_FIELDS and row["dataset_version"] == DATASET_VERSION for row in periodos)
+    mandatos_parquet = pq.read_table(output_root / "parquet" / "mandatos.parquet")
+    periodos_parquet = pq.read_table(output_root / "parquet" / "parlamentares_periodos.parquet")
+    assert mandatos_parquet.column_names == MANDATOS_FIELDS
+    assert periodos_parquet.column_names == PERIODOS_FIELDS
+    assert set(mandatos_parquet.column("dataset_version").to_pylist()) == {DATASET_VERSION}
+    assert set(periodos_parquet.column("dataset_version").to_pylist()) == {DATASET_VERSION}
+
+
+def test_build_periodos_refuses_negative_interval() -> None:
+    parlamentar = {
+        "parlamentar_key": "camara:1",
+        "source": "camara",
+        "casa": "Camara dos Deputados",
+        "parlamentar_id": "1",
+    }
+    mandato = {
+        "parlamentar_key": "camara:1",
+        "source": "camara",
+        "parlamentar_id": "1",
+        "mandato_id": "camara:1:invalido",
+        "data_inicio": "2023-02-01",
+        "data_fim": "2023-01-31",
+    }
+
+    with pytest.raises(ValueError, match="Intervalo parlamentar invalido"):
+        build_periodos(
+            parlamentares={"camara:1": parlamentar},
+            mandatos=[mandato],
+            filiacoes=[],
+            data_inicio=None,
+            data_fim=None,
+        )
 
 
 def test_process_parlamentares_builds_camara_periodos_from_legislature_lists(tmp_path: Path) -> None:

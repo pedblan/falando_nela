@@ -546,12 +546,33 @@ def normalize_camara_historico(
     if not deputado_id:
         return []
     items = [item for item in _list(payload.get("dados")) if isinstance(item, dict)]
-    items.sort(key=lambda item: _date_part(item.get("dataHora") or item.get("data")) or "")
+    indexed_items = list(enumerate(items))
+    indexed_items.sort(
+        key=lambda entry: _camara_historico_timestamp_key(entry[1].get("dataHora") or entry[1].get("data"))
+    )
+
+    undated_items = []
+    daily_items: dict[str, dict[str, Any]] = {}
+    for _, item in indexed_items:
+        day = _date_part(item.get("dataHora") or item.get("data"))
+        if day is None:
+            undated_items.append(item)
+            continue
+        # O sort e estavel: timestamps identicos mantem a ordem oficial, e a
+        # atribuicao abaixo conserva o ultimo estado recebido naquele dia.
+        daily_items[day] = item
+
+    items = [*undated_items, *(daily_items[day] for day in sorted(daily_items))]
     rows = []
     for index, item in enumerate(items):
         start = _date_part(item.get("dataHora") or item.get("data"))
         next_start = _date_part(items[index + 1].get("dataHora") or items[index + 1].get("data")) if index + 1 < len(items) else None
         end = _previous_day(next_start) if next_start else None
+        if start and end and end < start:
+            raise ValueError(
+                f"Historico da Camara produziu intervalo negativo para deputado {deputado_id}: "
+                f"{start} a {end}"
+            )
         row = _base_mandato_row(
             source="camara",
             casa="Camara dos Deputados",
@@ -847,6 +868,12 @@ def _periodo_from_parts(
     intervalo_inferido: bool,
     observacao_qualidade: str | None,
 ) -> dict[str, Any]:
+    if vigencia_fim < vigencia_inicio:
+        raise ValueError(
+            "Intervalo parlamentar invalido: "
+            f"{parlamentar.get('parlamentar_key')} {vigencia_inicio} a {vigencia_fim} "
+            f"(mandato_id={mandato.get('mandato_id')})"
+        )
     row = {field: None for field in PERIODOS_FIELDS}
     row.update(
         {
@@ -1232,6 +1259,22 @@ def _date_part(value: Any) -> str | None:
         return None
     match = re.search(r"\d{4}-\d{2}-\d{2}", text)
     return match.group(0) if match else None
+
+
+def _camara_historico_timestamp_key(value: Any) -> tuple[int, str]:
+    text = _string(value)
+    if not text:
+        return (0, "")
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return (1, text)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+    return (1, parsed.isoformat(timespec="microseconds"))
 
 
 def _previous_day(value: str | None) -> str | None:

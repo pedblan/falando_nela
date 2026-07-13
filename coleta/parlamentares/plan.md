@@ -62,6 +62,9 @@ Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
   do backfill e nao deve parecer travada no Colab.
 - Normalizar a camada bruta em uma dimensao processada
   `processed/parlamentares/v1`.
+- No historico da Camara, ordenar mudancas pelo `dataHora` completo e
+  consolidar a granularidade diaria, preservando somente o ultimo estado
+  cronologico de cada dia antes de calcular o fim dos periodos.
 - Gerar uma tabela de intervalos pronta para juncao temporal com
   `textos_parlamentares/v1`.
 - Gerar metadados suficientes para juncao temporal de bases relacionais, como
@@ -72,6 +75,9 @@ Esse intervalo cobre, no fluxo atual, as legislaturas 54, 55, 56 e 57.
   que o parlamentar nao estava em exercicio.
 - Produzir auditoria de cobertura da juncao entre textos e metadados de
   parlamentares.
+- Recusar a construcao de qualquer mandato ou periodo cuja data final seja
+  anterior a data inicial; o gate de parlamentares deve continuar bloqueando
+  as faixas seguintes se esse invariante falhar.
 
 ## Saidas brutas
 
