@@ -93,6 +93,13 @@ subprocess.run([
 - Nenhum valor de `genero` e inferido por nome.
 - Datas de mandatos, filiacoes e intervalos usam formato `AAAA-MM-DD`.
 - `vigencia_inicio <= vigencia_fim` quando `vigencia_fim` existir.
+- Mudancas intradiarias da Camara geram uma unica linha por data, usando o
+  ultimo estado segundo `dataHora` completo e, em empate exato, a ultima
+  ocorrencia na resposta oficial.
+- Duplicatas no mesmo timestamp nao geram mandatos ou periodos duplicados.
+- `data_fim >= data_inicio` em `mandatos` e
+  `vigencia_fim >= vigencia_inicio` em `parlamentares_periodos`, tanto nos
+  JSONLs quanto nos Parquets.
 - Intervalos abertos ou indefinidos ficam documentados por
   `observacao_qualidade`.
 - O manifest processed registra contagens por casa, endpoint, tabela de saida,
@@ -192,6 +199,11 @@ deve confirmar:
 - Processed: deduplicacao por `parlamentar_key`.
 - Processed: construcao de `parlamentares_periodos` sem sobreposicoes
   silenciosas.
+- Processed: regressao com varias mudancas da Camara no mesmo dia, incluindo
+  timestamps identicos, preservando somente o ultimo estado diario e sem
+  intervalos negativos.
+- Processed: limite final anterior ao inicial interrompe a construcao de
+  `parlamentares_periodos` com erro explicito.
 - Common coleta: carregamento de `parlamentares_periodos` e filtragem por
   janela de mandato para planejamento de coletores.
 - Join: match por intervalo temporal, unmatched e ambiguidades.
@@ -200,6 +212,10 @@ deve confirmar:
 - Manifest: cabecalhos de deprecacao do Senado sao preservados quando presentes.
 
 ## Validacao manual minima
+
+- No caderno `01_atualizacao_parlamentares_colab.ipynb`, manter o gate de
+  periodos bloqueante e exigir `Gate aprovado: ... periodos de mandato` antes
+  de iniciar os cadernos 02 a 05.
 
 - Abrir uma amostra de discursos da Camara e confirmar match com deputado pelo
   `parlamentar_id` da API da Camara.
