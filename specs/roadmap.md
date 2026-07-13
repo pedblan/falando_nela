@@ -63,6 +63,10 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   sem duplicar raw nem reler particoes concluidas.
 - Registrar separadamente cobertura historica maxima e recorte analitico
   recomendado `2010-01-01` em diante.
+- Permitir adiamentos operacionais apenas para bases explicitamente excluidas
+  da analise corrente, com `run_id`, status e particoes exatas, motivo e
+  acompanhamento arquivados. O gate aceito nunca deve ser confundido com a
+  conclusao estrita do ciclo.
 
 ## Fase 3: normalizacao e armazenamento
 

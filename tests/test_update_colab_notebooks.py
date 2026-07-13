@@ -4,6 +4,8 @@ import ast
 import json
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = [
@@ -88,3 +90,98 @@ def test_camara_plenario_recovery_uses_safe_boundary_and_local_mandate_cache() -
     assert "cache_parlamentares_periodos" in source
     assert 'Path("/content/falando_nela_runtime")' in source
     assert "shutil.copyfile" in source
+
+
+def test_senado_notebook_defers_only_the_exact_historical_ccj_gap() -> None:
+    senate = "\n".join(_code_cells(_load(NOTEBOOKS[2])))
+    final = "\n".join(_code_cells(_load(NOTEBOOKS[6])))
+
+    assert "REGISTRAR_ADIAMENTO_CCJ_HISTORICA = False" in senate
+    assert "DEFERRED_COLLECTION_POLICIES" in senate
+    assert '"allowed_unresolved_partitions": ["2015-05"]' in senate
+    assert 'unresolved == policy["allowed_unresolved_partitions"]' in senate
+    assert '"analysis_excluded": True' in senate
+    assert "deferred_collections.json" in senate
+    assert "ADIADO, sem nova coleta" in senate
+    assert "collection_acceptance(run)" in senate
+
+    assert "STRICT_COLLECTION_GATE_OK" in final
+    assert "DEFERRED_GATE_KEYS" in final
+    assert '"deferred_collections": read_json(DEFERRED_COLLECTIONS_PATH)' in final
+
+
+def test_shared_gate_accepts_only_the_exact_deferred_partition(tmp_path: Path) -> None:
+    helpers = _code_cells(_load(NOTEBOOKS[2]))[3]
+    namespace = {
+        "Path": Path,
+        "json": json,
+        "DATA_ROOT": tmp_path,
+        "EXPECTED_CYCLE_ID": "20260713",
+        "CONFIG": {"cycle_id": "20260713"},
+    }
+    exec(helpers, namespace)
+    run = {
+        "key": "senado_ccj_historico",
+        "source": "senado",
+        "dataset": "ccj_notas",
+        "run_id": "prod-historico-senado-ccj",
+        "data_inicio": "1900-01-01",
+        "data_fim": "2026-05-28",
+    }
+    manifest_path = tmp_path / "manifests" / "prod-historico-senado-ccj.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "run_id": run["run_id"],
+                "status": "completed_with_errors",
+                "mode": "prod",
+                "sample": False,
+                "data_inicio": run["data_inicio"],
+                "data_fim": run["data_fim"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    checkpoint_path = tmp_path / "checkpoints" / "senado" / "ccj_notas.json"
+    checkpoint_path.parent.mkdir(parents=True)
+    checkpoint = {
+        "runs": {
+            run["run_id"]: {
+                "completed_partitions": {"2013-10": {}},
+                "failed_partitions": {"2013-10": {}, "2015-05": {}},
+            }
+        }
+    }
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+    deferred_path = namespace["DEFERRED_COLLECTIONS_PATH"]
+    deferred_path.parent.mkdir(parents=True)
+    deferred_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cycle_id": "20260713",
+                "items": [
+                    {
+                        "key": run["key"],
+                        "run_id": run["run_id"],
+                        "allowed_statuses": ["completed_with_errors"],
+                        "allowed_unresolved_partitions": ["2015-05"],
+                        "analysis_excluded": True,
+                        "analysis_exclusion": "senado/ccj_notas",
+                        "reason": "Artigo exclui a CCJ.",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    acceptance = namespace["collection_acceptance"](run)
+    assert acceptance["deferred"] is True
+    assert acceptance["unresolved"] == ["2015-05"]
+
+    checkpoint["runs"][run["run_id"]]["failed_partitions"]["2016-01"] = {}
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+    with pytest.raises(AssertionError, match="actual_unresolved"):
+        namespace["collection_acceptance"](run)

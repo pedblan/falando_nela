@@ -12,7 +12,7 @@ todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
 - As coletas historicas textuais mais recentes usaram `2026-05-28` como corte.
 - Os apartes foram coletados ate `2026-05-18`.
 - `prod-historico-camara-plenario` possui apenas autosave em estado `running`.
-- `prod-historico-senado-ccj` terminou com 2 erros e
+- `prod-historico-senado-ccj` terminou inicialmente com 2 erros e
   `prod-historico-camara-ccjc` com 33 erros.
 - A fotografia processada de `2026-06-03` tem 407.084 textos em seis bases.
 - `senado/congresso_discursos` possui somente listas em `metadata/`; o corpus
@@ -34,7 +34,9 @@ todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
    particao parcial restringe o indice de duplicatas aos anos afetados;
    fronteira limpa pode pula-lo.
 4. Bloquear o processamento final ate todos os manifests obrigatorios estarem
-   completos e sem particoes falhas ainda nao concluidas.
+   completos e sem particoes falhas ainda nao concluidas. Uma base excluida da
+   analise corrente pode ter excecao exata, datada e auditada, sem alterar seu
+   manifest de erro nem ampliar a tolerancia para outras particoes.
 5. Regerar as fotografias canonicas `current`, Parquets, auditorias e samples.
 6. Validar a nova janela no visualizador Gradio.
 
@@ -43,6 +45,13 @@ registrou `partition_started` para `1999` antes da interrupcao. Portanto a
 proxima retomada deve reconstruir o indice do raw e nao pode usar o atalho ate
 essa particao ser concluida. Como checkpoint e log identificam `1999` de forma
 coerente, nao e necessario reler os anos historicos ja concluidos.
+
+Na recuperacao da CCJ do Senado em `2026-07-13`, `2013-10` foi concluida e
+somente `2015-05` permaneceu falha por JSON malformado da API. Como o artigo
+corrente usa Plenario e exclui `senado/ccj_notas`, essa particao pode ser
+registrada em `deferred_collections.json` e retomada em ciclo posterior. O
+caderno 2 continua com as demais coletas do Senado; o caderno 6 registra a
+cobertura degradada, mas nao chama a CCJ historica de concluida.
 
 ## Cadernos
 
@@ -67,6 +76,9 @@ O fechamento fica em
 - A configuracao, os manifests processados e o resumo final de cada ciclo sao
   copiados para `operations/atualizacao/ciclos/{cycle_id}/`.
 - Samples e auditorias usam `run_id`s datados e permanecem por ciclo.
+- Adiamentos excepcionais ficam em
+  `operations/atualizacao/ciclos/{cycle_id}/deferred_collections.json`, com
+  base excluida da analise, motivo, particoes exatas e acao de acompanhamento.
 
 ## Fora de escopo
 

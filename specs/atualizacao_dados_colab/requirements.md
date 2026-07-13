@@ -27,6 +27,10 @@ Os dois arquivos devem ter o mesmo conteudo e incluir:
 - `expected_text_datasets`, `expected_apartes_sources` e
   `expected_processed_outputs`.
 
+Excecoes posteriores ao inicio do ciclo devem ser aditivas e registradas em
+`operations/atualizacao/ciclos/20260713/deferred_collections.json`; nao devem
+reescrever um manifest `completed_with_errors` como `completed`.
+
 Os demais cadernos devem ler `active.json`, recusar outro `cycle_id` e nunca
 derivar datas do relogio durante a execucao.
 
@@ -97,6 +101,14 @@ Processamento:
   `--skip-existing-record-scan`. Divergencia deve provocar scan integral.
 - A retomada do Plenario da Camara deve imprimir progresso durante o scan do
   raw e durante a particao, com heartbeat a cada 25 deputados no autosave.
+- O caderno 02 pode adiar somente `senado_ccj_historico`, somente quando o
+  manifest mantiver `completed_with_errors` e a lista exata de falhas nao
+  resolvidas for `["2015-05"]`. A excecao exige confirmacao do `cycle_id`,
+  `analysis_excluded=true`, motivo e `follow_up`.
+- Depois do registro, o caderno 02 nao deve executar novamente a recuperacao
+  historica adiada e deve prosseguir com Plenario, CCJ incremental, pareceres
+  de PEC e apartes do Senado. Falhas dessas outras coletas continuam
+  bloqueantes.
 
 ## Congresso textual
 
@@ -123,6 +135,13 @@ O caderno 06 deve recusar a execucao se:
   `completed_partitions` para o mesmo `run_id`;
 - `parlamentares/v1` do ciclo nao existir.
 
+Excecao: uma coleta pode ser aceita como `deferred`, sem ser considerada
+completa, quando houver entrada correspondente em `deferred_collections.json`
+e `run_id`, status e conjunto de particoes nao resolvidas coincidirem
+exatamente. O caderno deve expor separadamente `COLLECTION_GATE_OK=true` e
+`STRICT_COLLECTION_GATE_OK=false`, arquivando as chaves adiadas. Qualquer
+divergencia continua bloqueante.
+
 ## Fotografia current
 
 - A normalizacao textual le todo o raw e grava uma fotografia completa com
@@ -131,6 +150,9 @@ O caderno 06 deve recusar a execucao se:
   com `--overwrite`.
 - Os sete Parquets esperados sao Senado Plenario, Congresso, CCJ e pareceres de
   PEC; Camara Plenario, CCJC e pareceres de PEC.
+- Neste ciclo, o Parquet da CCJ pode ser regenerado com a cobertura raw
+  disponivel, mas deve ser excluido do artigo corrente e nao pode ser descrito
+  como historicamente completo enquanto `2015-05` estiver adiado.
 - Depois de cada etapa `current`, seu manifest deve ser copiado para o
   diretorio do ciclo antes que uma atualizacao futura possa sobrescreve-lo.
 - Samples sao geradas a partir da base completa do Drive, nunca de samples

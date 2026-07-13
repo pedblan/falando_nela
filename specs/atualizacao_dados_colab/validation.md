@@ -30,16 +30,16 @@ configuracao, sem apagar dados.
 - O manifest final existe, usa `mode=prod`, `sample=false` e o `run_id` certo.
 - `data_inicio` e `data_fim` correspondem a configuracao ou a retomada
   historica declarada.
-- Status final e `completed`.
+- Status final e `completed`, salvo excecao exata registrada para uma base
+  excluida da analise corrente.
 - `unresolved_failed_partitions`, calculado como falhas menos conclusoes
-  posteriores do mesmo run, e vazio.
+  posteriores do mesmo run, e vazio, salvo a lista exata da excecao auditada.
 - Logs e autosave continuam acessiveis e as ultimas linhas sao exibidas.
 - JSONLs tocados pela faixa sao parseaveis.
-- Para `prod-historico-senado-ccj`, as particoes `2013-10` e `2015-05` devem
-  aparecer em `completed_partitions` depois da retomada; suas entradas
-  historicas em `failed_partitions` podem permanecer, desde que
-  `unresolved_failed_partitions` seja vazio e o manifest termine em
-  `completed`.
+- A conclusao estrita de `prod-historico-senado-ccj` continua exigindo que as
+  particoes `2013-10` e `2015-05` aparecam em `completed_partitions`; suas
+  entradas historicas em `failed_partitions` podem permanecer quando o mesmo
+  run registrar conclusao posterior.
 - O log da recuperacao pode conter `agenda_range_split`; cada evento deve
   descrever metades contiguas e sem sobreposicao da janela que falhou.
 - Para os dias problematicos alcancados pela subdivisao, o log pode conter
@@ -49,7 +49,17 @@ configuracao, sem apagar dados.
   XML diario mesmo quando ele nao contiver reuniao da CCJ; ausencia de CCJ e
   resultado valido, nao falha de particao.
 - Se JSON e XML falharem para o mesmo dia, a particao deve continuar em
-  `unresolved_failed_partitions` e bloquear o processamento final.
+  `unresolved_failed_partitions` e, por default, bloquear o processamento
+  final; a unica flexibilizacao e a excecao auditada descrita abaixo.
+- Estado auditado em `2026-07-13`: `2013-10` esta concluida e apenas
+  `2015-05` permanece nao resolvida; o manifest tem
+  `status=completed_with_errors` e `errors=1`.
+- Se a analise corrente excluir a CCJ, o caderno 02 pode gravar a excecao
+  somente para `senado_ccj_historico` e `["2015-05"]`. A validacao deve falhar
+  se aparecer outra particao, outro status, outro `run_id` ou manifest ausente.
+- Com a excecao registrada, a validacao da faixa deve imprimir
+  `deferred=True` para a recuperacao historica e continuar exigindo
+  `completed` para as quatro coletas seguintes do Senado.
 - Para `prod-historico-camara-plenario`, o preflight deve detectar a particao
   parcial `1999` observada no log e registrar
   `existing_record_scan=filtered`, `existing_record_scan_years=["1999"]` na
@@ -84,6 +94,11 @@ configuracao, sem apagar dados.
 
 ## Processamento final
 
+- O gate aceito deve mostrar `COLLECTION_GATE_OK=True`,
+  `STRICT_COLLECTION_GATE_OK=False` e
+  `DEFERRED_GATE_KEYS=["senado_ccj_historico"]`. O resumo do ciclo deve copiar
+  o conteudo de `deferred_collections.json` e a justificativa da cobertura
+  degradada.
 - O manifest textual registra os nove `run_id`s incrementais/recuperados e o
   backfill textual do Congresso entre suas entradas observadas.
 - `dataset_version` e sempre `v1`, `texto` e nao vazio e `texto_id` e unico.
@@ -96,6 +111,9 @@ configuracao, sem apagar dados.
   manifest; as auditorias de join nao inferem genero por nome.
 - O manifest de samples contem as sete bases textuais e os ZIPs preservam o
   schema v1.
+- Nenhum resultado do artigo corrente deve ler `senado/ccj_notas`; antes de
+  uma analise futura da CCJ, `2015-05` deve ser retomada e o gate estrito deve
+  voltar a ser verdadeiro.
 
 ## Inspecao no Gradio
 

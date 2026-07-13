@@ -19,11 +19,12 @@ Arquivos atuais:
   sob confirmacao explicita, o controle do ciclo `20260713`.
 - `01_atualizacao_parlamentares_colab.ipynb`: atualiza deputados e senadores e
   regenera `parlamentares/v1` antes das faixas da Camara.
-- `02_atualizacao_senado_colab.ipynb`: recupera a CCJ historica e atualiza
-  Plenario, CCJ, pareceres de PEC e apartes do Senado. A recuperacao preserva
-  o mesmo `run_id --resume`; respostas JSON interrompidas ou com HTTP 5xx sao
-  subdivididas pelo coletor e, se necessario, o ultimo dia usa a agenda XML.
-  Nao edite manualmente checkpoint ou raw.
+- `02_atualizacao_senado_colab.ipynb`: permite registrar, com confirmacao, o
+  adiamento exato de `2015-05` da CCJ historica quando a analise excluir essa
+  base; depois prossegue com Plenario, CCJ incremental, pareceres de PEC e
+  apartes. O manifest permanece `completed_with_errors` e a excecao fica em
+  `operations/atualizacao/ciclos/20260713/deferred_collections.json`. Nao
+  edite manualmente checkpoint ou raw.
 - `03_backfill_congresso_textos_colab.ipynb`: valida e executa o backfill
   textual mensal do Congresso desde `1996-05-01`.
 - `04_atualizacao_camara_demais_bases_colab.ipynb`: recupera a CCJC historica e

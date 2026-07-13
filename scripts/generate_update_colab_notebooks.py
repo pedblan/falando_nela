@@ -88,6 +88,22 @@ HELPERS_CELL = code(
     from datetime import datetime, timezone
 
     TERMINAL_STATUSES = {"completed"}
+    DEFERRED_COLLECTIONS_PATH = (
+        DATA_ROOT
+        / "operations"
+        / "atualizacao"
+        / "ciclos"
+        / EXPECTED_CYCLE_ID
+        / "deferred_collections.json"
+    )
+    DEFERRED_COLLECTION_POLICIES = {
+        "senado_ccj_historico": {
+            "run_id": "prod-historico-senado-ccj",
+            "allowed_statuses": ["completed_with_errors"],
+            "allowed_unresolved_partitions": ["2015-05"],
+            "analysis_exclusion": "senado/ccj_notas",
+        }
+    }
 
     def read_json(path):
         path = Path(path)
@@ -106,18 +122,80 @@ HELPERS_CELL = code(
         completed = set((current.get("completed_partitions") or {}).keys())
         return sorted(failed - completed)
 
-    def assert_collection_complete(run):
+    def _assert_manifest_contract(run):
         manifest = read_json(manifest_for(run))
         assert manifest is not None, f"Manifest final ausente: {manifest_for(run)}"
         assert manifest.get("run_id") == run["run_id"]
-        assert manifest.get("status") in TERMINAL_STATUSES, (run["key"], manifest.get("status"))
         assert manifest.get("mode") == "prod", (run["key"], manifest.get("mode"))
         assert manifest.get("sample") is False, (run["key"], manifest.get("sample"))
         assert manifest.get("data_inicio") == run["data_inicio"], (run["key"], manifest.get("data_inicio"))
         assert manifest.get("data_fim") == run["data_fim"], (run["key"], manifest.get("data_fim"))
+        return manifest
+
+    def assert_collection_complete(run):
+        manifest = _assert_manifest_contract(run)
+        assert manifest.get("status") in TERMINAL_STATUSES, (run["key"], manifest.get("status"))
         unresolved = unresolved_partitions(run)
         assert not unresolved, f"Particoes falhas nao resolvidas em {run['key']}: {unresolved[:20]}"
         return manifest
+
+    def deferred_collection_for(run):
+        payload = read_json(DEFERRED_COLLECTIONS_PATH)
+        if not payload:
+            return None
+        assert payload.get("schema_version") == 1, DEFERRED_COLLECTIONS_PATH
+        assert payload.get("cycle_id") == EXPECTED_CYCLE_ID, payload.get("cycle_id")
+        for item in payload.get("items", []):
+            if item.get("key") == run["key"]:
+                policy = DEFERRED_COLLECTION_POLICIES.get(run["key"])
+                assert policy is not None, f"Adiamento sem politica: {run['key']}"
+                assert item.get("run_id") == run["run_id"] == policy["run_id"], item
+                assert item.get("allowed_statuses") == policy["allowed_statuses"], item
+                assert (
+                    item.get("allowed_unresolved_partitions")
+                    == policy["allowed_unresolved_partitions"]
+                ), item
+                assert item.get("analysis_exclusion") == policy["analysis_exclusion"], item
+                return item
+        return None
+
+    def collection_acceptance(run):
+        try:
+            manifest = assert_collection_complete(run)
+            return {
+                "manifest": manifest,
+                "deferred": False,
+                "status": manifest.get("status"),
+                "unresolved": [],
+            }
+        except AssertionError as strict_error:
+            deferral = deferred_collection_for(run)
+            assert deferral is not None, strict_error
+            manifest = _assert_manifest_contract(run)
+            allowed_statuses = set(deferral.get("allowed_statuses") or [])
+            allowed_unresolved = sorted(deferral.get("allowed_unresolved_partitions") or [])
+            actual_unresolved = unresolved_partitions(run)
+            assert deferral.get("analysis_excluded") is True, deferral
+            assert str(deferral.get("reason") or "").strip(), deferral
+            assert manifest.get("status") in allowed_statuses, (
+                run["key"], manifest.get("status"), sorted(allowed_statuses)
+            )
+            assert actual_unresolved == allowed_unresolved, {
+                "run": run["key"],
+                "expected_unresolved": allowed_unresolved,
+                "actual_unresolved": actual_unresolved,
+            }
+            return {
+                "manifest": manifest,
+                "deferred": True,
+                "status": manifest.get("status"),
+                "unresolved": actual_unresolved,
+                "reason": deferral["reason"],
+                "follow_up": deferral.get("follow_up"),
+            }
+
+    def assert_collection_accepted(run):
+        return collection_acceptance(run)["manifest"]
 
     def show_run_state(run, tail_lines=5):
         final = read_json(manifest_for(run))
@@ -473,6 +551,164 @@ def build_01() -> nbformat.NotebookNode:
     )
 
 
+def build_02() -> nbformat.NotebookNode:
+    run_keys = [
+        "senado_ccj_historico",
+        "senado_plenario",
+        "senado_ccj",
+        "senado_pareceres_pec",
+        "senado_apartes",
+    ]
+    return notebook(
+        "02 - Atualizacao do Senado",
+        "Registra de forma auditavel o adiamento da unica particao historica ainda falha da CCJ e prossegue com Plenario, CCJ incremental, pareceres de PEC e apartes.",
+        [
+            CONTROL_CELL,
+            HELPERS_CELL,
+            md(
+                """
+                ## Excecao explicita da CCJ historica
+
+                A auditoria de `2026-07-13` confirmou que `2013-10` foi
+                recuperada e apenas `2015-05` permanece falha por JSON
+                malformado na API. Como a analise corrente exclui a CCJ, esta
+                particao pode ser adiada sem converter o manifest em sucesso.
+
+                A celula abaixo grava a excecao em
+                `operations/atualizacao/ciclos/20260713/deferred_collections.json`.
+                O gate aceita somente o `run_id`, o status e a particao exatos;
+                qualquer outra falha continua bloqueante.
+                """
+            ),
+            code(
+                """
+                REGISTRAR_ADIAMENTO_CCJ_HISTORICA = False
+                CONFIRMAR_CICLO = ""
+                require_explicit_confirmation(
+                    REGISTRAR_ADIAMENTO_CCJ_HISTORICA,
+                    CONFIRMAR_CICLO,
+                )
+
+                if REGISTRAR_ADIAMENTO_CCJ_HISTORICA:
+                    run = RUNS["senado_ccj_historico"]
+                    policy = DEFERRED_COLLECTION_POLICIES[run["key"]]
+                    manifest = _assert_manifest_contract(run)
+                    unresolved = unresolved_partitions(run)
+                    assert manifest.get("status") in policy["allowed_statuses"], manifest
+                    assert unresolved == policy["allowed_unresolved_partitions"], unresolved
+
+                    existing = read_json(DEFERRED_COLLECTIONS_PATH) or {
+                        "schema_version": 1,
+                        "cycle_id": EXPECTED_CYCLE_ID,
+                        "items": [],
+                    }
+                    assert existing.get("schema_version") == 1, existing
+                    assert existing.get("cycle_id") == EXPECTED_CYCLE_ID, existing
+                    item = {
+                        "key": run["key"],
+                        "run_id": run["run_id"],
+                        "dataset": f"{run['source']}/{run['dataset']}",
+                        "allowed_statuses": policy["allowed_statuses"],
+                        "allowed_unresolved_partitions": policy["allowed_unresolved_partitions"],
+                        "analysis_excluded": True,
+                        "analysis_exclusion": policy["analysis_exclusion"],
+                        "reason": (
+                            "A analise corrente usa Plenario e exclui a CCJ; "
+                            "a lacuna historica 2015-05 foi adiada explicitamente."
+                        ),
+                        "follow_up": (
+                            "Retomar 2015-05 em ciclo posterior, antes de qualquer "
+                            "analise que inclua a CCJ."
+                        ),
+                        "deferred_at": datetime.now(timezone.utc).isoformat(),
+                        "manifest_path": str(manifest_for(run)),
+                        "checkpoint_path": str(checkpoint_for(run)),
+                    }
+                    items = [
+                        value
+                        for value in existing.get("items", [])
+                        if value.get("key") != run["key"]
+                    ]
+                    payload = {**existing, "updated_at": item["deferred_at"], "items": [*items, item]}
+                    DEFERRED_COLLECTIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+                    temporary = DEFERRED_COLLECTIONS_PATH.with_suffix(".tmp")
+                    temporary.write_text(
+                        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\\n",
+                        encoding="utf-8",
+                    )
+                    temporary.replace(DEFERRED_COLLECTIONS_PATH)
+                    print("Adiamento registrado:", DEFERRED_COLLECTIONS_PATH)
+                    print(item)
+                else:
+                    print("Registro protegido: REGISTRAR_ADIAMENTO_CCJ_HISTORICA=False")
+                """
+            ),
+            code(
+                f"""
+                RUN_KEYS = {run_keys!r}
+                RODAR_FAIXA = False
+                CONFIRMAR_CICLO = ""
+                require_explicit_confirmation(RODAR_FAIXA, CONFIRMAR_CICLO)
+
+                if RODAR_FAIXA:
+                    assert_parlamentares_ready()
+                    for key in RUN_KEYS:
+                        run = RUNS[key]
+                        deferral = deferred_collection_for(run)
+                        if deferral is not None:
+                            acceptance = collection_acceptance(run)
+                            if acceptance["deferred"]:
+                                print(
+                                    "ADIADO, sem nova coleta:",
+                                    key,
+                                    acceptance["unresolved"],
+                                    acceptance["reason"],
+                                )
+                                continue
+                        try:
+                            acceptance = collection_acceptance(run)
+                        except AssertionError:
+                            acceptance = None
+                        if acceptance and not acceptance["deferred"]:
+                            print("Ja concluido; coleta pulada:", key)
+                            continue
+                        rc = run_collector(run)
+                        assert rc == 0, (key, rc)
+                        assert_collection_complete(run)
+                else:
+                    print("Faixa protegida: RODAR_FAIXA=False")
+                """
+            ),
+            md("## Validacao da faixa, incluindo adiamentos"),
+            code(
+                """
+                for key in RUN_KEYS:
+                    run = RUNS[key]
+                    show_run_state(run)
+                    try:
+                        acceptance = collection_acceptance(run)
+                        print(key, {
+                            "status": acceptance["status"],
+                            "deferred": acceptance["deferred"],
+                            "unresolved": acceptance["unresolved"],
+                            "reason": acceptance.get("reason"),
+                        })
+                    except Exception as exc:
+                        print(key, "PENDENTE OU BLOQUEANTE", str(exc))
+                """
+            ),
+            md(
+                """
+                Se uma sessao caiu e deixou lock, confirme no log que nao existe
+                outra sessao ativa. Remova manualmente apenas o arquivo
+                correspondente em `operations/atualizacao/locks/` e execute de
+                novo com o mesmo `run_id` e `--resume`.
+                """
+            ),
+        ],
+    )
+
+
 def lane_notebook(title: str, description: str, run_keys: list[str]) -> nbformat.NotebookNode:
     keys_repr = repr(run_keys)
     return notebook(
@@ -738,7 +974,7 @@ def build_05() -> nbformat.NotebookNode:
 def build_06() -> nbformat.NotebookNode:
     return notebook(
         "06 - Processamento e validacao da atualizacao",
-        "Aplica gates a todas as coletas, regenera a fotografia `current`, valida os sete Parquets e arquiva os artefatos operacionais do ciclo.",
+        "Aplica gates estritos a todas as coletas, exceto adiamentos exatos e auditados, regenera a fotografia `current`, valida os sete Parquets e arquiva os artefatos operacionais do ciclo.",
         [
             CONTROL_CELL,
             HELPERS_CELL,
@@ -748,10 +984,22 @@ def build_06() -> nbformat.NotebookNode:
                 GATE_RESULTS = {}
                 for key, run in RUNS.items():
                     try:
-                        manifest = assert_collection_complete(run)
-                        GATE_RESULTS[key] = {"ok": True, "status": manifest.get("status"), "manifest": str(manifest_for(run))}
+                        acceptance = collection_acceptance(run)
+                        GATE_RESULTS[key] = {
+                            "ok": True,
+                            "status": acceptance["status"],
+                            "deferred": acceptance["deferred"],
+                            "unresolved": acceptance["unresolved"],
+                            "reason": acceptance.get("reason"),
+                            "manifest": str(manifest_for(run)),
+                        }
                     except Exception as exc:
-                        GATE_RESULTS[key] = {"ok": False, "error": str(exc), "manifest": str(manifest_for(run))}
+                        GATE_RESULTS[key] = {
+                            "ok": False,
+                            "deferred": False,
+                            "error": str(exc),
+                            "manifest": str(manifest_for(run)),
+                        }
 
                 for key, result in GATE_RESULTS.items():
                     print(key, result)
@@ -760,8 +1008,17 @@ def build_06() -> nbformat.NotebookNode:
                 parlamentares_periodos = DATA_ROOT / "processed" / "parlamentares" / "v1" / "parquet" / "parlamentares_periodos.parquet"
                 PARLAMENTARES_GATE_OK = parlamentares_manifest.exists() and parlamentares_periodos.exists()
                 COLLECTION_GATE_OK = all(item["ok"] for item in GATE_RESULTS.values()) and PARLAMENTARES_GATE_OK
+                STRICT_COLLECTION_GATE_OK = (
+                    COLLECTION_GATE_OK
+                    and not any(item.get("deferred") for item in GATE_RESULTS.values())
+                )
+                DEFERRED_GATE_KEYS = sorted(
+                    key for key, item in GATE_RESULTS.items() if item.get("deferred")
+                )
                 print("PARLAMENTARES_GATE_OK=", PARLAMENTARES_GATE_OK)
                 print("COLLECTION_GATE_OK=", COLLECTION_GATE_OK)
+                print("STRICT_COLLECTION_GATE_OK=", STRICT_COLLECTION_GATE_OK)
+                print("DEFERRED_GATE_KEYS=", DEFERRED_GATE_KEYS)
                 """
             ),
             md("## Auditoria JSONL bloqueante\n\nA leitura pode ser longa no Drive, mas nao faz requisicoes externas nem altera o raw."),
@@ -979,6 +1236,9 @@ def build_06() -> nbformat.NotebookNode:
                         "window": CONFIG["window"],
                         "collection_gate": GATE_RESULTS,
                         "collection_gate_ok": COLLECTION_GATE_OK,
+                        "strict_collection_gate_ok": STRICT_COLLECTION_GATE_OK,
+                        "deferred_collection_keys": DEFERRED_GATE_KEYS,
+                        "deferred_collections": read_json(DEFERRED_COLLECTIONS_PATH),
                         "jsonl_gate_ok": JSONL_GATE_OK,
                         "expected_text_parquets": CONFIG["expected_text_parquets"],
                         "row_comparison": ROW_COMPARISON,
@@ -1014,11 +1274,7 @@ def main() -> None:
     notebooks = {
         COLETA_DIR / "00_auditoria_configuracao_atualizacao_colab.ipynb": build_00(),
         COLETA_DIR / "01_atualizacao_parlamentares_colab.ipynb": build_01(),
-        COLETA_DIR / "02_atualizacao_senado_colab.ipynb": lane_notebook(
-            "02 - Atualizacao do Senado",
-            "Retoma as duas particoes historicas da CCJ e, depois, atualiza Plenario, CCJ, pareceres de PEC e apartes.",
-            ["senado_ccj_historico", "senado_plenario", "senado_ccj", "senado_pareceres_pec", "senado_apartes"],
-        ),
+        COLETA_DIR / "02_atualizacao_senado_colab.ipynb": build_02(),
         COLETA_DIR / "03_backfill_congresso_textos_colab.ipynb": build_03(),
         COLETA_DIR / "04_atualizacao_camara_demais_bases_colab.ipynb": lane_notebook(
             "04 - Atualizacao das demais bases da Camara",
