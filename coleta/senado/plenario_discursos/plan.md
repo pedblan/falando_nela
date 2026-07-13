@@ -1,5 +1,8 @@
 # Plano: discursos do Plenario do Senado
 
+O coletor usa a esteira compartilhada `coleta.senado.discursos`, parametrizada
+com `siglaCasa=SF`; o Congresso usa a mesma implementacao com `siglaCasa=CN`.
+
 ## Objetivo
 
 Coletar pronunciamentos do Plenario do Senado Federal como unidade textual analitica. A lista mensal de discursos serve apenas para descobrir `CodigoPronunciamento` e metadados de contexto; o corpus bruto deve ser formado por registros com texto integral baixado do endpoint oficial por pronunciamento.

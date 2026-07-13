@@ -1,5 +1,24 @@
 # Plan
 
+## Ciclo operacional 20260713
+
+- Regerar a fotografia canonica `current` depois que todas as faixas de coleta
+  do ciclo passarem pelos gates definidos em
+  `specs/atualizacao_dados_colab/validation.md`.
+- Usar os `run_id`s estaveis `processed-textos-v1-current`,
+  `processed-parlamentares-v1-current`,
+  `processed-apartes-parlamentares-v1-current` e
+  `parquet-textos-v1-current`; `--overwrite` substitui somente os derivados,
+  nunca os JSONLs raw cumulativos.
+- Produzir os sete Parquets textuais, incluindo
+  `senado__congresso_discursos.parquet`, agora alimentado por
+  `pronunciamento_texto`.
+- Arquivar em `operations/atualizacao/ciclos/20260713/` somente configuracao,
+  manifests, auditorias e amostras. Os corpus processados permanecem na
+  fotografia unica `current`.
+- Orquestrar processamento, validacao, amostras e visualizacao no caderno
+  `notebooks/processamento/06_processamento_validacao_atualizacao_colab.ipynb`.
+
 ## Tarefa operacional de amanha: inventario de separadores
 
 Tarefa planejada para quarta-feira, 2026-05-27.

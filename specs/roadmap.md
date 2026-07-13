@@ -2,6 +2,19 @@
 
 Este roadmap organiza o projeto em fases pequenas, com specs orientando as decisoes antes da implementacao.
 
+## Atualizacao temporal via Colab
+
+- O ciclo `20260713` regulariza runs historicos pendentes e atualiza todas as
+  bases ate `2026-07-13`, com sobreposicao desde `2026-05-01`, conforme
+  `specs/atualizacao_dados_colab/`.
+- Coletas historicas longas rodam exclusivamente no Colab/Drive. O repositorio
+  local executa testes, validacao estrutural dos cadernos e smokes pequenos.
+- `senado/congresso_discursos` passa a integrar o corpus
+  `textos_parlamentares/v1` com texto integral, fallback de sessao e fila de
+  transcricao.
+- Processamento usa fotografia canonica `current`; configuracoes, manifests,
+  auditorias e amostras sao arquivados por ciclo.
+
 ## Fase 0: fundacao
 
 - Criar as specs primarias: missao, stack tecnica e roadmap.

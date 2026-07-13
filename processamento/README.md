@@ -2,6 +2,13 @@
 
 Ferramentas da fase 3 do roadmap: normalizacao e armazenamento.
 
+Nos ciclos de atualizacao, os derivados canonicos usam `run_id`s estaveis com
+sufixo `-current`. A coleta raw permanece imutavel e cumulativa; somente
+JSONLs processados, Parquets e tabelas derivadas sao regenerados depois dos
+gates. O ciclo `20260713` e orquestrado por
+`notebooks/processamento/06_processamento_validacao_atualizacao_colab.ipynb` e
+passa a exigir sete Parquets textuais, incluindo Congresso.
+
 ## Normalizacao
 
 ```bash

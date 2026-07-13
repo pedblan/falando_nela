@@ -15,6 +15,11 @@ Convencoes:
 
 Arquivos atuais:
 
+- `06_processamento_validacao_atualizacao_colab.ipynb`: bloqueia derivados ate
+  todas as faixas do ciclo `20260713` estarem completas, regenera a fotografia
+  `current`, produz os sete Parquets, apartes, auditorias e amostras, arquiva os
+  manifests do ciclo e abre o visualizador Gradio.
+
 - `normalizacao_armazenamento_colab.ipynb`: executa
   `processed/textos_parlamentares/v1` a partir do `raw/` no Google Drive.
 - `geracao_parquets_colab.ipynb`: gera Parquets unificados por base a partir dos

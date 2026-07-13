@@ -167,7 +167,10 @@ normalizacao relacional via metadados oficiais de parlamentares.
 - `senado/plenario_apartes`: metadados de apartes no Plenario do Senado,
   gravados somente em `metadata/`.
 - `senado/congresso_discursos`: discursos do Plenario do Congresso
-  (`siglaCasa=CN`), com backfill operacional a partir de `1996-05-01`.
+  (`siglaCasa=CN`), com backfill operacional a partir de `1996-05-01` e a
+  mesma esteira textual do Plenario do Senado: lista mensal em `metadata/`,
+  `pronunciamento_texto` no corpus e candidatos sem texto em
+  `transcription_queue/`.
 - `senado/ccj_notas`: agenda, detalhes e notas taquigraficas da CCJ do Senado.
 - `senado/pareceres_pec`: pareceres, relatorios, avulsos de parecer e relatorios do vencido de PEC no Plenario e na CCJ do Senado.
 - `camara/plenario_discursos`: discursos por deputado na API da Camara, com

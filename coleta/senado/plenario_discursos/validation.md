@@ -1,5 +1,11 @@
 # Validation: discursos do Plenario do Senado
 
+- Executar tambem `tests/test_congresso_discursos.py` para garantir que a
+  esteira compartilhada nao misture `SF` e `CN` e preserve retomada, fallback
+  de sessao e fila de transcricao.
+- Simular uma falha inesperada por item e confirmar que a particao fica
+  retomavel ate que esse item seja gravado com sucesso.
+
 ## Smoke Local
 
 ```bash

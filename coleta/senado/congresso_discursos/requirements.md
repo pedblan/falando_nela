@@ -33,6 +33,21 @@
 - URL final, status HTTP e payload/texto retornado.
 - Checksum do payload.
 
+## Pipeline textual compartilhado
+
+- Reutilizar o mesmo extrator e a mesma cadeia de obtencao de texto de
+  `senado/plenario_discursos`, variando somente `dataset` e `siglaCasa`.
+- Gravar `pronunciamento_texto` na particao mensal com o contrato canonico
+  `CodigoPronunciamento`, `TextoIntegral`, `TextoIntegralUrl`, `texto`,
+  `forma`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.
+- Tentar, nesta ordem, o endpoint oficial de texto integral e as notas da
+  sessao. Preservar as tentativas no payload quando houver fallback.
+- Quando nao houver texto e existir video, texto binario ou endpoint de videos
+  da sessao, gravar tambem em `transcription_queue`.
+- Uma excecao inesperada ao baixar um pronunciamento deve marcar a particao
+  mensal como falha. Em `--resume`, registros ja gravados sao pulados e os
+  faltantes sao tentados novamente.
+
 ## Limites
 
 - A API do Senado limita rotinas com mais de 10 requisicoes por segundo.

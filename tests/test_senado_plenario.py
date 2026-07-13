@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 
 from coleta.common.http import OpenDataClient
@@ -189,3 +191,22 @@ def test_fetch_pronunciamento_texto_stores_response_body_not_link() -> None:
     assert payload["texto"] != item["fontes"]["texto_integral_txt"]
     assert payload["TextoIntegral"] != item["fontes"]["texto_integral_txt"]
     assert payload["metodo_obtencao"] == "api_texto_integral"
+
+
+def test_plenario_wrapper_uses_shared_pipeline_with_sf(monkeypatch) -> None:
+    import coleta.senado.plenario_discursos.collect as plenario
+
+    captured = {}
+
+    def fake_collect_discursos(**kwargs):
+        captured.update(kwargs)
+        return Path("manifest.json")
+
+    monkeypatch.setattr(plenario, "collect_discursos", fake_collect_discursos)
+
+    result = plenario.collect(["--mode", "dev"])
+
+    assert result == Path("manifest.json")
+    assert captured["dataset"] == "plenario_discursos"
+    assert captured["sigla_casa"] == "SF"
+    assert captured["argv"] == ["--mode", "dev"]

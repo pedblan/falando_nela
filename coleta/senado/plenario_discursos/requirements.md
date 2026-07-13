@@ -1,5 +1,11 @@
 # Requirements: discursos do Plenario do Senado
 
+- A coleta textual deve permanecer na esteira compartilhada com o Congresso,
+  preservando os defaults historicos da CLI e parametrizando somente dataset,
+  casa e descricao.
+- Uma falha inesperada ao obter um item deve impedir que a particao seja
+  marcada como concluida, para que `--resume` tente novamente o texto ausente.
+
 ## Interface CLI
 
 - `--data-inicio AAAA-MM-DD`: inicio da janela de coleta; default baseline `2011-05-18`.

@@ -15,6 +15,19 @@ Convencoes:
 
 Arquivos atuais:
 
+- `00_auditoria_configuracao_atualizacao_colab.ipynb`: audita o Drive e grava,
+  sob confirmacao explicita, o controle do ciclo `20260713`.
+- `01_atualizacao_parlamentares_colab.ipynb`: atualiza deputados e senadores e
+  regenera `parlamentares/v1` antes das faixas da Camara.
+- `02_atualizacao_senado_colab.ipynb`: recupera a CCJ historica e atualiza
+  Plenario, CCJ, pareceres de PEC e apartes do Senado.
+- `03_backfill_congresso_textos_colab.ipynb`: valida e executa o backfill
+  textual mensal do Congresso desde `1996-05-01`.
+- `04_atualizacao_camara_demais_bases_colab.ipynb`: recupera a CCJC historica e
+  atualiza CCJC, pareceres de PEC e apartes da Camara.
+- `05_atualizacao_camara_plenario_colab.ipynb`: conclui o backfill historico do
+  Plenario antes de iniciar a faixa incremental.
+
 - `coleta_template.ipynb`: template geral para rodar todos os coletores, incluindo pareceres de PEC.
 - `coleta_backfill_historico_colab.ipynb`: orquestrador Colab para backfill historico longo de todas as bases, com `run_id`s fixos, `--resume`, validacao curta, auditoria de layout raw, processamento, Parquets e samples.
 - `coleta_senado_plenario.ipynb`: fluxo especifico para validar e rodar a coleta do Plenario do Senado.
@@ -72,3 +85,18 @@ de backfill deve usar os inicios operacionais encontrados por probes mensais:
 `1995-02-01` para `senado/plenario_discursos` e `1996-05-01` para
 `senado/congresso_discursos`. Esse endpoint rejeita janelas trimestrais/anuais,
 entao esses dois coletores continuam mensais.
+
+No ciclo `20260713`, execute primeiro os cadernos 00 e 01. Depois, os cadernos
+02 a 05 podem rodar em paralelo ou em ondas, desde que nunca existam duas
+execucoes simultaneas do mesmo dataset. Todas as celulas longas ficam
+desativadas por default, usam datas e `run_id`s do controle ativo, imprimem
+saida continuamente e retomam com `--resume`.
+
+Os sete cadernos do ciclo sao gerados de forma reproduzivel com `nbformat`:
+
+```bash
+python scripts/generate_update_colab_notebooks.py
+```
+
+O gerador valida o schema do notebook antes de gravar cada `.ipynb`; a suite
+local tambem compila individualmente todas as celulas de codigo.

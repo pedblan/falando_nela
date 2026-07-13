@@ -1,5 +1,21 @@
 # Validation
 
+## Gate do ciclo 20260713
+
+- Nao iniciar processamento enquanto algum run requerido estiver sem manifest
+  final ou tiver particao falha ainda nao compensada por uma conclusao da mesma
+  particao.
+- Confirmar a janela explicita `2026-05-01` a `2026-07-13` nos runs
+  incrementais e `1996-05-01` a `2026-07-13` no backfill textual do Congresso.
+- Validar exatamente sete Parquets textuais, `texto_id` unico,
+  `dataset_version = v1`, `texto` nao vazio e soma de linhas coerente com os
+  JSONLs processados distintos.
+- Confirmar `parlamentares/v1`, `apartes_parlamentares/v1`, auditoria de joins,
+  ZIPs de todas as bases e copia dos manifests em
+  `operations/atualizacao/ciclos/20260713/`.
+- No Gradio, localizar registros entre `2026-05-01` e `2026-07-13`, manter
+  `texto` fora da tabela compacta e abrir o texto integral por `texto_id`.
+
 ## Checks obrigatorios
 
 - `pytest` deve passar.

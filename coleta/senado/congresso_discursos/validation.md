@@ -28,12 +28,17 @@ subprocess.run([
 - Gera JSONL bruto, log, manifest e checkpoint.
 - Em `dev`, grava em `data/dev` e usa amostra por default.
 - Em `prod`, exige destino externo e registra `mode=prod` no manifest.
-- As listas mensais ficam em `metadata/{run_id}.jsonl`; registros mensais `ano=YYYY/mes=MM` devem ser reservados ao corpus textual.
+- As listas mensais ficam em `metadata/{run_id}.jsonl`; registros
+  `pronunciamento_texto` ficam em `ano=YYYY/mes=MM/{run_id}.jsonl`.
 - O backfill operacional usa `1996-05-01` como inicio para evitar varrer meses
   anteriores sem cobertura no endpoint.
 - A coleta continua mensal; nao deve depender de preflight anual/trimestral no
   endpoint de lista do Senado.
-- O registro bruto preserva metadados de periodo, mas a saida analitica deve priorizar registros com texto integral por pronunciamento.
+- Cada item com `CodigoPronunciamento` tenta o endpoint oficial de texto
+  integral e, quando necessario, notas da sessao.
+- O campo `texto` contem o corpo transferido, nunca a URL de texto integral.
+- Casos audiovisuais sem texto aparecem em `transcription_queue` e nao entram
+  silenciosamente no corpus analitico.
 - O request preserva `siglaCasa=CN`.
 - Analises futuras devem usar o texto integral transferido, nao `Resumo` ou apenas metadados de sessao.
 - Uma segunda execucao com `--resume` pula a particao concluida.
@@ -45,3 +50,5 @@ subprocess.run([
 - O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular registros ja gravados.
+- Falha inesperada de item deixa a particao retomavel; uma execucao posterior
+  tenta apenas os pronunciamentos faltantes.

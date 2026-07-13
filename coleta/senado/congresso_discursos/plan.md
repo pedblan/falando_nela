@@ -23,14 +23,17 @@
 - Para cada particao, requisitar os discursos do Congresso Nacional.
 - Gravar a resposta mensal como metadado de apoio em `metadata/{run_id}.jsonl`, sem misturar a lista ao corpus textual mensal.
 - Extrair `CodigoPronunciamento` e transferir prioritariamente o texto integral de cada discurso pelo endpoint oficial de texto integral, seguindo o mesmo contrato de `senado/plenario_discursos`.
-- Gravar registros textuais consolidados em `ano=YYYY/mes=MM/{run_id}.jsonl` quando a etapa de texto integral for implementada.
+- Gravar cada pronunciamento consolidado como `pronunciamento_texto` em
+  `ano=YYYY/mes=MM/{run_id}.jsonl`.
 - Se texto por pronunciamento nao estiver disponivel, usar texto/notas da sessao como proximo caminho antes de fila de transcricao.
 - Usar checkpoint por particao mensal para retomada.
 
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.
-- `data/raw/senado/congresso_discursos/ano=YYYY/mes=MM/{run_id}.jsonl`: registros textuais consolidados quando implementados.
+- `data/raw/senado/congresso_discursos/ano=YYYY/mes=MM/{run_id}.jsonl`: registros textuais consolidados.
+- `data/raw/senado/congresso_discursos/transcription_queue/{run_id}.jsonl`:
+  pronunciamentos sem texto oficial e com fonte audiovisual candidata.
 - `data/checkpoints/senado/congresso_discursos.json`.
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
@@ -42,8 +45,8 @@
 - Portanto, este coletor nao deve prometer preflight `ano -> trimestre -> mes`
   nesse endpoint. A reducao de consultas vazias deve vir do recorte operacional
   `1996-05-01` e da retomada por checkpoint.
-- Requisicoes mensais de descoberta ficam em `metadata/`; registros textuais,
-  quando implementados, continuam restritos a requisicoes mensais em
+- Requisicoes mensais de descoberta ficam em `metadata/`; registros textuais
+  continuam restritos a requisicoes mensais em
   `ano=YYYY/mes=MM/`.
 
 ## Dev e producao

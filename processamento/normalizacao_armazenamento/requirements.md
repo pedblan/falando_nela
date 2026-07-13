@@ -17,6 +17,14 @@ versionada, rastreavel e pronta para cadernos analiticos.
 
 ## Saida
 
+- Em ciclos temporais, manter uma fotografia canonica regeneravel identificada
+  por `run_id`s terminados em `-current`; a entrada continua sendo todo o raw
+  cumulativo, salvo filtro explicitamente registrado no manifest.
+- A regeneracao de `current` deve ocorrer somente depois dos gates de coleta e
+  nao deve apagar, mover ou reescrever arquivos abaixo de `raw/`.
+- O arquivo `senado__congresso_discursos.parquet` e obrigatorio quando o ciclo
+  inclui o backfill textual de `senado/congresso_discursos`.
+
 - Criar `processed/textos_parlamentares/v1/ano=YYYY/mes=MM/{run_id}.jsonl`.
 - Criar `processed/manifests/{run_id}.json` com contagens de entrada, saida,
   duplicatas, arquivos lidos e `raw_run_id`s incorporados.
@@ -36,6 +44,11 @@ versionada, rastreavel e pronta para cadernos analiticos.
   `raw_source_id`, `raw_record_type`, `raw_checksum` e `raw_response_url`.
 
 ## Cadernos operacionais
+
+- Manter `notebooks/processamento/06_processamento_validacao_atualizacao_colab.ipynb`
+  como orquestrador final do ciclo `20260713`: gates, fotografia `current`,
+  sete Parquets, apartes, auditoria de joins, ZIPs, arquivamento de manifests e
+  visualizador Gradio.
 
 - Manter `notebooks/processamento/normalizacao_armazenamento_colab.ipynb`
   como caminho recomendado para executar a normalizacao no Colab sem depender
