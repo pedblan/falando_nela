@@ -29,11 +29,11 @@ Arquivos atuais:
   textual mensal do Congresso desde `1996-05-01`.
 - `04_atualizacao_camara_demais_bases_colab.ipynb`: recupera a CCJC historica e
   atualiza CCJC, pareceres de PEC e apartes da Camara.
-- `05_atualizacao_camara_plenario_colab.ipynb`: conclui o backfill historico do
-  Plenario antes de iniciar a faixa incremental. Copia o plano de mandatos
-  para o disco efemero do runtime, audita checkpoint/log e restringe o indice
-  de duplicatas aos anos parciais quando esse escopo e comprovado. O stdout
-  mostra o progresso da indexacao e heartbeats por lote de deputados.
+- `05_atualizacao_camara_plenario_colab.ipynb`: coleta somente a sobreposicao
+  `2026-05-01` a `2026-07-13`. Copia o plano de mandatos para o disco efemero
+  do runtime e preserva, sem executar, o run historico iniciado em 1946. O
+  controle valida a identidade exata dessa exclusao e o caderno 06 a arquiva
+  separadamente do manifest incremental.
 
 - `coleta_template.ipynb`: template geral para rodar todos os coletores, incluindo pareceres de PEC.
 - `coleta_backfill_historico_colab.ipynb`: orquestrador Colab para backfill historico longo de todas as bases, com `run_id`s fixos, `--resume`, validacao curta, auditoria de layout raw, processamento, Parquets e samples.

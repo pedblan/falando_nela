@@ -34,10 +34,24 @@ python -m coleta.camara.plenario_discursos.collect \
   --no-sample
 ```
 
-O caderno 05 acrescenta `--parlamentares-periodos-path` com uma copia local
-do Parquet. Ele acrescenta `--skip-existing-record-scan` somente quando o
-preflight e o proprio coletor confirmam uma fronteira limpa; particao parcial
-mantem a retomada normal.
+O comando acima valida o backfill historico dedicado. Ele nao faz parte do
+ciclo incremental `20260713`. Nesse ciclo, o caderno 05 deve gerar somente:
+
+```bash
+python -u -m coleta.camara.plenario_discursos.collect \
+  --mode prod \
+  --output-dir /content/drive/MyDrive/falando_nela/data \
+  --data-inicio 2026-05-01 \
+  --data-fim 2026-07-13 \
+  --run-id prod-atualizacao-20260713-camara-plenario \
+  --no-sample \
+  --resume
+```
+
+O caderno acrescenta `--parlamentares-periodos-path` com uma copia local do
+Parquet. Ele deve falhar antes da chamada se janela ou `run_id` divergirem e
+nao deve conter uma celula capaz de retomar o run historico. A presenca dos
+artefatos antigos no Drive e informativa e nao autoriza edicao ou remocao.
 
 ## Testes Automatizados
 

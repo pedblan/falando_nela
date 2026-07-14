@@ -21,6 +21,12 @@
 ## Recorte
 
 - O backfill oficial deve usar `--data-inicio 1946-01-01`.
+- O caderno operacional 05 do ciclo `20260713` nao e um backfill: deve usar
+  `--data-inicio 2026-05-01 --data-fim 2026-07-13` e o `run_id`
+  `prod-atualizacao-20260713-camara-plenario`.
+- Esse caderno nao deve chamar `prod-historico-camara-plenario`; raw,
+  checkpoint, log, autosave e eventual manifest desse run sao somente
+  preservados. O coletor e seus defaults historicos permanecem inalterados.
 - O intervalo `1900-01-01` a `1945-12-31` so pode ser usado em diagnostico
   separado, com limite explicito, para investigar anomalias como discursos sem
   data real. Ele nao deve ser default do caderno de backfill.

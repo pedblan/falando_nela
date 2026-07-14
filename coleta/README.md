@@ -233,7 +233,7 @@ Para o fluxo especifico do Plenario do Senado, use `notebooks/coleta/coleta_sena
 
 Para o fluxo especifico da CCJ do Senado, use `notebooks/coleta/coleta_senado_ccj.ipynb`. Ele segue o mesmo padrao operacional do Plenario, com validacao curta, inspecao dos JSONLs e coleta completa retomavel.
 
-Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados e probes em `metadata/`, paginas mensais de discursos no JSONL de corpus e a presenca de `transcricao` quando a API entregar texto. A producao desse fluxo deve iniciar em `1946-01-01`. No caderno operacional 05, uma particao parcial obriga a retomada fina pelo raw; o atalho de fronteira de checkpoint nunca e aplicado sem validacao de checkpoint e log.
+Para o fluxo especifico do Plenario da Camara, use `notebooks/coleta/coleta_camara_plenario.ipynb`. Ele valida paginas de deputados e probes em `metadata/`, paginas mensais de discursos no JSONL de corpus e a presenca de `transcricao` quando a API entregar texto. Um backfill historico dedicado deve iniciar em `1946-01-01`. No ciclo incremental `20260713`, porem, o caderno operacional 05 coleta somente `2026-05-01` a `2026-07-13`; o run historico incompleto fica preservado para uma tarefa separada e nao e executado pelo caderno de atualizacao.
 
 Para apartes de Plenario, use
 `notebooks/coleta/coleta_senado_plenario_apartes.ipynb` e

@@ -76,8 +76,50 @@ CONTROL_CELL = code(
     assert CONFIG["data_inicio"] == CONFIG["window"]["data_inicio"]
     assert CONFIG["data_fim"] == CONFIG["window"]["data_fim"]
     assert Path(CONFIG["data_root"]) == DATA_ROOT
-    RUNS = {item["key"]: item for item in CONFIG["collection_runs"]}
+    ALL_CONFIGURED_RUNS = {item["key"]: item for item in CONFIG["collection_runs"]}
+    PRESERVED_OUT_OF_SCOPE_RUNS = {
+        item["key"]: item for item in CONFIG.get("preserved_out_of_scope_runs", [])
+    }
+    CAMARA_PLENARIO_HISTORICAL_SCOPE = {
+        "key": "camara_plenario_historico",
+        "source": "camara",
+        "dataset": "plenario_discursos",
+        "run_id": "prod-historico-camara-plenario",
+        "data_inicio": "1946-01-01",
+        "data_fim": "2026-05-28",
+    }
+    historical_candidate = (
+        ALL_CONFIGURED_RUNS.get("camara_plenario_historico")
+        or PRESERVED_OUT_OF_SCOPE_RUNS.get("camara_plenario_historico")
+    )
+    SCOPE_EXCLUDED_RUNS = {}
+    if historical_candidate is not None:
+        for field, expected in CAMARA_PLENARIO_HISTORICAL_SCOPE.items():
+            assert historical_candidate.get(field) == expected, {
+                "field": field,
+                "expected": expected,
+                "actual": historical_candidate.get(field),
+            }
+        SCOPE_EXCLUDED_RUNS[historical_candidate["key"]] = historical_candidate
+    RUNS = {
+        key: run
+        for key, run in ALL_CONFIGURED_RUNS.items()
+        if key not in SCOPE_EXCLUDED_RUNS
+    }
+    SCOPE_EXCLUSION_RESULTS = {
+        key: {
+            "run_id": run["run_id"],
+            "status": "out_of_scope",
+            "reason": (
+                "O ciclo 20260713 e uma atualizacao incremental de no maximo tres meses; "
+                "a recuperacao iniciada em 1946 nao e requisito desta atualizacao."
+            ),
+            "preserved_artifacts": ["raw", "checkpoint", "log", "autosave", "manifest"],
+        }
+        for key, run in SCOPE_EXCLUDED_RUNS.items()
+    }
     print("Ciclo ativo:", CONFIG["cycle_id"], CONFIG["window"])
+    print("Coletas fora do escopo incremental:", SCOPE_EXCLUSION_RESULTS)
     """
 )
 
@@ -107,7 +149,10 @@ HELPERS_CELL = code(
 
     def read_json(path):
         path = Path(path)
-        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        if not path.exists():
+            return None
+        content = path.read_text(encoding="utf-8")
+        return json.loads(content) if content.strip() else None
 
     def manifest_for(run):
         return DATA_ROOT / "manifests" / f"{run['run_id']}.json"
@@ -310,6 +355,10 @@ def build_00() -> nbformat.NotebookNode:
                 CYCLE_DIR = DATA_ROOT / "operations" / "atualizacao" / "ciclos" / EXPECTED_CYCLE_ID
                 WINDOW = {"data_inicio": "2026-05-01", "data_fim": "2026-07-13"}
 
+                PRESERVED_OUT_OF_SCOPE_RUNS = [
+                    {"key": "camara_plenario_historico", "lane": "camara_plenario", "module": "coleta.camara.plenario_discursos.collect", "source": "camara", "dataset": "plenario_discursos", "run_id": "prod-historico-camara-plenario", "data_inicio": "1946-01-01", "data_fim": "2026-05-28", "recovery": True, "scope_status": "out_of_scope"},
+                ]
+
                 COLLECTION_RUNS = [
                     {"key": "parlamentares", "lane": "prerequisite", "module": "coleta.parlamentares.collect", "source": "all", "dataset": "parlamentares", "run_id": "prod-atualizacao-20260713-parlamentares", "data_inicio": "2026-05-01", "data_fim": "2026-07-13", "checkpoint_sources": ["camara", "senado"]},
                     {"key": "senado_ccj_historico", "lane": "senado", "module": "coleta.senado.ccj_notas.collect", "source": "senado", "dataset": "ccj_notas", "run_id": "prod-historico-senado-ccj", "data_inicio": "1900-01-01", "data_fim": "2026-05-28", "recovery": True},
@@ -322,7 +371,6 @@ def build_00() -> nbformat.NotebookNode:
                     {"key": "camara_ccjc", "lane": "camara_demais", "module": "coleta.camara.ccjc_eventos.collect", "source": "camara", "dataset": "ccjc_eventos", "run_id": "prod-atualizacao-20260713-camara-ccjc", "data_inicio": "2026-05-01", "data_fim": "2026-07-13"},
                     {"key": "camara_pareceres_pec", "lane": "camara_demais", "module": "coleta.camara.pareceres_pec.collect", "source": "camara", "dataset": "pareceres_pec", "run_id": "prod-atualizacao-20260713-camara-pareceres-pec", "data_inicio": "2026-05-01", "data_fim": "2026-07-13"},
                     {"key": "camara_apartes", "lane": "camara_demais", "module": "coleta.camara.plenario_apartes.collect", "source": "camara", "dataset": "plenario_apartes", "run_id": "prod-atualizacao-20260713-camara-plenario-apartes", "data_inicio": "2026-05-01", "data_fim": "2026-07-13"},
-                    {"key": "camara_plenario_historico", "lane": "camara_plenario", "module": "coleta.camara.plenario_discursos.collect", "source": "camara", "dataset": "plenario_discursos", "run_id": "prod-historico-camara-plenario", "data_inicio": "1946-01-01", "data_fim": "2026-05-28", "recovery": True},
                     {"key": "camara_plenario", "lane": "camara_plenario", "module": "coleta.camara.plenario_discursos.collect", "source": "camara", "dataset": "plenario_discursos", "run_id": "prod-atualizacao-20260713-camara-plenario", "data_inicio": "2026-05-01", "data_fim": "2026-07-13"},
                 ]
 
@@ -359,9 +407,11 @@ def build_00() -> nbformat.NotebookNode:
                     "raw_policy": "immutable_cumulative",
                     "processed_policy": "canonical_current",
                     "collection_runs": COLLECTION_RUNS,
+                    "preserved_out_of_scope_runs": PRESERVED_OUT_OF_SCOPE_RUNS,
                     "historical_recoveries": [item for item in COLLECTION_RUNS if item.get("recovery")],
                     "run_ids": {
                         "collection": {item["key"]: item["run_id"] for item in COLLECTION_RUNS},
+                        "preserved_out_of_scope": {item["key"]: item["run_id"] for item in PRESERVED_OUT_OF_SCOPE_RUNS},
                         "processing": PROCESSING_RUN_IDS,
                     },
                     "processing_run_ids": PROCESSING_RUN_IDS,
@@ -395,7 +445,10 @@ def build_00() -> nbformat.NotebookNode:
 
                 def read_json(path):
                     path = Path(path)
-                    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+                    if not path.exists():
+                        return None
+                    content = path.read_text(encoding="utf-8")
+                    return json.loads(content) if content.strip() else None
 
                 import pyarrow.parquet as pq
 
@@ -830,28 +883,35 @@ def build_03() -> nbformat.NotebookNode:
 def build_05() -> nbformat.NotebookNode:
     return notebook(
         "05 - Atualizacao do Plenario da Camara",
-        "Retoma primeiro `prod-historico-camara-plenario`. A retomada historica rapida exige uma fronteira limpa de checkpoint e usa uma copia local do plano de mandatos. A faixa incremental so e liberada depois do manifest historico final.",
+        "Atualiza somente a janela incremental de `2026-05-01` a `2026-07-13`. O run historico iniciado em 1946 fica preservado no Drive, mas fora dos gates deste ciclo.",
         [
             CONTROL_CELL,
             HELPERS_CELL,
             md(
                 """
-                ## Preparacao da retomada historica
+                ## Recorte operacional deste ciclo
 
-                O run historico possui centenas de milhares de registros ja gravados. Se houver
-                uma particao parcial, o coletor restringe o indice de duplicatas aos anos abertos
-                ou com falha, sem reler os anos ja concluidos. Em uma fronteira limpa, ele so
-                aceita `--skip-existing-record-scan` quando checkpoint e log concordam. O Parquet
-                pequeno de periodos e copiado para o disco local efemero do runtime; o raw continua
-                no Drive, imutavel e cumulativo.
+                Esta atualizacao cobre pouco mais de dois meses, com sobreposicao desde a ultima
+                coleta de maio. `prod-historico-camara-plenario` nao sera retomado aqui: seu raw,
+                checkpoint, log, autosave e eventual manifest permanecem intactos para uma tarefa
+                historica separada. Um `try/except` nao resolveria a demora observada, pois as
+                requisicoes antigas estavam respondendo normalmente; o tratamento correto e nao
+                executar uma faixa que esta fora do escopo.
+
+                O Parquet pequeno de periodos parlamentares e copiado para o disco local efemero
+                do runtime. Todas as saidas da coleta incremental continuam no Drive.
                 """
             ),
             code(
                 """
                 import shutil
 
-                historical = RUNS["camara_plenario_historico"]
+                assert "camara_plenario_historico" not in RUNS
+                historical = SCOPE_EXCLUDED_RUNS["camara_plenario_historico"]
                 incremental = RUNS["camara_plenario"]
+                assert incremental["data_inicio"] == CONFIG["window"]["data_inicio"] == "2026-05-01"
+                assert incremental["data_fim"] == CONFIG["window"]["data_fim"] == "2026-07-13"
+                assert incremental["run_id"] == "prod-atualizacao-20260713-camara-plenario"
                 LOCAL_RUNTIME_ROOT = Path("/content/falando_nela_runtime")
 
                 def cache_parlamentares_periodos():
@@ -863,80 +923,27 @@ def build_05() -> nbformat.NotebookNode:
                     assert target.is_file() and target.stat().st_size == source.stat().st_size, (source, target)
                     print("Plano de mandatos copiado para o runtime local:", target, target.stat().st_size, "bytes")
                     return target
-
-                def inspect_resume_boundary(run):
-                    checkpoint = read_json(checkpoint_for(run)) or {}
-                    current = (checkpoint.get("runs") or {}).get(run["run_id"], {}) or {}
-                    requested_partitions = {
-                        str(year)
-                        for year in range(int(run["data_inicio"][:4]), int(run["data_fim"][:4]) + 1)
-                    }
-                    completed = set((current.get("completed_partitions") or {}).keys()) & requested_partitions
-                    failed = set((current.get("failed_partitions") or {}).keys()) & requested_partitions
-                    unresolved = failed - completed
-                    open_partitions = set()
-                    completed_in_log = set()
-                    log_path = DATA_ROOT / "logs" / f"{run['run_id']}.jsonl"
-                    if log_path.exists():
-                        with log_path.open("r", encoding="utf-8") as handle:
-                            for line in handle:
-                                try:
-                                    event = json.loads(line)
-                                except json.JSONDecodeError:
-                                    continue
-                                if event.get("run_id") != run["run_id"] or not isinstance(event.get("partition"), str):
-                                    continue
-                                partition = event["partition"]
-                                if partition not in requested_partitions:
-                                    continue
-                                if event.get("event") == "partition_started":
-                                    open_partitions.add(partition)
-                                elif event.get("event") == "partition_completed":
-                                    completed_in_log.add(partition)
-                                    open_partitions.discard(partition)
-                                elif event.get("event") == "partition_failed":
-                                    open_partitions.discard(partition)
-                    missing_log_completion = completed - completed_in_log
-                    clean = bool(completed) and not unresolved and not open_partitions and not missing_log_completion
-                    state = {
-                        "run_id": run["run_id"],
-                        "completed_partitions": len(completed),
-                        "unresolved": sorted(unresolved),
-                        "open_partitions": sorted(open_partitions),
-                        "checkpoint_completions_missing_in_log": sorted(missing_log_completion),
-                        "fast_boundary": clean,
-                    }
-                    print("Estado da retomada:", state)
-                    return state
-
-                HISTORICAL_RESUME_STATE = inspect_resume_boundary(historical)
+                print("Historico preservado e fora do escopo:", SCOPE_EXCLUSION_RESULTS[historical["key"]])
+                print("Faixa incremental:", incremental["data_inicio"], incremental["data_fim"], incremental["run_id"])
+                incremental_lock_path = (
+                    DATA_ROOT
+                    / "operations"
+                    / "atualizacao"
+                    / "locks"
+                    / f"{incremental['source']}__{incremental['dataset']}.json"
+                )
+                if incremental_lock_path.exists():
+                    print("LOCK EXISTENTE:", incremental_lock_path)
+                    print(incremental_lock_path.read_text(encoding="utf-8"))
                 """
             ),
-            code(
+            md(
                 """
-                RODAR_RECUPERACAO_HISTORICA = False
-                CONFIRMAR_CICLO = ""
-                require_explicit_confirmation(RODAR_RECUPERACAO_HISTORICA, CONFIRMAR_CICLO)
-                if RODAR_RECUPERACAO_HISTORICA:
-                    assert_parlamentares_ready()
-                    local_periodos = cache_parlamentares_periodos()
-                    recovery_extra = ["--parlamentares-periodos-path", local_periodos]
-                    if HISTORICAL_RESUME_STATE["fast_boundary"]:
-                        recovery_extra.append("--skip-existing-record-scan")
-                        print("Fronteira limpa: a varredura integral do raw sera pulada.")
-                    else:
-                        print(
-                            "Particao parcial detectada: o coletor reconstruira o indice apenas "
-                            "para os anos abertos ou com falha e exibira o progresso."
-                        )
-                    rc = run_collector(
-                        historical,
-                        *recovery_extra,
-                    )
-                    assert rc == 0
-                    assert_collection_complete(historical)
-                else:
-                    print("Recuperacao protegida: RODAR_RECUPERACAO_HISTORICA=False")
+                Se o lock exibido pertencer a uma sessao historica que ja foi encerrada, confirme
+                no Colab que nao existe outro runtime ativo e remova manualmente **somente**
+                `operations/atualizacao/locks/camara__plenario_discursos.json`. Nao remova raw,
+                checkpoint, log, autosave ou manifest. Se outra sessao ainda estiver ativa, pare
+                aqui para evitar duas escritas simultaneas no mesmo dataset.
                 """
             ),
             code(
@@ -946,7 +953,6 @@ def build_05() -> nbformat.NotebookNode:
                 require_explicit_confirmation(RODAR_FAIXA_INCREMENTAL, CONFIRMAR_CICLO)
                 if RODAR_FAIXA_INCREMENTAL:
                     assert_parlamentares_ready()
-                    assert_collection_complete(historical)  # gate obrigatorio
                     local_periodos = cache_parlamentares_periodos()
                     rc = run_collector(
                         incremental,
@@ -958,13 +964,20 @@ def build_05() -> nbformat.NotebookNode:
                     print("Incremental protegido: RODAR_FAIXA_INCREMENTAL=False")
                 """
             ),
-            md("## Estado dos dois manifests"),
+            md("## Estado da atualizacao e artefatos preservados"),
             code(
                 """
-                for run in [historical, incremental]:
-                    show_run_state(run)
-                    manifest = read_json(manifest_for(run))
-                    print(run["key"], manifest.get("status") if manifest else "PENDENTE", "unresolved=", unresolved_partitions(run))
+                show_run_state(incremental)
+                historical_manifest_path = manifest_for(historical)
+                historical_autosave_path = DATA_ROOT / "manifests" / f"{historical['run_id']}.autosave.json"
+                print("Historico fora do escopo:", {
+                    "run_id": historical["run_id"],
+                    "manifest_path": str(historical_manifest_path),
+                    "manifest_bytes": historical_manifest_path.stat().st_size if historical_manifest_path.exists() else None,
+                    "autosave_path": str(historical_autosave_path),
+                    "autosave_exists": historical_autosave_path.exists(),
+                    "raw_preservado": str(DATA_ROOT / "raw" / historical["source"] / historical["dataset"]),
+                })
                 """
             ),
         ],
@@ -974,7 +987,7 @@ def build_05() -> nbformat.NotebookNode:
 def build_06() -> nbformat.NotebookNode:
     return notebook(
         "06 - Processamento e validacao da atualizacao",
-        "Aplica gates estritos a todas as coletas, exceto adiamentos exatos e auditados, regenera a fotografia `current`, valida os sete Parquets e arquiva os artefatos operacionais do ciclo.",
+        "Aplica gates a todas as coletas do recorte incremental, registra separadamente exclusoes de escopo e adiamentos exatos, regenera a fotografia `current`, valida os sete Parquets e arquiva os artefatos operacionais do ciclo.",
         [
             CONTROL_CELL,
             HELPERS_CELL,
@@ -1011,14 +1024,17 @@ def build_06() -> nbformat.NotebookNode:
                 STRICT_COLLECTION_GATE_OK = (
                     COLLECTION_GATE_OK
                     and not any(item.get("deferred") for item in GATE_RESULTS.values())
+                    and not SCOPE_EXCLUSION_RESULTS
                 )
                 DEFERRED_GATE_KEYS = sorted(
                     key for key, item in GATE_RESULTS.items() if item.get("deferred")
                 )
+                SCOPE_EXCLUDED_GATE_KEYS = sorted(SCOPE_EXCLUSION_RESULTS)
                 print("PARLAMENTARES_GATE_OK=", PARLAMENTARES_GATE_OK)
                 print("COLLECTION_GATE_OK=", COLLECTION_GATE_OK)
                 print("STRICT_COLLECTION_GATE_OK=", STRICT_COLLECTION_GATE_OK)
                 print("DEFERRED_GATE_KEYS=", DEFERRED_GATE_KEYS)
+                print("SCOPE_EXCLUDED_GATE_KEYS=", SCOPE_EXCLUDED_GATE_KEYS)
                 """
             ),
             md("## Auditoria JSONL bloqueante\n\nA leitura pode ser longa no Drive, mas nao faz requisicoes externas nem altera o raw."),
@@ -1239,6 +1255,8 @@ def build_06() -> nbformat.NotebookNode:
                         "strict_collection_gate_ok": STRICT_COLLECTION_GATE_OK,
                         "deferred_collection_keys": DEFERRED_GATE_KEYS,
                         "deferred_collections": read_json(DEFERRED_COLLECTIONS_PATH),
+                        "scope_excluded_collection_keys": SCOPE_EXCLUDED_GATE_KEYS,
+                        "scope_excluded_collections": SCOPE_EXCLUSION_RESULTS,
                         "jsonl_gate_ok": JSONL_GATE_OK,
                         "expected_text_parquets": CONFIG["expected_text_parquets"],
                         "row_comparison": ROW_COMPARISON,

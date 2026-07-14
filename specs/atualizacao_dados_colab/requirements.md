@@ -23,6 +23,8 @@ Os dois arquivos devem ter o mesmo conteudo e incluir:
 - `schema_version = 1`;
 - `cycle_id`, `data_inicio`, `data_fim`, `data_root` e `created_at`;
 - `historical_recoveries`, com modulo, janela e `run_id` de cada retomada;
+- `preserved_out_of_scope_runs`, para runs anteriores mantidos no Drive mas
+  nao executados nem exigidos pelo recorte incremental;
 - `run_ids`, com todos os identificadores de coleta e processamento;
 - `expected_text_datasets`, `expected_apartes_sources` e
   `expected_processed_outputs`.
@@ -34,13 +36,23 @@ reescrever um manifest `completed_with_errors` como `completed`.
 Os demais cadernos devem ler `active.json`, recusar outro `cycle_id` e nunca
 derivar datas do relogio durante a execucao.
 
+Como o `active.json` deste ciclo foi gravado antes da decisao de escopo da
+Camara, o controle deve aceitar tambem a forma antiga em que o run historico
+exato ainda aparece em `collection_runs`: ele e removido apenas do conjunto
+efetivo em memoria, sem reescrever a configuracao no Drive. Configuracoes novas
+o registram diretamente em `preserved_out_of_scope_runs`, e o resumo final
+arquiva a decisao nas duas formas.
+
 ## Run IDs
 
 Retomadas existentes:
 
 - `prod-historico-senado-ccj`;
 - `prod-historico-camara-ccjc`;
-- `prod-historico-camara-plenario`.
+
+Run historico preservado fora do escopo deste ciclo:
+
+- `prod-historico-camara-plenario`, de `1946-01-01` a `2026-05-28`.
 
 Backfill textual novo:
 
@@ -94,13 +106,20 @@ Processamento:
   `processed/parlamentares/v1/parquet/parlamentares_periodos.parquet` para o
   disco local efemero do runtime e passa-lo explicitamente ao coletor; todas
   as saidas permanecem na raiz ativa do Drive.
-- Antes da recuperacao historica do Plenario da Camara, o caderno deve cruzar
-  checkpoint e log. Se houver particao iniciada sem conclusao, deve manter o
-  scan de registros do `run_id`, restrito aos anos parciais quando o escopo
-  puder ser provado; somente fronteira limpa pode usar
-  `--skip-existing-record-scan`. Divergencia deve provocar scan integral.
-- A retomada do Plenario da Camara deve imprimir progresso durante o scan do
-  raw e durante a particao, com heartbeat a cada 25 deputados no autosave.
+- O caderno 05 nao deve oferecer celula de execucao para
+  `prod-historico-camara-plenario` nem usar seu manifest como gate da faixa
+  incremental.
+- O unico comando de coleta do caderno 05 deve usar o `run_id`
+  `prod-atualizacao-20260713-camara-plenario`, com inicio `2026-05-01` e fim
+  `2026-07-13`. Essas tres propriedades devem ser verificadas antes da chamada
+  ao coletor.
+- Raw, checkpoint, log, autosave e eventual manifest do run historico devem
+  permanecer intocados. A exclusao so e valida para a chave, o `run_id` e a
+  janela historica exatos; divergencia deve bloquear o caderno.
+- Se a sessao historica encerrada tiver deixado lock, o caderno deve exibir seu
+  conteudo. A remocao e manual, somente depois de confirmar que nao existe
+  outro runtime ativo, e se limita a
+  `operations/atualizacao/locks/camara__plenario_discursos.json`.
 - O caderno 02 pode adiar somente `senado_ccj_historico`, somente quando o
   manifest mantiver `completed_with_errors` e a lista exata de falhas nao
   resolvidas for `["2015-05"]`. A excecao exige confirmacao do `cycle_id`,
@@ -134,6 +153,13 @@ O caderno 06 deve recusar a execucao se:
 - houver particao em `failed_partitions` que nao apareca posteriormente em
   `completed_partitions` para o mesmo `run_id`;
 - `parlamentares/v1` do ciclo nao existir.
+
+`camara_plenario_historico` nao integra mais o conjunto de coletas
+obrigatorias do ciclo. O caderno deve registra-lo separadamente como
+`out_of_scope`, nunca como `completed`, e expor
+`SCOPE_EXCLUDED_GATE_KEYS=["camara_plenario_historico"]`. A faixa incremental
+da mesma base continua obrigatoria e deve terminar em `completed` sem falhas
+nao resolvidas.
 
 Excecao: uma coleta pode ser aceita como `deferred`, sem ser considerada
 completa, quando houver entrada correspondente em `deferred_collections.json`

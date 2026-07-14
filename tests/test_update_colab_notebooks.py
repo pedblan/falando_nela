@@ -57,6 +57,7 @@ def test_production_cells_are_protected_and_use_fixed_cycle_contract() -> None:
 
 def test_control_and_final_notebooks_cover_expected_outputs() -> None:
     control = NOTEBOOKS[0].read_text(encoding="utf-8")
+    control_config = _code_cells(_load(NOTEBOOKS[0]))[2]
     final = NOTEBOOKS[-1].read_text(encoding="utf-8")
     for run_id in [
         "prod-historico-senado-ccj",
@@ -80,16 +81,74 @@ def test_control_and_final_notebooks_cover_expected_outputs() -> None:
     assert "build_gradio_app" in final
     assert "JSONL_GATE_OK" in final
     assert "texto_id" in final
+    assert "PRESERVED_OUT_OF_SCOPE_RUNS" in control_config
+    assert '"preserved_out_of_scope_runs": PRESERVED_OUT_OF_SCOPE_RUNS' in control_config
+    assert control_config.count('{"key": "camara_plenario_historico"') == 1
 
 
-def test_camara_plenario_recovery_uses_safe_boundary_and_local_mandate_cache() -> None:
+def test_camara_plenario_update_is_limited_to_incremental_window() -> None:
     source = "\n".join(_code_cells(_load(NOTEBOOKS[5])))
 
-    assert '"--skip-existing-record-scan"' in source
     assert '"--parlamentares-periodos-path"' in source
     assert "cache_parlamentares_periodos" in source
     assert 'Path("/content/falando_nela_runtime")' in source
     assert "shutil.copyfile" in source
+    assert 'RODAR_FAIXA_INCREMENTAL = False' in source
+    assert "RODAR_RECUPERACAO_HISTORICA" not in source
+    assert 'incremental["data_inicio"] == CONFIG["window"]["data_inicio"] == "2026-05-01"' in source
+    assert 'incremental["data_fim"] == CONFIG["window"]["data_fim"] == "2026-07-13"' in source
+    assert 'assert_collection_complete(historical)' not in source
+    assert 'SCOPE_EXCLUDED_RUNS["camara_plenario_historico"]' in source
+
+
+def test_control_excludes_only_the_exact_legacy_camara_history(tmp_path: Path) -> None:
+    control = _code_cells(_load(NOTEBOOKS[5]))[2]
+    data_root = tmp_path / "data"
+    active_path = data_root / "operations" / "atualizacao" / "active.json"
+    active_path.parent.mkdir(parents=True)
+    historical = {
+        "key": "camara_plenario_historico",
+        "source": "camara",
+        "dataset": "plenario_discursos",
+        "run_id": "prod-historico-camara-plenario",
+        "data_inicio": "1946-01-01",
+        "data_fim": "2026-05-28",
+    }
+    incremental = {
+        "key": "camara_plenario",
+        "source": "camara",
+        "dataset": "plenario_discursos",
+        "run_id": "prod-atualizacao-20260713-camara-plenario",
+        "data_inicio": "2026-05-01",
+        "data_fim": "2026-07-13",
+    }
+    config = {
+        "schema_version": 1,
+        "cycle_id": "20260713",
+        "window": {"data_inicio": "2026-05-01", "data_fim": "2026-07-13"},
+        "data_inicio": "2026-05-01",
+        "data_fim": "2026-07-13",
+        "data_root": str(data_root),
+        "collection_runs": [historical, incremental],
+    }
+    active_path.write_text(json.dumps(config), encoding="utf-8")
+    namespace = {
+        "Path": Path,
+        "json": json,
+        "ACTIVE_CONFIG_PATH": active_path,
+        "DATA_ROOT": data_root,
+    }
+
+    exec(control, namespace)
+
+    assert set(namespace["RUNS"]) == {"camara_plenario"}
+    assert set(namespace["SCOPE_EXCLUDED_RUNS"]) == {"camara_plenario_historico"}
+    assert namespace["SCOPE_EXCLUSION_RESULTS"]["camara_plenario_historico"]["status"] == "out_of_scope"
+
+    config["collection_runs"][0]["run_id"] = "outro-run-id"
+    active_path.write_text(json.dumps(config), encoding="utf-8")
+    with pytest.raises(AssertionError, match="prod-historico-camara-plenario"):
+        exec(control, namespace.copy())
 
 
 def test_senado_notebook_defers_only_the_exact_historical_ccj_gap() -> None:
@@ -108,6 +167,8 @@ def test_senado_notebook_defers_only_the_exact_historical_ccj_gap() -> None:
     assert "STRICT_COLLECTION_GATE_OK" in final
     assert "DEFERRED_GATE_KEYS" in final
     assert '"deferred_collections": read_json(DEFERRED_COLLECTIONS_PATH)' in final
+    assert "SCOPE_EXCLUDED_GATE_KEYS" in final
+    assert '"scope_excluded_collections": SCOPE_EXCLUSION_RESULTS' in final
 
 
 def test_shared_gate_accepts_only_the_exact_deferred_partition(tmp_path: Path) -> None:

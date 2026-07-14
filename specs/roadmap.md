@@ -14,6 +14,9 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   transcricao.
 - Processamento usa fotografia canonica `current`; configuracoes, manifests,
   auditorias e amostras sao arquivados por ciclo.
+- A faixa do Plenario da Camara nesse ciclo e estritamente incremental,
+  `2026-05-01` a `2026-07-13`. O backfill iniciado em 1946 foi retirado dos
+  gates da atualizacao e preservado para trabalho historico separado.
 
 ## Fase 0: fundacao
 
@@ -55,7 +58,7 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   `camara/plenario_discursos` e `camara/plenario_apartes`, evitando consultas de
   deputados em anos fora do exercicio oficial. A descoberta via API permanece
   como fallback quando a tabela ainda nao existir.
-- Nas retomadas extensas do Plenario da Camara, tornar a inicializacao
+- Em tarefas historicas extensas do Plenario da Camara, tornar a inicializacao
   observavel e proporcional: copiar o pequeno plano de mandatos para o runtime
   Colab, imprimir o scan do raw e heartbeats por deputado. Pular o scan apenas
   quando checkpoint e log comprovarem uma fronteira entre particoes; particao

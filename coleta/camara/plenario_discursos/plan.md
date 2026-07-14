@@ -22,6 +22,15 @@
 - Para analises substantivas comparaveis entre bases, o recorte recomendado do
   projeto continua sendo `2010-01-01` em diante.
 
+O inicio oficial acima continua sendo o contrato de um backfill historico
+dedicado; ele nao deve ser confundido com uma atualizacao temporal. No ciclo
+`20260713`, as ultimas coletas uteis ja haviam ocorrido em maio e o caderno 05
+coleta somente a sobreposicao `2026-05-01` a `2026-07-13`.
+
+O run incompleto `prod-historico-camara-plenario` e seus artefatos permanecem
+no Drive, fora dos gates desse ciclo. Uma retomada desde 1946 exige tarefa e
+runtime proprios e nao pode bloquear a incorporacao da nova janela.
+
 ## Fluxo
 
 1. Particionar o periodo por ano.

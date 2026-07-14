@@ -60,17 +60,20 @@ configuracao, sem apagar dados.
 - Com a excecao registrada, a validacao da faixa deve imprimir
   `deferred=True` para a recuperacao historica e continuar exigindo
   `completed` para as quatro coletas seguintes do Senado.
-- Para `prod-historico-camara-plenario`, o preflight deve detectar a particao
-  parcial `1999` observada no log e registrar
-  `existing_record_scan=filtered`, `existing_record_scan_years=["1999"]` na
-  primeira retomada. O stdout deve progredir durante a indexacao e depois
-  emitir `deputy_progress`.
-- Depois que nenhuma particao da janela estiver aberta, uma nova retomada pode
-  usar o atalho; checkpoint e log divergentes devem faze-lo falhar antes de
-  qualquer escrita raw.
+- O caderno 05 nao contem flag nem chamada para executar
+  `prod-historico-camara-plenario`; o estado historico aparece somente como
+  preservado e `out_of_scope`.
+- O comando executavel da Camara Plenario usa exatamente
+  `prod-atualizacao-20260713-camara-plenario`, `2026-05-01` e `2026-07-13`.
 - O caminho registrado em `parlamentares_periodos_path` deve apontar para
   `/content/falando_nela_runtime/parlamentares_periodos.parquet`, enquanto
   `output_dir` permanece `/content/drive/MyDrive/falando_nela/data`.
+- O teste do controle deve rejeitar qualquer tentativa de aplicar a exclusao a
+  outro `run_id`, dataset, source ou janela. Os artefatos historicos no Drive
+  nao sao alterados pela validacao.
+- Um lock preexistente deve ser mostrado antes da coleta incremental e nunca
+  removido automaticamente; com outro runtime ativo, a coleta permanece
+  bloqueada.
 
 ## Gate de parlamentares
 
@@ -96,11 +99,13 @@ configuracao, sem apagar dados.
 
 - O gate aceito deve mostrar `COLLECTION_GATE_OK=True`,
   `STRICT_COLLECTION_GATE_OK=False` e
-  `DEFERRED_GATE_KEYS=["senado_ccj_historico"]`. O resumo do ciclo deve copiar
-  o conteudo de `deferred_collections.json` e a justificativa da cobertura
-  degradada.
-- O manifest textual registra os nove `run_id`s incrementais/recuperados e o
-  backfill textual do Congresso entre suas entradas observadas.
+  `DEFERRED_GATE_KEYS=["senado_ccj_historico"]`, alem de
+  `SCOPE_EXCLUDED_GATE_KEYS=["camara_plenario_historico"]`. O resumo do ciclo
+  deve copiar o conteudo de `deferred_collections.json`, a justificativa da
+  cobertura degradada e a decisao de escopo da Camara.
+- O manifest textual registra todos os `run_id`s obrigatorios do recorte
+  incremental e das recuperacoes ainda em escopo, alem do backfill textual do
+  Congresso; o run historico excluido nao e requisito.
 - `dataset_version` e sempre `v1`, `texto` e nao vazio e `texto_id` e unico.
 - Existem sete Parquets, cada um contendo somente o `source/dataset` indicado
   no nome.

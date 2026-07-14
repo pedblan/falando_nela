@@ -2,9 +2,10 @@
 
 ## Objetivo
 
-Regularizar as execucoes incompletas observadas no Google Drive e atualizar
-todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
-`2026-05-01`. Coletas longas devem acontecer somente no Colab, gravando em
+Atualizar as bases existentes ate `2026-07-13`, com sobreposicao a partir de
+`2026-05-01`. O recorte de atualizacao cobre pouco mais de dois meses porque
+as ultimas coletas ocorreram em maio; ele nao autoriza refazer a historia das
+bases. Coletas longas devem acontecer somente no Colab, gravando em
 `/content/drive/MyDrive/falando_nela/data`.
 
 ## Estado inicial observado
@@ -30,9 +31,7 @@ todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
    no ultimo dia ainda problematico, usa a agenda XML diaria. O mesmo
    `run_id --resume`, checkpoint e raw cumulativo sao preservados.
    A faixa do Plenario da Camara copia `parlamentares_periodos.parquet` para o
-   disco efemero do Colab e escolhe a estrategia de retomada pelo estado real:
-   particao parcial restringe o indice de duplicatas aos anos afetados;
-   fronteira limpa pode pula-lo.
+   disco efemero do Colab e coleta somente `2026-05-01` a `2026-07-13`.
 4. Bloquear o processamento final ate todos os manifests obrigatorios estarem
    completos e sem particoes falhas ainda nao concluidas. Uma base excluida da
    analise corrente pode ter excecao exata, datada e auditada, sem alterar seu
@@ -40,11 +39,20 @@ todas as bases existentes ate `2026-07-13`, com sobreposicao a partir de
 5. Regerar as fotografias canonicas `current`, Parquets, auditorias e samples.
 6. Validar a nova janela no visualizador Gradio.
 
-Na execucao de `2026-07-13`, o log de `prod-historico-camara-plenario`
-registrou `partition_started` para `1999` antes da interrupcao. Portanto a
-proxima retomada deve reconstruir o indice do raw e nao pode usar o atalho ate
-essa particao ser concluida. Como checkpoint e log identificam `1999` de forma
-coerente, nao e necessario reler os anos historicos ja concluidos.
+Na execucao de `2026-07-13`, `prod-historico-camara-plenario` chegou a uma
+particao anterior ao recorte da pesquisa e consumiu o runtime sem contribuir
+para a atualizacao iniciada em maio. A decisao operacional posterior substitui
+a retomada historica prevista originalmente: esse run fica fora dos gates do
+ciclo, sem ser chamado de concluido. Raw, checkpoint, log, autosave e eventual
+manifest permanecem intactos no Drive para uma tarefa historica separada.
+
+Essa exclusao e fechada sobre a identidade exata
+`camara_plenario_historico` / `prod-historico-camara-plenario` / janela
+`1946-01-01` a `2026-05-28`. Ela nao permite omitir a faixa incremental nem
+qualquer outra coleta. O caderno 5 fixa por `assert` a janela incremental
+`2026-05-01` a `2026-07-13`; nao ha `try/except` para esconder uma execucao
+historica incompleta, pois ela simplesmente nao pertence ao escopo temporal da
+atualizacao.
 
 Na recuperacao da CCJ do Senado em `2026-07-13`, `2013-10` foi concluida e
 somente `2015-05` permaneceu falha por JSON malformado da API. Como o artigo
@@ -75,6 +83,9 @@ O fechamento fica em
 - A fotografia historica existente nao deve ser removida.
 - A configuracao, os manifests processados e o resumo final de cada ciclo sao
   copiados para `operations/atualizacao/ciclos/{cycle_id}/`.
+- Runs preservados, mas retirados do escopo depois da auditoria, aparecem em
+  `preserved_out_of_scope_runs` e no resumo final com motivo e lista de
+  artefatos mantidos.
 - Samples e auditorias usam `run_id`s datados e permanecem por ciclo.
 - Adiamentos excepcionais ficam em
   `operations/atualizacao/ciclos/{cycle_id}/deferred_collections.json`, com
