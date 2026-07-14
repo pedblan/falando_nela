@@ -23,6 +23,12 @@
 - Incluir exatamente `2010-02-02` e `2026-07-13`.
 - Excluir `2010-02-01` e `2026-07-14`.
 - Excluir fontes, datasets e âmbitos incompatíveis com a arena.
+- Uma fixture com `senado/2015=0` ou `congresso/2016=0` deve falhar com arena e
+  ano na mensagem; a matriz completa deve passar.
+- `run_snapshot` deve persistir `annual_coverage.csv`,
+  `missing_complete_years.csv` e `coverage_gate` no manifest antes de falhar.
+- A célula autônoma do caderno 00 deve aplicar o mesmo gate aos anos completos,
+  sem reprovar apenas pela ausência parcial do ano YTD.
 - Preservar Câmara, Senado e Congresso separadamente.
 - Exigir a presença exata das três arenas, sem aceitar subconjuntos.
 - Mostrar resumo por arena, matriz completa de 2010–2026 e lista explícita de

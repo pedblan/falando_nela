@@ -33,6 +33,10 @@
 - Manter `arena` e `casa_origem` em colunas distintas.
 - A validação final deve exigir exatamente `camara`, `senado` e `congresso`,
   mostrar contagens completas por arena-ano e listar anos sem discursos.
+- Para `complete_year_start..complete_year_end`, zero em qualquer arena deve
+  falhar a etapa 00. A etapa persiste `annual_coverage.csv` e
+  `missing_complete_years.csv` e registra `coverage_gate` no manifest antes de
+  interromper a rodada.
 - A célula de validação deve poder ler o snapshot pronto em uma sessão Colab
   já aberta, sem reinstalar dependências nem reexecutar a etapa 00.
 

@@ -1,5 +1,22 @@
 # Validation
 
+## Gate do backfill 2015–2016
+
+Executar, no diretório persistente do ciclo:
+
+```bash
+python -m processamento.reconciliacao_discursos \
+  --data-root "$FALANDO_NELA_DATA_ROOT" \
+  --cycle-dir "$FALANDO_NELA_DATA_ROOT/operations/atualizacao/ciclos/$CYCLE_ID" \
+  --phase post --snapshot-path "$SNAPSHOT_PATH" --strict
+```
+
+Exigir igualdade descoberta→raw, texto raw→processed e processed→Parquet.
+Cada linha Parquet deve estar no snapshot ou em
+`snapshot_duplicate_removed`. As quatro sentinelas e os dois datasets devem
+estar presentes; `normalization_loss`, `parquet_loss` e perda de snapshot sem
+justificativa reprovam o ciclo.
+
 ## Gate do ciclo 20260713
 
 - Nao iniciar processamento enquanto algum run requerido estiver sem manifest

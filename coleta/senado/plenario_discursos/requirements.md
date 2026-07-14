@@ -16,6 +16,22 @@
 - `--sample-limit N`: limite de pronunciamentos textuais baixados; default `5` em `dev` e sem limite em `prod`.
 - `--resume`: pula particoes mensais concluidas no checkpoint.
 - `--run-id ID`: identificador da execucao, usado em logs, manifests e nomes de JSONL.
+- `--discovery-strategy period-session|historical-official`: mantém
+  `period-session` como default. `historical-official` é opt-in para recuperar
+  lacunas históricas pelo índice oficial de pronunciamentos, com paginação por
+  autor, reconciliação de IDs e casa `SF`.
+
+## Recuperação 2015–2016
+
+- `Sessoes=null` no endpoint mensal não significa ausência de atividade.
+- Na estratégia histórica, cada página HTML oficial consultada deve ser
+  preservada em `metadata/` como `discursos_portal_page`; o conjunto canônico
+  e a paridade com a lista mensal ficam em `discursos_historical_discovery`.
+- A fonte alternativa deve reproduzir todos os IDs da lista mensal quando ela
+  estiver não vazia. Divergência bloqueia a partição.
+- `Senado Federal` é mapeado exclusivamente para `SF/plenario_discursos`.
+- A estratégia histórica limita as requisições a menos de 10/s e registra no
+  manifest a versão do adaptador, partições anômalas e partições concordantemente vazias.
 
 ## Dependencias
 

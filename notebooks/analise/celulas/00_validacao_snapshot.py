@@ -95,6 +95,19 @@ SNAPSHOT_COVERAGE = (
 SNAPSHOT_COVERAGE.index.name = "ano"
 SNAPSHOT_COVERAGE.columns.name = "arena"
 
+SNAPSHOT_COMPLETE_YEAR_START = 2010
+SNAPSHOT_COMPLETE_YEAR_END = 2025
+SNAPSHOT_COMPLETE_COVERAGE = SNAPSHOT_COVERAGE.loc[
+    SNAPSHOT_COMPLETE_YEAR_START:SNAPSHOT_COMPLETE_YEAR_END
+]
+SNAPSHOT_COMPLETE_MISSING = [
+    {"arena": arena, "ano": int(ano)}
+    for arena in SNAPSHOT_EXPECTED_ARENAS
+    for ano in SNAPSHOT_COMPLETE_COVERAGE.index[
+        SNAPSHOT_COMPLETE_COVERAGE[arena].eq(0)
+    ]
+]
+
 display(SNAPSHOT_SUMMARY)
 display(SNAPSHOT_COVERAGE)
 
@@ -105,6 +118,11 @@ SNAPSHOT_MISSING_YEARS = {
 print("Anos sem discursos no snapshot:")
 for SNAPSHOT_ARENA in SNAPSHOT_EXPECTED_ARENAS:
     print(f"- {SNAPSHOT_ARENA}: {SNAPSHOT_MISSING_YEARS[SNAPSHOT_ARENA] or 'nenhum'}")
+
+assert not SNAPSHOT_COMPLETE_MISSING, (
+    "Anos completos sem discursos em arenas obrigatórias: "
+    f"{SNAPSHOT_COMPLETE_MISSING}"
+)
 
 print("Snapshot validado:", SNAPSHOT_PATH)
 print("Total de discursos:", len(SNAPSHOT_FRAME))

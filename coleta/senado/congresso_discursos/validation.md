@@ -6,6 +6,19 @@
 python -m coleta.senado.congresso_discursos.collect --mode dev --run-id smoke-senado-cn
 ```
 
+Smoke da recuperação:
+
+```bash
+python -m coleta.senado.congresso_discursos.collect \
+  --mode dev --data-inicio 2015-01-01 --data-fim 2015-01-31 \
+  --discovery-strategy historical-official \
+  --run-id smoke-congresso-2015-historical
+```
+
+Confirmar `CN` sem itens `SF`, paginação completa, páginas raw em metadata e
+paridade em mês-controle. Produção exige 24 partições completas, `errors=0`,
+sem amostra e presença das sentinelas `411219` e `426642`.
+
 ## Exemplo Colab
 
 Assume que a celula base do README ja montou o Drive, definiu `FALANDO_NELA_DATA_ROOT` e entrou no diretorio do repo.

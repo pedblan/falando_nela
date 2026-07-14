@@ -1,20 +1,31 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Sequence
 
 import httpx
 
-from coleta.common.cli import build_parser, parse_runtime_args
+from coleta.common.cli import build_parser, runtime_config_from_namespace
 from coleta.common.config import apply_sample_window, format_senado_date, month_windows
 from coleta.common.http import OpenDataClient
 from coleta.common.io import CollectionRun, error_summary, listify
+from coleta.senado.discursos_historicos import (
+    PORTAL_BASE_URL,
+    PortalDiscovery,
+    discover_portal_pronunciamentos,
+    merge_primary_and_portal,
+)
 
 SOURCE = "senado"
 BASE_URL = "https://legis.senado.leg.br/"
 TEXT_ENDPOINT = "dadosabertos/discurso/texto-integral/{codigo}"
 SESSION_NOTES_ENDPOINT = "dadosabertos/taquigrafia/notas/sessao/{codigo_sessao}.json"
 VIDEOS_SESSAO_ENDPOINT = "dadosabertos/taquigrafia/videos/sessao/{codigo_sessao}"
+DISCOVERY_PERIOD_SESSION = "period-session"
+DISCOVERY_HISTORICAL_OFFICIAL = "historical-official"
+HISTORICAL_ADAPTER_VERSION = "portal-pronunciamentos-v1"
 
 
 def collect_discursos(
@@ -25,7 +36,18 @@ def collect_discursos(
     argv: Sequence[str] | None = None,
 ) -> Path:
     parser = build_parser(description)
-    runtime = parse_runtime_args(parser, argv)
+    parser.add_argument(
+        "--discovery-strategy",
+        choices=[DISCOVERY_PERIOD_SESSION, DISCOVERY_HISTORICAL_OFFICIAL],
+        default=DISCOVERY_PERIOD_SESSION,
+        help=(
+            "period-session usa a lista mensal da API; historical-official reconcilia essa lista "
+            "com o indice oficial de pronunciamentos do Senado."
+        ),
+    )
+    args = parser.parse_args(argv)
+    runtime = runtime_config_from_namespace(parser, args)
+    discovery_strategy = str(args.discovery_strategy)
     run = CollectionRun(
         runtime.output_dir,
         source=SOURCE,
@@ -37,9 +59,18 @@ def collect_discursos(
     processed_pronunciamentos = 0
     status = "completed"
     errors = 0
+    discovered_items = 0
+    source_anomaly_partitions: list[str] = []
+    empty_partitions: list[str] = []
 
     try:
-        with OpenDataClient(BASE_URL) as client:
+        portal_context = (
+            OpenDataClient(PORTAL_BASE_URL, min_interval_seconds=0.11)
+            if discovery_strategy == DISCOVERY_HISTORICAL_OFFICIAL
+            else nullcontext(None)
+        )
+        api_client_options = {"min_interval_seconds": 0.11} if discovery_strategy == DISCOVERY_HISTORICAL_OFFICIAL else {}
+        with OpenDataClient(BASE_URL, **api_client_options) as client, portal_context as portal_client:
             for partition, start, end in windows:
                 if runtime.sample_limit is not None and processed_pronunciamentos >= runtime.sample_limit:
                     break
@@ -67,7 +98,57 @@ def collect_discursos(
                         record_type="discursos_periodo_metadata",
                     )
 
-                    pronunciamentos = extract_pronunciamentos(result.data)
+                    primary_pronunciamentos = extract_pronunciamentos(result.data)
+                    if discovery_strategy == DISCOVERY_HISTORICAL_OFFICIAL:
+                        if portal_client is None:
+                            raise RuntimeError("Cliente do portal historico nao inicializado")
+                        discovery = discover_portal_pronunciamentos(
+                            portal_client,
+                            start=start,
+                            end=end,
+                            limit=runtime.sample_limit if runtime.sample else None,
+                        )
+                        write_portal_raw_pages(
+                            run,
+                            discovery=discovery,
+                            sigla_casa=sigla_casa,
+                            partition=partition,
+                            periodo=periodo,
+                        )
+                        pronunciamentos, discovery_audit = merge_primary_and_portal(
+                            primary_pronunciamentos,
+                            list(discovery.items),
+                            sigla_casa=sigla_casa,
+                            require_parity=not discovery.truncated,
+                        )
+                        discovered_items += len(pronunciamentos)
+                        if discovery_audit["primary_empty_portal_nonempty"]:
+                            source_anomaly_partitions.append(partition)
+                        if not pronunciamentos:
+                            empty_partitions.append(partition)
+                        write_historical_discovery_summary(
+                            run,
+                            discovery=discovery,
+                            discovery_audit=discovery_audit,
+                            pronunciamentos=pronunciamentos,
+                            sigla_casa=sigla_casa,
+                            partition=partition,
+                            periodo=periodo,
+                        )
+                        run.log(
+                            "historical_discovery_completed",
+                            partition=partition,
+                            expected_portal=discovery.expected_count,
+                            discovered_portal=discovery.discovered_count,
+                            discovered_house=len(pronunciamentos),
+                            source_anomaly=discovery_audit["primary_empty_portal_nonempty"],
+                            truncated=discovery.truncated,
+                        )
+                    else:
+                        pronunciamentos = primary_pronunciamentos
+                        discovered_items += len(pronunciamentos)
+                        if not pronunciamentos:
+                            empty_partitions.append(partition)
                     partition_errors = 0
                     for item in pronunciamentos:
                         if runtime.sample_limit is not None and processed_pronunciamentos >= runtime.sample_limit:
@@ -162,12 +243,90 @@ def collect_discursos(
             mode=runtime.mode,
             sample=runtime.sample,
             sample_limit=runtime.sample_limit,
+            discovery_strategy=discovery_strategy,
+            historical_adapter_version=(
+                HISTORICAL_ADAPTER_VERSION
+                if discovery_strategy == DISCOVERY_HISTORICAL_OFFICIAL
+                else None
+            ),
+            discovered_items=discovered_items,
+            source_anomaly_partitions=sorted(set(source_anomaly_partitions)),
+            empty_partitions=sorted(set(empty_partitions)),
             status=status,
             errors=errors,
         )
         print(run.manifest_path)
 
     return run.manifest_path
+
+
+def write_portal_raw_pages(
+    run: CollectionRun,
+    *,
+    discovery: PortalDiscovery,
+    sigla_casa: str,
+    partition: str,
+    periodo: dict[str, str],
+) -> None:
+    for page in discovery.pages:
+        page_hash = sha256(page.url.encode("utf-8")).hexdigest()[:20]
+        run.write_record(
+            partition="metadata",
+            source_id=f"{sigla_casa}:portal-page:{partition}:{page_hash}",
+            request={"method": "GET", "url": page.url, "params": {}},
+            response=page.response,
+            periodo=periodo,
+            payload={
+                "kind": page.kind,
+                "author": page.author,
+                "page": page.page,
+                "url": page.url,
+                "html": page.html,
+            },
+            record_type="discursos_portal_page",
+        )
+
+
+def write_historical_discovery_summary(
+    run: CollectionRun,
+    *,
+    discovery: PortalDiscovery,
+    discovery_audit: dict[str, Any],
+    pronunciamentos: list[dict[str, Any]],
+    sigla_casa: str,
+    partition: str,
+    periodo: dict[str, str],
+) -> None:
+    ids = [str(item["codigo_pronunciamento"]) for item in pronunciamentos]
+    run.write_record(
+        partition="metadata",
+        source_id=f"{sigla_casa}:historical-discovery:{partition}",
+        request={
+            "method": "COMPOSED_GET",
+            "strategy": DISCOVERY_HISTORICAL_OFFICIAL,
+            "adapter_version": HISTORICAL_ADAPTER_VERSION,
+        },
+        response={
+            "portal_pages": len(discovery.pages),
+            "portal_expected_count": discovery.expected_count,
+            "portal_discovered_count": discovery.discovered_count,
+        },
+        periodo=periodo,
+        payload={
+            "strategy": DISCOVERY_HISTORICAL_OFFICIAL,
+            "adapter_version": HISTORICAL_ADAPTER_VERSION,
+            "house": sigla_casa,
+            "partition": partition,
+            "portal_expected_count_all_houses": discovery.expected_count,
+            "portal_discovered_count_all_houses": discovery.discovered_count,
+            "portal_duplicate_count": discovery.duplicate_count,
+            "truncated": discovery.truncated,
+            "audit": discovery_audit,
+            "ids": ids,
+            "items": pronunciamentos,
+        },
+        record_type="discursos_historical_discovery",
+    )
 
 
 def extract_pronunciamentos(payload: Any) -> list[dict[str, Any]]:

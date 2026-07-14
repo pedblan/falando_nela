@@ -35,12 +35,15 @@ class OpenDataClient:
         timeout: float = 30.0,
         retries: int = 4,
         backoff_seconds: float = 1.0,
+        min_interval_seconds: float = 0.0,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.base_url = base_url.rstrip("/") + "/"
         self.retries = retries
         self.backoff_seconds = backoff_seconds
+        self.min_interval_seconds = min_interval_seconds
         self.sleep = sleep
+        self._last_request_at: float | None = None
         self.client = httpx.Client(
             timeout=timeout,
             headers={
@@ -82,6 +85,7 @@ class OpenDataClient:
 
         while attempt <= self.retries:
             try:
+                self._wait_for_rate_limit()
                 response = self.client.get(url, params=params, headers={"Accept": accept})
                 if response.status_code not in RETRY_STATUS_CODES:
                     response.raise_for_status()
@@ -102,6 +106,16 @@ class OpenDataClient:
         if last_error is not None:
             raise last_error
         raise RuntimeError(f"Falha inesperada ao acessar {url}")
+
+    def _wait_for_rate_limit(self) -> None:
+        if self.min_interval_seconds <= 0:
+            return
+        now = time.monotonic()
+        if self._last_request_at is not None:
+            remaining = self.min_interval_seconds - (now - self._last_request_at)
+            if remaining > 0:
+                self.sleep(remaining)
+        self._last_request_at = time.monotonic()
 
     def _resolve_url(self, path_or_url: str) -> str:
         if path_or_url.startswith("http://") or path_or_url.startswith("https://"):

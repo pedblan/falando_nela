@@ -6,7 +6,7 @@ import re
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
@@ -72,11 +72,19 @@ def build_snapshot(
         snapshot = add_unmatched_temporal_columns(snapshot)
 
     snapshot = snapshot.sort_values(["data_analise", "arena", "texto_id"], kind="stable").reset_index(drop=True)
+    annual_coverage = build_annual_coverage(
+        snapshot,
+        arenas=list(config.raw["arenas"]),
+        year_start=int(config.raw["complete_year_start"]),
+        year_end=int(config.raw["complete_year_end"]),
+    )
     audits = {
         "duplicate_audit": duplicate_audit,
         "identifier_conflicts": id_conflicts,
         "near_duplicate_candidates": near_duplicates,
         "temporal_join_summary": temporal_join_summary(snapshot),
+        "annual_coverage": annual_coverage,
+        "missing_complete_years": missing_annual_coverage(annual_coverage),
     }
     return snapshot, audits
 
@@ -355,6 +363,75 @@ def temporal_join_summary(snapshot: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def build_annual_coverage(
+    snapshot: pd.DataFrame,
+    *,
+    arenas: Sequence[str],
+    year_start: int,
+    year_end: int,
+) -> pd.DataFrame:
+    if year_start > year_end:
+        raise ValueError("year_start nao pode ser posterior a year_end")
+    required = {"arena", "ano"}
+    missing = required.difference(snapshot.columns)
+    if missing:
+        raise ValueError(f"Snapshot sem colunas para cobertura anual: {sorted(missing)}")
+    counts = (
+        snapshot.assign(ano=pd.to_numeric(snapshot["ano"], errors="coerce"))
+        .dropna(subset=["ano"])
+        .groupby(["ano", "arena"], observed=True)
+        .size()
+        .unstack("arena")
+    )
+    coverage = (
+        counts.reindex(index=range(year_start, year_end + 1), columns=list(arenas), fill_value=0)
+        .fillna(0)
+        .astype("int64")
+    )
+    coverage.index.name = "ano"
+    coverage.columns.name = "arena"
+    return coverage.reset_index()
+
+
+def missing_annual_coverage(coverage: pd.DataFrame) -> pd.DataFrame:
+    if "ano" not in coverage:
+        raise ValueError("Matriz de cobertura sem coluna ano")
+    arenas = [column for column in coverage.columns if column != "ano"]
+    rows = [
+        {"arena": arena, "ano": int(row["ano"]), "discursos": int(row[arena])}
+        for _, row in coverage.iterrows()
+        for arena in arenas
+        if int(row[arena]) == 0
+    ]
+    return pd.DataFrame(rows, columns=["arena", "ano", "discursos"])
+
+
+def validate_annual_coverage(
+    snapshot: pd.DataFrame,
+    *,
+    arenas: Sequence[str],
+    year_start: int,
+    year_end: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    observed = set(snapshot["arena"].dropna().astype(str).unique())
+    expected = set(arenas)
+    if observed != expected:
+        raise ValueError(f"Arenas observadas={sorted(observed)}; esperadas={sorted(expected)}")
+    coverage = build_annual_coverage(
+        snapshot,
+        arenas=arenas,
+        year_start=year_start,
+        year_end=year_end,
+    )
+    missing = missing_annual_coverage(coverage)
+    if not missing.empty:
+        details = ", ".join(
+            f"{row.arena}/{int(row.ano)}" for row in missing.itertuples(index=False)
+        )
+        raise ValueError(f"Cobertura anual incompleta: {details}")
+    return coverage, missing
+
+
 def run_snapshot(
     *,
     data_root: str | Path,
@@ -386,6 +463,7 @@ def run_snapshot(
         "snapshot_rows": len(snapshot),
         "rows_by_arena": snapshot["arena"].value_counts(dropna=False).to_dict(),
         "ytd_rows": int(snapshot["ano_ytd"].sum()),
+        "missing_complete_years": len(audits["missing_complete_years"]),
     }
     manifest = base_manifest(
         config=config,
@@ -395,7 +473,26 @@ def run_snapshot(
         outputs=artifacts,
         counts=counts,
     )
+    observed_arenas = set(snapshot["arena"].dropna().astype(str).unique())
+    expected_arenas = set(config.raw["arenas"])
+    missing_complete_years = audits["missing_complete_years"]
+    coverage_gate_passed = observed_arenas == expected_arenas and missing_complete_years.empty
+    manifest["coverage_gate"] = {
+        "passed": coverage_gate_passed,
+        "expected_arenas": sorted(expected_arenas),
+        "observed_arenas": sorted(observed_arenas),
+        "complete_year_start": int(config.raw["complete_year_start"]),
+        "complete_year_end": int(config.raw["complete_year_end"]),
+        "missing": missing_complete_years.to_dict("records"),
+    }
     manifest_path = write_json_atomic(output_root / "00_snapshot" / "manifest.json", manifest)
+    if not coverage_gate_passed:
+        details = ", ".join(
+            f"{row.arena}/{int(row.ano)}" for row in missing_complete_years.itertuples(index=False)
+        ) or "arenas divergentes"
+        raise ValueError(
+            f"Gate de cobertura anual falhou ({details}). Artefatos de diagnostico: {manifest_path}"
+        )
     manifest["manifest_path"] = str(manifest_path)
     manifest["snapshot_path"] = str(snapshot_path)
     return manifest

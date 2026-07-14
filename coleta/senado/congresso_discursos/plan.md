@@ -28,6 +28,16 @@
 - Se texto por pronunciamento nao estiver disponivel, usar texto/notas da sessao como proximo caminho antes de fila de transcricao.
 - Usar checkpoint por particao mensal para retomada.
 
+## Caminho histórico oficial
+
+Na recuperação explícita de 2015–2016, adicionar
+`--discovery-strategy historical-official`. O coletor preserva o probe mensal,
+percorre o índice oficial completo por autor, valida contagens e paginação,
+retém apenas linhas cuja casa exibida seja `Congresso Nacional`, reconcilia
+por `CodigoPronunciamento` e usa o endpoint oficial de texto já compartilhado
+com o Senado. A enumeração por senador é apenas controle diagnóstico, pois não
+cobre deputados e autoridades que podem falar em sessões conjuntas.
+
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.

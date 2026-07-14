@@ -1,5 +1,15 @@
 # Plan
 
+## Recuperação histórica 2015–2016
+
+1. Executar a reconciliação `pre` antes da coleta e preservar seus checksums.
+2. Após os gates dos dois coletores, regenerar
+   `processed-textos-v1-current` a partir de todo o raw cumulativo.
+3. Regenerar `parquet-textos-v1-current`, incluindo os dois Parquets do Senado.
+4. Construir um novo snapshot imutável e executar a reconciliação `post` com
+   `--strict` e o caminho desse snapshot.
+5. Fechar o ciclo somente com todos os gates verdadeiros em `summary.json`.
+
 ## Ciclo operacional 20260713
 
 - Regerar a fotografia canonica `current` depois que todas as faixas de coleta

@@ -202,6 +202,12 @@ exemplo.
 
 ## Camadas analiticas derivadas
 
+Para auditar a recuperação 2015–2016 de Senado e Congresso, use
+`python -m processamento.reconciliacao_discursos`. O comando gera cobertura
+`pre/post` e, na fase final, reconcilia por `texto_id` descoberta, raw,
+processed, Parquet e snapshot. `--strict` bloqueia perdas entre camadas e
+grava a decisão em `operations/atualizacao/ciclos/{cycle_id}/summary.json`.
+
 `parlamentares/v1` e `apartes_parlamentares/v1` continuam canonicos e baseados
 em fontes oficiais. A suite `analise.discursos_plenario` pode criar, sob
 `analises/discursos_plenario/v1/{run_id}`, uma camada revisada de genero, pontes

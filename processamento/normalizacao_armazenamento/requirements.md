@@ -15,6 +15,21 @@ versionada, rastreavel e pronta para cadernos analiticos.
   quando forem necessarios para enriquecer registros textuais, como o mapa de
   deputados da Camara.
 
+## Reconciliação do backfill 2015–2016
+
+- `python -m processamento.reconciliacao_discursos` deve reconciliar, por
+  `texto_id`, descoberta histórica, raw, processed, Parquet e snapshot para
+  `senado/plenario_discursos` e `senado/congresso_discursos`.
+- `--phase pre|post` persiste `coverage_pre.csv` ou `coverage_post.csv` sob o
+  diretório do ciclo. A fase `post` também grava
+  `reconciliation_ids.parquet`, `source_probes.jsonl`,
+  `source_conflicts.jsonl` e `summary.json`.
+- `--strict` falha se descoberta e raw divergirem, se texto raw se perder na
+  normalização, se processed e Parquet divergirem, ou se o Parquet não chegar
+  ao snapshot sem justificativa de duplicata Senado × Congresso.
+- A normalização pós-recuperação deve ler todo o raw cumulativo. Não usar os
+  dois `run_id`s históricos como filtro exclusivo.
+
 ## Saida
 
 - Em ciclos temporais, manter uma fotografia canonica regeneravel identificada

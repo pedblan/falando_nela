@@ -12,6 +12,15 @@ gráficos e persistência pertencem a `analise.discursos_plenario`, de modo que 
 mesma implementação possa sustentar cadernos Marimo e variantes narrativas em
 inglês no futuro.
 
+## Gate de cobertura anual
+
+Na etapa 00, construir a matriz cartesiana de todas as arenas configuradas e
+todos os anos `complete_year_start..complete_year_end`. Persistir a matriz e
+a lista de zeros junto ao snapshot. Somente depois de gravar esses artefatos e
+o manifest, permitir continuidade se as arenas observadas forem exatamente
+`camara`, `senado` e `congresso` e a lista de zeros estiver vazia. O ano YTD
+continua visível na matriz de inspeção do caderno, mas fora desse gate.
+
 ## Entradas somente leitura
 
 - `processed/textos_parlamentares/v1/parquet/camara__plenario_discursos.parquet`;

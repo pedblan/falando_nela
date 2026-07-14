@@ -15,6 +15,20 @@ python -m coleta.senado.plenario_discursos.collect \
   --run-id smoke-senado-texto
 ```
 
+Smoke específico da lacuna, sem promover amostra a produção:
+
+```bash
+python -m coleta.senado.plenario_discursos.collect \
+  --mode dev --data-inicio 2015-01-01 --data-fim 2015-01-31 \
+  --discovery-strategy historical-official \
+  --run-id smoke-senado-2015-historical
+```
+
+Validar `source_anomaly_partitions`, `discursos_portal_page`,
+`discursos_historical_discovery`, casa `SF`, paginação completa e paridade em
+um mês-controle não vazio. A produção deve usar `--no-sample`, nenhum
+`--sample-limit`, 24 partições concluídas e as sentinelas `414849` e `422757`.
+
 Para um smoke mais facil de auditar:
 
 ```bash

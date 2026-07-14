@@ -50,7 +50,7 @@ from analise.discursos_plenario.genero import (
     select_unknown_parliamentarians,
 )
 from analise.discursos_plenario.inferencia import paired_trajectory_correlations
-from analise.discursos_plenario.snapshot import apply_cleaning_rules, build_snapshot
+from analise.discursos_plenario.snapshot import apply_cleaning_rules, build_snapshot, run_snapshot
 from analise.discursos_plenario.topicos import balanced_summary_sample
 
 
@@ -173,6 +173,48 @@ def test_cleaning_applies_only_approved_hard_cut() -> None:
     unchanged, no_rule = apply_cleaning_rules(text, [{"action": "hard_cut", "approved": False, "pattern": "ARTIGO"}])
     assert unchanged == text
     assert no_rule is None
+
+
+def test_run_snapshot_persists_coverage_diagnostics_before_gate_failure(tmp_path: Path) -> None:
+    config_payload = json.loads(json.dumps(CONFIG.raw))
+    config_payload.update(
+        {
+            "date_start": "2015-01-01",
+            "date_end": "2016-12-31",
+            "complete_year_start": 2015,
+            "complete_year_end": 2016,
+            "ytd_year": 2017,
+        }
+    )
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    rows = {
+        "camara": [
+            _speech(arena="camara", text_id="c15", date="2015-01-02", text="Câmara 2015"),
+            _speech(arena="camara", text_id="c16", date="2016-01-02", text="Câmara 2016"),
+        ],
+        "senado": [
+            _speech(arena="senado", text_id="s16", date="2016-02-02", text="Senado 2016"),
+        ],
+        "congresso": [
+            _speech(arena="congresso", text_id="g15", date="2015-03-02", text="Congresso 2015"),
+            _speech(arena="congresso", text_id="g16", date="2016-03-02", text="Congresso 2016"),
+        ],
+    }
+    for arena, arena_rows in rows.items():
+        path = tmp_path / config_payload["arenas"][arena]["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(arena_rows).to_parquet(path, index=False)
+
+    with pytest.raises(ValueError, match="senado/2015"):
+        run_snapshot(data_root=tmp_path, run_id="coverage-failure", config_path=config_path)
+
+    output = tmp_path / "analises" / "discursos_plenario" / "v1" / "coverage-failure" / "00_snapshot"
+    assert (output / "annual_coverage.csv").exists()
+    missing = pd.read_csv(output / "missing_complete_years.csv")
+    assert missing.to_dict("records") == [{"arena": "senado", "ano": 2015, "discursos": 0}]
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["coverage_gate"]["passed"] is False
 
 
 def test_gender_candidates_require_evidence_and_human_approval() -> None:

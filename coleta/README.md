@@ -14,6 +14,12 @@ Este modulo organiza coletas independentes dos portais oficiais de dados abertos
   `1995-02-01` para `senado/plenario_discursos` (`siglaCasa=SF`) e
   `1996-05-01` para `senado/congresso_discursos` (`siglaCasa=CN`). O endpoint
   rejeita janelas trimestrais/anuais, entao esses coletores continuam mensais.
+- Os anos 2015–2016 exigem recuperação explícita porque a lista mensal retorna
+  vazia apesar de existirem pronunciamentos oficiais. Use
+  `--discovery-strategy historical-official` somente no ciclo dedicado: o
+  coletor preserva o probe mensal, percorre o índice oficial paginado por
+  autor, separa `SF` de `CN`, arquiva o HTML em `metadata/` e baixa o texto
+  pelo endpoint canônico. O default continua `period-session`.
 - Para apartes de Plenario, a coleta de producao deve tentar a cobertura
   historica maxima da fonte oficial, alinhada ao backfill historico do projeto,
   usando `1900-01-01` como inicio amplo quando a fonte aceitar a janela;

@@ -15,6 +15,12 @@ Convencoes:
 
 Arquivos atuais:
 
+- `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
+  histórico dedicado que audita a lacuna, executa as duas coletas com
+  `historical-official`, regenera os derivados cumulativos e fecha a
+  reconciliação por identificador. Todas as mutações ficam desativadas por
+  default.
+
 - `00_auditoria_configuracao_atualizacao_colab.ipynb`: audita o Drive e grava,
   sob confirmacao explicita, o controle do ciclo `20260713`.
 - `01_atualizacao_parlamentares_colab.ipynb`: atualiza deputados e senadores e
@@ -107,3 +113,10 @@ python scripts/generate_update_colab_notebooks.py
 
 O gerador valida o schema do notebook antes de gravar cada `.ipynb`; a suite
 local tambem compila individualmente todas as celulas de codigo.
+
+O caderno isolado da recuperação 2015–2016 tem gerador próprio:
+
+```bash
+python scripts/generate_backfill_2015_2016_colab_notebook.py
+python scripts/generate_backfill_2015_2016_colab_notebook.py --check
+```

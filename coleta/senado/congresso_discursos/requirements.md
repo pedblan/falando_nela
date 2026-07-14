@@ -8,6 +8,20 @@
 - `--sample` / `--no-sample`: sobrescreve o default do modo.
 - `--resume`: pula particoes concluidas no checkpoint.
 - `--run-id`: identificador da execucao.
+- `--discovery-strategy period-session|historical-official`: default
+  `period-session`; o modo histórico é opt-in e percorre a busca oficial
+  paginada por autor, filtrando exclusivamente `Congresso Nacional`/`CN`.
+
+## Recuperação 2015–2016
+
+- `Sessoes=null` no endpoint mensal é `source_anomaly` quando a busca oficial
+  encontra pronunciamentos.
+- HTML bruto fica em `metadata/` como `discursos_portal_page`; IDs e auditoria
+  consolidada ficam em `discursos_historical_discovery`.
+- Todos os IDs do endpoint mensal em meses-controle devem reaparecer na fonte
+  histórica; ausência bloqueia a partição.
+- Autores sem código de senador não podem ser descartados, razão pela qual o
+  índice oficial por autor é a descoberta autoritativa do Congresso.
 
 ## Separacao de dados
 

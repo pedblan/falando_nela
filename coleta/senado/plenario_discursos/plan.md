@@ -54,6 +54,17 @@ Coletar pronunciamentos do Plenario do Senado Federal como unidade textual anali
 9. Se nao houver texto oficial, gravar o registro com `texto=null`, `TextoIntegral=null`, `forma=video`, `metodo_obtencao=pendente_transcricao_video` e, quando houver fonte candidata, tambem gravar em `transcription_queue/{run_id}.jsonl`.
 10. Marcar a particao como concluida somente depois de processar os pronunciamentos selecionados.
 
+## Caminho histórico oficial
+
+Para a recuperação explícita de 2015–2016, executar o mesmo fluxo com
+`--discovery-strategy historical-official`. A lista mensal continua sendo
+consultada e arquivada como probe; em seguida o adaptador percorre o índice
+oficial de pronunciamentos, seus autores e todas as páginas, valida as
+contagens divulgadas, filtra `Senado Federal`, reconcilia por
+`CodigoPronunciamento` e só então baixa o texto pelo endpoint canônico. HTML
+de descoberta permanece em `metadata/`; apenas `pronunciamento_texto` entra
+nas partições mensais.
+
 ## Saidas
 
 - `data/raw/senado/plenario_discursos/metadata/{run_id}.jsonl`: listas mensais brutas, somente `discursos_periodo_metadata`.

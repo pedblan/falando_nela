@@ -6,6 +6,7 @@ from pathlib import Path
 
 import nbformat
 import pandas as pd
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,6 +84,7 @@ def test_snapshot_validation_cell_is_standalone_and_synchronized() -> None:
     assert "SNAPSHOT_OBSERVED_ARENAS == set(SNAPSHOT_EXPECTED_ARENAS)" in standalone_source
     assert "SNAPSHOT_COVERAGE" in standalone_source
     assert "SNAPSHOT_MISSING_YEARS" in standalone_source
+    assert "assert not SNAPSHOT_COMPLETE_MISSING" in standalone_source
     assert ".tail(" not in standalone_source
     ast.parse(standalone_source, filename=str(SNAPSHOT_VALIDATION_CELL_PATH))
 
@@ -99,14 +101,25 @@ def test_snapshot_validation_cell_runs_against_existing_artifact(tmp_path: Path)
         / "discursos_plenario_snapshot.parquet"
     )
     snapshot_path.parent.mkdir(parents=True)
-    pd.DataFrame(
+    rows = [
         {
-            "arena": ["camara", "senado", "congresso", "camara"],
-            "ano": [2010, 2010, 2010, 2026],
-            "data_analise": ["2010-02-02", "2010-02-03", "2010-02-04", "2026-07-13"],
-            "elegivel_inferencia_anual": [True, True, True, False],
+            "arena": arena,
+            "ano": year,
+            "data_analise": f"{year}-02-02",
+            "elegivel_inferencia_anual": True,
         }
-    ).to_parquet(snapshot_path, index=False)
+        for year in range(2010, 2026)
+        for arena in ("camara", "senado", "congresso")
+    ]
+    rows.append(
+        {
+            "arena": "camara",
+            "ano": 2026,
+            "data_analise": "2026-07-13",
+            "elegivel_inferencia_anual": False,
+        }
+    )
+    pd.DataFrame(rows).to_parquet(snapshot_path, index=False)
 
     displayed: list[pd.DataFrame] = []
     namespace = {
@@ -122,6 +135,37 @@ def test_snapshot_validation_cell_runs_against_existing_artifact(tmp_path: Path)
     assert namespace["SNAPSHOT_COVERAGE"].loc[2010].tolist() == [1, 1, 1]
     assert namespace["SNAPSHOT_COVERAGE"].loc[2026].tolist() == [1, 0, 0]
     assert len(displayed) == 2
+
+
+def test_snapshot_validation_cell_fails_for_missing_complete_year(tmp_path: Path) -> None:
+    run_id = "snapshot-incompleto"
+    snapshot_path = (
+        tmp_path
+        / "analises"
+        / "discursos_plenario"
+        / "v1"
+        / run_id
+        / "00_snapshot"
+        / "discursos_plenario_snapshot.parquet"
+    )
+    snapshot_path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "arena": arena,
+            "ano": year,
+            "data_analise": f"{year}-02-02",
+            "elegivel_inferencia_anual": True,
+        }
+        for year in range(2010, 2026)
+        for arena in ("camara", "senado", "congresso")
+        if not (arena == "congresso" and year == 2016)
+    ]
+    pd.DataFrame(rows).to_parquet(snapshot_path, index=False)
+
+    namespace = {"DATA_ROOT": tmp_path, "RUN_ID": run_id, "display": lambda _: None}
+    source = SNAPSHOT_VALIDATION_CELL_PATH.read_text(encoding="utf-8")
+    with pytest.raises(AssertionError, match="2016"):
+        exec(compile(source, str(SNAPSHOT_VALIDATION_CELL_PATH), "exec"), namespace)
 
 
 def test_analysis_requirements_pin_colab_binary_stack() -> None:
