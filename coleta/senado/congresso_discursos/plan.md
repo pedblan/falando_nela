@@ -38,6 +38,14 @@ por `CodigoPronunciamento` e usa o endpoint oficial de texto já compartilhado
 com o Senado. A enumeração por senador é apenas controle diagnóstico, pois não
 cobre deputados e autoridades que podem falar em sessões conjuntas.
 
+## Auditoria de cobertura de senadores
+
+A auditoria por CodigoParlamentar também pode consultar casa CN para confirmar
+que discursos de senadores estejam no raw. Ela não é a população completa do
+Congresso: deputados e autoridades podem aparecer somente no raw ou na
+descoberta de sessões. Assim, somente IDs da fonte por senador ausentes do raw
+são lacunas; IDs adicionais no raw são informativos.
+
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.

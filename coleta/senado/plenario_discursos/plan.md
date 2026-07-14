@@ -65,6 +65,14 @@ contagens divulgadas, filtra `Senado Federal`, reconcilia por
 de descoberta permanece em `metadata/`; apenas `pronunciamento_texto` entra
 nas partições mensais.
 
+## Auditoria de cobertura por senador
+
+Antes de ampliar qualquer recuperação histórica, usar
+coleta.senado.auditoria_discursos_historicos com casa SF. Ela enumera
+senadores por legislatura, consulta discursos por CodigoParlamentar e compara
+CodigoPronunciamento com o raw. É uma auditoria separada, sem escrita no
+corpus; nomes não participam da descoberta nem da comparação.
+
 ## Saidas
 
 - `data/raw/senado/plenario_discursos/metadata/{run_id}.jsonl`: listas mensais brutas, somente `discursos_periodo_metadata`.

@@ -23,6 +23,15 @@
 - Autores sem código de senador não podem ser descartados, razão pela qual o
   índice oficial por autor é a descoberta autoritativa do Congresso.
 
+## Auditoria de senadores
+
+- A auditoria desde 2010 consulta o endpoint por CodigoParlamentar com casa CN
+  e compara apenas CodigoPronunciamento de senadores com o raw.
+- raw_ids_not_in_senator_endpoint não bloqueia a auditoria de CN, pois pode
+  representar deputados ou autoridades.
+- A auditoria não substitui a descoberta por sessões ou índice oficial para
+  completar autores não senadores.
+
 ## Separacao de dados
 
 - Listas mensais da API ficam em `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`.

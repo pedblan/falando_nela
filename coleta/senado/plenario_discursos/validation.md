@@ -6,6 +6,13 @@
 - Simular uma falha inesperada por item e confirmar que a particao fica
   retomavel ate que esse item seja gravado com sucesso.
 
+## Auditoria de lacunas
+
+Antes de um backfill de lacunas de senador, rodar a auditoria no Colab com
+janela explícita e exigir que não haja erros, conflitos ou JSONL inválido. A
+presença de IDs ausentes é diagnóstico, não autorização para regenerar
+derivados.
+
 ## Smoke Local
 
 ```bash

@@ -1,5 +1,11 @@
 # Validation: discursos do Plenario do Congresso
 
+## Auditoria de lacunas
+
+Para a auditoria histórica, validar separadamente que IDs por senador ausentes
+no raw são reportados em senator_endpoint_missing_ids.jsonl; não aceitar IDs
+adicionais do raw como falha, pois CN também tem autores não senadores.
+
 ## Smoke test
 
 ```bash

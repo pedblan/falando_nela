@@ -33,6 +33,15 @@
 - A estratégia histórica limita as requisições a menos de 10/s e registra no
   manifest a versão do adaptador, partições anômalas e partições concordantemente vazias.
 
+## Auditoria histórica por código
+
+- Para investigar lacunas de senadores desde 2010, executar a auditoria
+  separada por CodigoParlamentar e CodigoPronunciamento.
+- A auditoria não grava em raw, processed ou snapshots; ela persiste somente
+  inventário, cobertura, erros, conflitos e IDs ausentes.
+- Uma lacuna só pode entrar em backfill após estar listada no artefato
+  senator_endpoint_missing_ids.jsonl.
+
 ## Dependencias
 
 - Python 3.11+.

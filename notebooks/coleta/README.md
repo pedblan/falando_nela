@@ -15,6 +15,11 @@ Convencoes:
 
 Arquivos atuais:
 
+- 07_auditoria_cobertura_discursos_senadores_2010_colab.ipynb: auditoria
+  isolada e retomável da cobertura de CodigoPronunciamento de senadores desde
+  2010. Consulta exclusivamente por CodigoParlamentar, compara com o raw e não
+  altera bases ou derivados.
+
 - `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
   histórico dedicado que audita a lacuna, executa as duas coletas com
   `historical-official`, regenera os derivados cumulativos e fecha a
