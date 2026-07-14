@@ -72,6 +72,8 @@ Os testes devem cobrir:
 - `ano` e `mes` derivam de `data` quando `data` existe.
 - `genero` aparece somente quando veio de `parlamentares/v1`.
 - Nenhuma linha contem campo textual de aparte ou campo `texto`.
+- Pontes, turnos e classificacoes qualitativas ficam fora de
+  `processed/apartes_parlamentares/v1` e nao alteram seus checksums ou schema.
 - Probes anuais/trimestrais aparecem no manifest, mas nao inflam a tabela.
 - Duplicatas de raw runs diferentes nao inflam as contagens.
 

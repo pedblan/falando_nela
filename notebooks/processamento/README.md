@@ -12,6 +12,10 @@ Convencoes:
   isso for mais claro no Colab.
 - Estes notebooks nao sao cadernos analiticos de artigo; eles existem para
   consolidar e validar dados processados.
+- Os cadernos comparativos ficam em `notebooks/analise/` e consomem estes
+  produtos em modo somente leitura. Pontes de apartes, turnos, atos de fala e
+  genero pesquisado permanecem na arvore `analises/` e nao mudam os Parquets
+  canonicos.
 
 Arquivos atuais:
 

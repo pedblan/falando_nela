@@ -199,3 +199,12 @@ no Colab.
 
 Esse diretorio e reservado para os JSONLs pequenos usados em cadernos locais de
 exemplo.
+
+## Camadas analiticas derivadas
+
+`parlamentares/v1` e `apartes_parlamentares/v1` continuam canonicos e baseados
+em fontes oficiais. A suite `analise.discursos_plenario` pode criar, sob
+`analises/discursos_plenario/v1/{run_id}`, uma camada revisada de genero, pontes
+para discursos, segmentos de turnos e classificacoes de atos de fala. Esses
+artefatos nunca regravam os Parquets de processamento: genero pesquisado exige
+evidencia textual e aprovacao humana; atos de fala exigem segmentacao validada.

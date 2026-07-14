@@ -117,3 +117,9 @@ python -m processamento.apartes_parlamentares \
 - Nao segmentar apartes no texto integral de discursos.
 - Nao alterar o schema de `textos_parlamentares/v1`.
 - Nao usar regex sobre discurso integral para descobrir apartes nesta etapa.
+
+Essas restricoes pertencem ao processamento canonico. A suite analitica
+`analise.discursos_plenario` pode, em outra arvore de saida, construir pontes
+para o corpus, segmentar turnos explicitamente marcados e classificar atos de
+fala depois de validacao humana. Nada desse material e incorporado a
+`apartes_parlamentares/v1`.

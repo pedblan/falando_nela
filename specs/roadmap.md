@@ -98,6 +98,25 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Produzir tabelas e visualizacoes com Altair.
 - Separar hipoteses substantivas, metodos e resultados em cada caderno.
 
+## Fase 4.1: suite comparativa dos discursos em plenario
+
+- Construir snapshot imutavel de Camara, Senado e Congresso entre
+  `2010-02-02` e `2026-07-13`, mantendo arena e Casa de origem separadas.
+- Tratar 2010–2025 como series anuais completas e 2026 apenas como YTD.
+- Auditar duplicacoes Senado × Congresso, aplicar exclusivamente regras de
+  limpeza aprovadas e fazer juncao temporal com `parlamentares_periodos`.
+- Criar camada derivada e humanamente revisada para genero oficial desconhecido,
+  sem alterar `parlamentares/v1`.
+- Produzir descritivas, apartes relacionais, segmentacao de turnos, atos de
+  fala, possivel descortesia, NLP, inferencia temporal, clusterizacao, BERTopic,
+  figuras de linguagem com GPT-5.6 e sintese comparativa.
+- Exigir piloto humano e evidencias textuais nas classificacoes; usar Batch API
+  e Structured Outputs somente por celula de comando explicita.
+- Manter cadernos Jupyter/Colab em portugues como primeira entrega, com logica
+  reutilizavel em `analise.discursos_plenario`.
+- Suportar futuramente conversao revisada para Marimo e variantes inglesas que
+  substituem apenas Markdown e preservam codigo, manifests e resultados.
+
 ## Fase 5: validacao e publicacao
 
 - Revisar consistencia dos dados e reproducibilidade das analises.

@@ -1,0 +1,55 @@
+# Cadernos de análise dos discursos em plenário
+
+Esta pasta contém a versão narrativa canônica, em português, dos cadernos
+Colab. Execute-os em ordem e use o mesmo `RUN_ID`:
+
+1. `00_snapshot_discursos_plenario_colab.ipynb`;
+2. `01_enriquecimento_genero_colab.ipynb`;
+3. `02_descritivas_discursos_plenario_colab.ipynb`;
+4. `03_apartes_relacionais_colab.ipynb`, incluindo ponte, segmentação,
+   codebooks de atos de fala, possível descortesia e piloto humano;
+5. `04_nlp_leiturabilidade_morfossintaxe_colab.ipynb`;
+6. `05_inferencia_series_temporais_colab.ipynb`;
+7. `06_clusterizacao_discursos_colab.ipynb`;
+8. `07_topicos_bertopic_colab.ipynb`;
+9. `08_figuras_linguagem_gpt56_colab.ipynb`;
+10. `09_sintese_comparativa_colab.ipynb`.
+
+## Execução
+
+A primeira célula executável monta o Drive. A segunda prepara o repositório e
+instala `requirements-analise.txt`. O corpus completo esperado está em:
+
+```text
+/content/drive/MyDrive/falando_nela/data
+```
+
+Cada etapa cara começa com `RODAR_ETAPA = False`. Revise configuração,
+entradas e cadernos anteriores; mude para `True` apenas quando desejar criar os
+artefatos. O caderno de figuras lê `OPENAI_API_KEY` do ambiente no momento da
+chamada e nunca a imprime ou grava. O mesmo vale para a pesquisa de gênero e a
+classificação qualitativa dos apartes.
+
+No caderno 03, a análise relacional pode ser executada antes da qualitativa. O
+Batch de atos de fala permanece bloqueado até uma amostra humana confirmar a
+segmentação do turno do aparte e da resposta. Discurso inteiro, URL ou metadado
+relacional não substituem o texto segmentado.
+
+## Resultados
+
+Todos os artefatos ficam em:
+
+```text
+analises/discursos_plenario/v1/{RUN_ID}/
+```
+
+O snapshot e o manifest 00 devem ser considerados imutáveis após a revisão. Se
+o corpus ou a configuração mudar, use outro `RUN_ID`.
+
+## Marimo e inglês
+
+Os notebooks mantêm lógica substantiva fora das células, IDs Markdown estáveis
+e configuração serializável. Uma fase futura pode criar equivalentes em
+`notebooks/analise/marimo/` com `marimo convert` e variantes `_en.ipynb` que
+substituem apenas Markdown. Português permanece a fonte narrativa de verdade;
+código e resultados devem ser idênticos entre idiomas e formatos.

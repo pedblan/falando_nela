@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "analysis_version": "v1",
+  "date_start": "2010-02-02",
+  "date_end": "2026-07-13",
+  "complete_year_start": 2010,
+  "complete_year_end": 2025,
+  "ytd_year": 2026,
+  "random_seed": 20260713,
+  "bootstrap_repetitions": 2000,
+  "paths": {
+    "parliamentarian_periods": "processed/parlamentares/v1/parquet/parlamentares_periodos.parquet",
+    "interjections": "processed/apartes_parlamentares/v1/parquet/apartes_parlamentares.parquet",
+    "output_root": "analises/discursos_plenario/v1"
+  },
+  "arenas": {
+    "camara": {
+      "source": "camara",
+      "house": "camara",
+      "dataset": "plenario_discursos",
+      "scope": "plenario",
+      "path": "processed/textos_parlamentares/v1/parquet/camara__plenario_discursos.parquet"
+    },
+    "senado": {
+      "source": "senado",
+      "house": "senado",
+      "dataset": "plenario_discursos",
+      "scope": "plenario",
+      "path": "processed/textos_parlamentares/v1/parquet/senado__plenario_discursos.parquet"
+    },
+    "congresso": {
+      "source": "senado",
+      "house": "congresso",
+      "dataset": "congresso_discursos",
+      "scope": "congresso",
+      "path": "processed/textos_parlamentares/v1/parquet/senado__congresso_discursos.parquet"
+    }
+  },
+  "cleaning": {
+    "ruleset": "hard_cut_reviewed_v1",
+    "allowed_actions": ["hard_cut"],
+    "rules_path": null
+  },
+  "eligibility": {
+    "nlp_min_words": 300,
+    "llm_min_words": 200,
+    "topic_requires_summary": true
+  },
+  "topics": {
+    "max_summaries_per_arena_year": 2000,
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+    "umap": {
+      "n_neighbors": 15,
+      "n_components": 5,
+      "min_dist": 0.0,
+      "metric": "cosine"
+    },
+    "hdbscan": {
+      "min_cluster_size": 30,
+      "metric": "euclidean",
+      "cluster_selection_method": "eom",
+      "prediction_data": true
+    }
+  },
+  "clustering": {
+    "k_min": 2,
+    "k_max": 8,
+    "stability_repetitions": 100,
+    "features": ["prop_pron", "prop_adp", "prop_aux"]
+  },
+  "openai": {
+    "gender_research_model": "gpt-5.6-sol",
+    "figures_default_model": "gpt-5.6-sol",
+    "figures_candidate_models": ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
+    "interjection_default_model": "gpt-5.6-sol",
+    "interjection_candidate_models": ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
+    "gender_prompt_version": "genero-publico-v1",
+    "figures_prompt_version": "figuras-linguagem-v1"
+  },
+  "rhetorical_figures": [
+    "aliteracao",
+    "analogia",
+    "antitese",
+    "anafora",
+    "apelo_ao_povo",
+    "eufemismo",
+    "gradacao",
+    "hiperbole",
+    "ironia",
+    "metonimia",
+    "metafora",
+    "paradoxo",
+    "pergunta_retorica",
+    "prosopopeia"
+  ],
+  "interjection_speech_acts": [
+    "concordar_apoiar",
+    "elogiar_reconhecer",
+    "buscar_compromisso",
+    "apelo_a_autoridade",
+    "explicar",
+    "procedimental_regimental",
+    "discordar_contestar",
+    "ataque_ad_hominem",
+    "perguntar_para_esclarecer",
+    "critica_politica"
+  ],
+  "response_speech_acts": [
+    "acolhimento_formal",
+    "conciliacao",
+    "desvio_topico",
+    "escalada",
+    "humor_ironico",
+    "ignorar",
+    "ad_hominem",
+    "reclamacao_interacao",
+    "rebatida_factual"
+  ]
+}

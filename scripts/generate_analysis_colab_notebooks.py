@@ -1,0 +1,900 @@
+from __future__ import annotations
+
+import argparse
+from hashlib import sha256
+from pathlib import Path
+from textwrap import dedent
+
+import nbformat
+
+
+ROOT = Path(__file__).resolve().parents[1]
+OUTPUT_DIR = ROOT / "notebooks" / "analise"
+REPO_URL = "https://github.com/pedblan/falando_nela.git"
+
+
+def md(source: str, key: str) -> nbformat.NotebookNode:
+    cell = nbformat.v4.new_markdown_cell(dedent(source).strip())
+    cell.metadata["falando_nela"] = {"markdown_id": key, "language": "pt-BR"}
+    return cell
+
+
+def code(source: str, role: str) -> nbformat.NotebookNode:
+    cell = nbformat.v4.new_code_cell(dedent(source).strip())
+    cell.metadata["falando_nela"] = {"role": role}
+    return cell
+
+
+DRIVE_CELL = code(
+    """
+    from google.colab import drive
+
+    drive.mount("/content/drive")
+    """,
+    "mount_drive",
+)
+
+
+SETUP_CELL = code(
+    f"""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    DATA_ROOT = Path("/content/drive/MyDrive/falando_nela/data")
+    REPO_DIR = Path("/content/falando_nela")
+    REPO_URL = "{REPO_URL}"
+    REPO_REF = ""  # Opcional: branch, tag ou commit; vazio acompanha o default remoto.
+
+    if not REPO_DIR.exists():
+        subprocess.run(["git", "clone", REPO_URL, str(REPO_DIR)], check=True)
+    else:
+        subprocess.run(["git", "-C", str(REPO_DIR), "fetch", "--all", "--tags", "--prune"], check=True)
+        if not REPO_REF:
+            subprocess.run(["git", "-C", str(REPO_DIR), "pull", "--ff-only"], check=True)
+    if REPO_REF:
+        subprocess.run(["git", "-C", str(REPO_DIR), "checkout", REPO_REF], check=True)
+
+    os.chdir(REPO_DIR)
+    os.environ["FALANDO_NELA_DATA_ROOT"] = str(DATA_ROOT)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements-analise.txt"], check=True)
+    print("Data root:", DATA_ROOT)
+    print("Commit:", subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True, capture_output=True).stdout.strip())
+    """,
+    "setup_repository",
+)
+
+
+CONTROL_CELL = code(
+    """
+    from analise.discursos_plenario.config import load_config, resolve_input_paths, resolve_output_root
+
+    RUN_ID = "analise-plenario-20260713-v1"
+    CONFIG_PATH = REPO_DIR / "analise" / "discursos_plenario" / "config.v1.json"
+    ANALYSIS_CONFIG = load_config(CONFIG_PATH)
+    RUN_OUTPUT_ROOT = resolve_output_root(ANALYSIS_CONFIG, DATA_ROOT, RUN_ID)
+    INPUT_PATHS = resolve_input_paths(ANALYSIS_CONFIG, DATA_ROOT)
+    RODAR_ETAPA = False
+
+    assert ANALYSIS_CONFIG.date_start == "2010-02-02"
+    assert ANALYSIS_CONFIG.date_end == "2026-07-13"
+    assert ANALYSIS_CONFIG.raw["complete_year_end"] == 2025
+    assert ANALYSIS_CONFIG.raw["ytd_year"] == 2026
+    print("Run:", RUN_ID)
+    print("Saida:", RUN_OUTPUT_ROOT)
+    """,
+    "configure_run",
+)
+
+
+NOTEBOOKS = [
+    {
+        "filename": "00_snapshot_discursos_plenario_colab.ipynb",
+        "title": "00 — Snapshot dos discursos em plenário",
+        "description": "Filtra as três arenas, preserva os textos, audita duplicações e realiza a junção temporal.",
+        "method": "Revise primeiro o inventário de entradas. A etapa é imutável por `RUN_ID`: se dados ou configuração mudarem, crie outro run.",
+        "preflight": """
+            import pandas as pd
+            from analise.discursos_plenario.io import input_inventory
+
+            SNAPSHOT_INVENTORY = input_inventory(ANALYSIS_CONFIG, DATA_ROOT)
+            display(SNAPSHOT_INVENTORY)
+            SNAPSHOT_REQUIRED = ["camara", "senado", "congresso", "parliamentarian_periods"]
+            SNAPSHOT_MISSING = SNAPSHOT_INVENTORY.loc[
+                SNAPSHOT_INVENTORY["entrada"].isin(SNAPSHOT_REQUIRED) & ~SNAPSHOT_INVENTORY["existe"], "caminho"
+            ].tolist()
+            assert not SNAPSHOT_MISSING, f"Entradas obrigatorias ausentes: {SNAPSHOT_MISSING}"
+        """,
+        "run": """
+            from analise.discursos_plenario.snapshot import run_snapshot
+
+            SNAPSHOT_RESULT = None
+            if RODAR_ETAPA:
+                SNAPSHOT_RESULT = run_snapshot(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    config_path=CONFIG_PATH,
+                    overwrite=False,
+                )
+                print(SNAPSHOT_RESULT["manifest_path"])
+            else:
+                print("Etapa não executada. Revise o inventário e defina RODAR_ETAPA=True.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            if SNAPSHOT_PATH.exists():
+                SNAPSHOT_FRAME = pd.read_parquet(SNAPSHOT_PATH)
+                assert set(SNAPSHOT_FRAME["arena"].unique()) <= {"camara", "senado", "congresso"}
+                assert SNAPSHOT_FRAME["data_analise"].min() >= pd.Timestamp("2010-02-02")
+                assert SNAPSHOT_FRAME["data_analise"].max() <= pd.Timestamp("2026-07-13")
+                assert not SNAPSHOT_FRAME.loc[SNAPSHOT_FRAME["ano"].eq(2026), "elegivel_inferencia_anual"].any()
+                display(SNAPSHOT_FRAME.groupby(["arena", "ano"]).size().rename("discursos").tail(12))
+        """,
+    },
+    {
+        "filename": "01_enriquecimento_genero_colab.ipynb",
+        "title": "01 — Enriquecimento revisado de gênero",
+        "description": "Prepara casos desconhecidos, pesquisa evidências públicas e publica somente candidatos aprovados.",
+        "method": "A informação oficial nunca é alterada. Nome, foto, aparência e tratamento isolados são evidências inválidas; toda candidatura identificada requer revisão humana.",
+        "preflight": """
+            GENERO_PERIODS_PATH = INPUT_PATHS["parliamentarian_periods"]
+            assert GENERO_PERIODS_PATH.exists(), GENERO_PERIODS_PATH
+            GENERO_RESEARCH_MODEL = ANALYSIS_CONFIG.raw["openai"]["gender_research_model"]
+            RODAR_PESQUISA_WEB = False
+            PUBLICAR_REVISAO = False
+            MAX_CASOS_PESQUISA = None
+            print("Modelo de pesquisa:", GENERO_RESEARCH_MODEL)
+        """,
+        "run": """
+            from analise.discursos_plenario.genero import run_gender_enrichment_setup
+
+            GENERO_SETUP_RESULT = None
+            if RODAR_ETAPA:
+                GENERO_SETUP_RESULT = run_gender_enrichment_setup(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    config_path=CONFIG_PATH,
+                    overwrite=False,
+                )
+                print(GENERO_SETUP_RESULT["manifest_path"])
+            else:
+                print("Fila não gerada. Defina RODAR_ETAPA=True após revisar o contrato.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            GENERO_UNKNOWN_PATH = RUN_OUTPUT_ROOT / "01_genero" / "parlamentares_genero_desconhecido.csv"
+            if GENERO_UNKNOWN_PATH.exists():
+                GENERO_UNKNOWNS = pd.read_csv(GENERO_UNKNOWN_PATH)
+                assert GENERO_UNKNOWNS["parlamentar_key"].is_unique
+                display(GENERO_UNKNOWNS.head())
+        """,
+        "extra": [
+            (
+                "Pesquisa pública opcional",
+                "A célula abaixo usa a chave disponível no ambiente ou nos Secrets do Colab. Ela não imprime nem persiste a chave. Resultados continuam pendentes até revisão.",
+                """
+                import os
+                import pandas as pd
+                from openai import OpenAI
+                from analise.discursos_plenario.genero import research_gender_candidates
+                from analise.discursos_plenario.io import write_dataframe_atomic
+
+                GENERO_RESEARCH_RESULT = None
+                if RODAR_PESQUISA_WEB:
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            GENERO_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            GENERO_SECRET = None
+                        if GENERO_SECRET:
+                            os.environ["OPENAI_API_KEY"] = GENERO_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    GENERO_CLIENT = OpenAI()
+                    GENERO_UNKNOWNS_FOR_RESEARCH = pd.read_csv(GENERO_UNKNOWN_PATH)
+                    GENERO_CANDIDATES, GENERO_ERRORS = research_gender_candidates(
+                        GENERO_UNKNOWNS_FOR_RESEARCH,
+                        client=GENERO_CLIENT,
+                        model=GENERO_RESEARCH_MODEL,
+                        prompt_version=ANALYSIS_CONFIG.raw["openai"]["gender_prompt_version"],
+                        limit=MAX_CASOS_PESQUISA,
+                    )
+                    write_dataframe_atomic(GENERO_CANDIDATES, RUN_OUTPUT_ROOT / "01_genero" / "revisao_genero.csv")
+                    write_dataframe_atomic(GENERO_ERRORS, RUN_OUTPUT_ROOT / "01_genero" / "erros_pesquisa_genero.csv")
+                    GENERO_RESEARCH_RESULT = {"candidatos": len(GENERO_CANDIDATES), "erros": len(GENERO_ERRORS)}
+                    print(GENERO_RESEARCH_RESULT)
+                else:
+                    print("Pesquisa web desativada.")
+                """,
+            ),
+            (
+                "Publicação após revisão humana",
+                "Edite `revisao_genero.csv` no Drive e preencha status, revisor e data. A função rejeita linhas incompletas.",
+                """
+                from analise.discursos_plenario.genero import publish_gender_review
+
+                GENERO_PUBLICATION_RESULT = None
+                GENERO_REVIEW_PATH = RUN_OUTPUT_ROOT / "01_genero" / "revisao_genero.csv"
+                if PUBLICAR_REVISAO:
+                    GENERO_PUBLICATION_RESULT = publish_gender_review(
+                        data_root=DATA_ROOT,
+                        run_id=RUN_ID,
+                        review_path=GENERO_REVIEW_PATH,
+                        config_path=CONFIG_PATH,
+                    )
+                    print(GENERO_PUBLICATION_RESULT["manifest_path"])
+                else:
+                    print("Publicação desativada.")
+                """,
+            ),
+        ],
+    },
+    {
+        "filename": "02_descritivas_discursos_plenario_colab.ipynb",
+        "title": "02 — Estatística descritiva",
+        "description": "Produz painéis exatos anuais, mensais e por dimensões substantivas.",
+        "method": "Bootstrap não é automático: use-o apenas para uma pergunta que declare explicitamente sua população de generalização.",
+        "preflight": """
+            DESCRITIVAS_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            assert DESCRITIVAS_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+        """,
+        "run": """
+            from analise.discursos_plenario.descritivas import run_descriptives
+
+            DESCRITIVAS_RESULT = None
+            if RODAR_ETAPA:
+                DESCRITIVAS_RESULT = run_descriptives(data_root=DATA_ROOT, run_id=RUN_ID, config_path=CONFIG_PATH)
+                print(DESCRITIVAS_RESULT["manifest_path"])
+            else:
+                print("Descritivas não executadas.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            DESCRITIVAS_ANUAL_PATH = RUN_OUTPUT_ROOT / "02_descritivas" / "anual.csv"
+            if DESCRITIVAS_ANUAL_PATH.exists():
+                DESCRITIVAS_ANUAL = pd.read_csv(DESCRITIVAS_ANUAL_PATH)
+                assert DESCRITIVAS_ANUAL["discursos"].ge(0).all()
+                display(DESCRITIVAS_ANUAL.tail(12))
+        """,
+    },
+    {
+        "filename": "03_apartes_relacionais_colab.ipynb",
+        "title": "03 — Apartes relacionais, segmentação e atos de fala",
+        "description": "Analisa díades, constrói pontes para o corpus e prepara a análise qualitativa dos apartes e respostas.",
+        "method": "Sem precisão contra conjunto ouro, a ponte não autoriza denominadores e a segmentação não autoriza classificação. A taxonomia de atos de fala reproduz o TD 355 e permanece revisável.",
+        "preflight": """
+            APARTES_PATH = INPUT_PATHS["interjections"]
+            APARTES_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            assert APARTES_PATH.exists(), APARTES_PATH
+            assert APARTES_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+            VALIDAR_SEGMENTACAO = False
+            GERAR_JSONL_ATOS_FALA = False
+            ENVIAR_BATCH_ATOS_FALA = False
+            BAIXAR_BATCH_ATOS_FALA = False
+            PROCESSAR_BATCH_ATOS_FALA = False
+            APARTES_QUALITATIVE_MODEL = ANALYSIS_CONFIG.raw["openai"]["interjection_default_model"]
+        """,
+        "run": """
+            from analise.discursos_plenario.apartes import run_interjection_analysis
+
+            APARTES_RESULT = None
+            if RODAR_ETAPA:
+                APARTES_RESULT = run_interjection_analysis(data_root=DATA_ROOT, run_id=RUN_ID, config_path=CONFIG_PATH)
+                print(APARTES_RESULT["manifest_path"])
+            else:
+                print("Apartes não executados.")
+        """,
+        "validate": """
+            import json
+            import pandas as pd
+
+            APARTES_TESTS_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "testes_associacao.csv"
+            APARTES_BRIDGE_QUALITY_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "ponte_camara_qualidade.json"
+            APARTES_SEGMENTATION_QUALITY_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "segmentacao_qualidade.json"
+            if APARTES_TESTS_PATH.exists():
+                APARTES_TESTS = pd.read_csv(APARTES_TESTS_PATH)
+                display(APARTES_TESTS.tail())
+            if APARTES_BRIDGE_QUALITY_PATH.exists():
+                APARTES_BRIDGE_QUALITY = json.loads(APARTES_BRIDGE_QUALITY_PATH.read_text(encoding="utf-8"))
+                assert APARTES_BRIDGE_QUALITY["denominators_authorized"] is False
+                print(APARTES_BRIDGE_QUALITY)
+            if APARTES_SEGMENTATION_QUALITY_PATH.exists():
+                APARTES_SEGMENTATION_QUALITY = json.loads(APARTES_SEGMENTATION_QUALITY_PATH.read_text(encoding="utf-8"))
+                print(APARTES_SEGMENTATION_QUALITY)
+        """,
+        "extra": [
+            (
+                "Revisar a segmentação dos turnos",
+                "O caderno cria uma amostra balanceada de 200 interações. Revise se o trecho é realmente o aparte e se a resposta pertence ao orador principal; só então recalcule a qualidade.",
+                """
+                import json
+                import pandas as pd
+                from analise.discursos_plenario.apartes_qualitativos import segmentation_quality
+                from analise.discursos_plenario.io import write_json_atomic
+
+                APARTES_INTERACTIONS_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "interacoes_segmentadas.parquet"
+                APARTES_SEGMENTATION_REVIEW_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "revisao_segmentacao.csv"
+                APARTES_SEGMENTATION_VALIDATION = None
+                if VALIDAR_SEGMENTACAO:
+                    APARTES_INTERACTIONS = pd.read_parquet(APARTES_INTERACTIONS_PATH)
+                    APARTES_SEGMENTATION_GOLD = pd.read_csv(APARTES_SEGMENTATION_REVIEW_PATH)
+                    APARTES_SEGMENTATION_VALIDATION = segmentation_quality(
+                        APARTES_INTERACTIONS,
+                        APARTES_SEGMENTATION_GOLD,
+                        min_precision=0.95,
+                        min_reviewed=100,
+                    )
+                    write_json_atomic(APARTES_SEGMENTATION_QUALITY_PATH, APARTES_SEGMENTATION_VALIDATION)
+                    print(APARTES_SEGMENTATION_VALIDATION)
+                else:
+                    print("Validação desativada; preencha primeiro a amostra de revisão.")
+                """,
+            ),
+            (
+                "Preparar atos de fala e possível descortesia",
+                "Complete o codebook do TD 355. O JSONL contém somente os turnos segmentados; respostas ausentes ficam explicitamente marcadas.",
+                """
+                import pandas as pd
+                from analise.discursos_plenario.apartes_qualitativos import write_qualitative_batch_jsonl
+
+                APARTES_CODEBOOK_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "codebook_atos_fala.csv"
+                APARTES_BATCH_REQUEST_PATH = RUN_OUTPUT_ROOT / "03_apartes" / f"batch_atos_fala_{APARTES_QUALITATIVE_MODEL}.jsonl"
+                if GERAR_JSONL_ATOS_FALA:
+                    APARTES_SEGMENTATION_GATE = json.loads(APARTES_SEGMENTATION_QUALITY_PATH.read_text(encoding="utf-8"))
+                    assert APARTES_SEGMENTATION_GATE["classification_authorized"] is True, "A segmentação ainda não atingiu o gate."
+                    APARTES_CODEBOOK = pd.read_csv(APARTES_CODEBOOK_PATH).fillna("")
+                    APARTES_CODEBOOK_FIELDS = ["definicao_operacional", "criterio_positivo", "criterio_negativo", "caso_limitrofe"]
+                    assert APARTES_CODEBOOK[APARTES_CODEBOOK_FIELDS].apply(lambda column: column.str.strip().ne("").all()).all(), "Complete o codebook."
+                    APARTES_INTERACTIONS_FOR_BATCH = pd.read_parquet(APARTES_INTERACTIONS_PATH)
+                    write_qualitative_batch_jsonl(
+                        APARTES_INTERACTIONS_FOR_BATCH,
+                        APARTES_BATCH_REQUEST_PATH,
+                        codebook=APARTES_CODEBOOK.to_csv(index=False),
+                        config=ANALYSIS_CONFIG,
+                        model=APARTES_QUALITATIVE_MODEL,
+                    )
+                    print(APARTES_BATCH_REQUEST_PATH)
+                else:
+                    print("JSONL de atos de fala não gerado.")
+                """,
+            ),
+            (
+                "Enviar o Batch de atos de fala",
+                "O envio é uma ação separada e explícita. A chave vem do ambiente ou dos Secrets do Colab e não é gravada.",
+                """
+                import os
+                from openai import OpenAI
+                from analise.discursos_plenario.figuras import submit_responses_batch
+                from analise.discursos_plenario.io import write_json_atomic
+
+                APARTES_BATCH_SUBMISSION = None
+                if ENVIAR_BATCH_ATOS_FALA:
+                    assert APARTES_BATCH_REQUEST_PATH.exists(), "Gere e inspecione o JSONL primeiro."
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            APARTES_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            APARTES_SECRET = None
+                        if APARTES_SECRET:
+                            os.environ["OPENAI_API_KEY"] = APARTES_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    APARTES_OPENAI_CLIENT = OpenAI()
+                    APARTES_BATCH_SUBMISSION = submit_responses_batch(
+                        APARTES_OPENAI_CLIENT,
+                        APARTES_BATCH_REQUEST_PATH,
+                        description=f"{RUN_ID}:atos-fala:{APARTES_QUALITATIVE_MODEL}",
+                    )
+                    APARTES_BATCH_CONTROL = {
+                        "batch_id": APARTES_BATCH_SUBMISSION.id,
+                        "model": APARTES_QUALITATIVE_MODEL,
+                        "request_path": str(APARTES_BATCH_REQUEST_PATH),
+                    }
+                    write_json_atomic(RUN_OUTPUT_ROOT / "03_apartes" / "batch_atos_fala.json", APARTES_BATCH_CONTROL)
+                    print("Batch criado:", APARTES_BATCH_SUBMISSION.id)
+                else:
+                    print("Envio desativado.")
+                """,
+            ),
+            (
+                "Baixar e analisar o Batch concluído",
+                "A saída é reconciliada por `custom_id`, gera prevalências anuais e por direção de gênero e, quando o piloto estiver adjudicado, Jaccard, F1 e kappa.",
+                """
+                import json
+                import os
+                from openai import OpenAI
+                from analise.discursos_plenario.apartes_qualitativos import run_qualitative_results
+                from analise.discursos_plenario.figuras import download_completed_batch
+
+                APARTES_BATCH_OUTPUT_PATH = RUN_OUTPUT_ROOT / "03_apartes" / f"batch_atos_fala_{APARTES_QUALITATIVE_MODEL}_output.jsonl"
+                APARTES_BATCH_CONTROL_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "batch_atos_fala.json"
+                if BAIXAR_BATCH_ATOS_FALA:
+                    assert APARTES_BATCH_CONTROL_PATH.exists(), APARTES_BATCH_CONTROL_PATH
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            APARTES_DOWNLOAD_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            APARTES_DOWNLOAD_SECRET = None
+                        if APARTES_DOWNLOAD_SECRET:
+                            os.environ["OPENAI_API_KEY"] = APARTES_DOWNLOAD_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    APARTES_DOWNLOAD_CLIENT = OpenAI()
+                    APARTES_BATCH_CONTROL_LOADED = json.loads(APARTES_BATCH_CONTROL_PATH.read_text(encoding="utf-8"))
+                    download_completed_batch(
+                        APARTES_DOWNLOAD_CLIENT,
+                        APARTES_BATCH_CONTROL_LOADED["batch_id"],
+                        APARTES_BATCH_OUTPUT_PATH,
+                    )
+                    print(APARTES_BATCH_OUTPUT_PATH)
+                APARTES_QUALITATIVE_RESULT = None
+                if PROCESSAR_BATCH_ATOS_FALA:
+                    assert APARTES_BATCH_OUTPUT_PATH.exists(), APARTES_BATCH_OUTPUT_PATH
+                    APARTES_QUALITATIVE_RESULT = run_qualitative_results(
+                        data_root=DATA_ROOT,
+                        run_id=RUN_ID,
+                        batch_output_path=APARTES_BATCH_OUTPUT_PATH,
+                        request_path=APARTES_BATCH_REQUEST_PATH,
+                        model=APARTES_QUALITATIVE_MODEL,
+                        config_path=CONFIG_PATH,
+                    )
+                    print(APARTES_QUALITATIVE_RESULT["manifest_path"])
+                else:
+                    print("Processamento da saída desativado.")
+                """,
+            ),
+        ],
+    },
+    {
+        "filename": "04_nlp_leiturabilidade_morfossintaxe_colab.ipynb",
+        "title": "04 — NLP, leiturabilidade e morfossintaxe",
+        "description": "Extrai métricas do TextDescriptives, do spaCy e padrões linguísticos específicos.",
+        "method": "O mesmo `Doc` de `pt_core_news_lg` alimenta as métricas gerais e customizadas; o processamento completo fica reservado ao Colab.",
+        "preflight": """
+            import subprocess
+            import sys
+
+            NLP_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            assert NLP_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+            try:
+                import pt_core_news_lg  # noqa: F401
+            except ImportError:
+                subprocess.run([sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True)
+            NLP_LIMIT = None
+            NLP_BATCH_SIZE = 32
+            NLP_N_PROCESS = 1
+        """,
+        "run": """
+            from analise.discursos_plenario.nlp import run_nlp_analysis
+
+            NLP_RESULT = None
+            if RODAR_ETAPA:
+                NLP_RESULT = run_nlp_analysis(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    config_path=CONFIG_PATH,
+                    model="pt_core_news_lg",
+                    limit=NLP_LIMIT,
+                    batch_size=NLP_BATCH_SIZE,
+                    n_process=NLP_N_PROCESS,
+                )
+                print(NLP_RESULT["manifest_path"])
+            else:
+                print("NLP não executado. Para smoke, defina NLP_LIMIT antes de habilitar.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            NLP_FEATURES_PATH = RUN_OUTPUT_ROOT / "04_nlp" / "nlp_features.parquet"
+            if NLP_FEATURES_PATH.exists():
+                NLP_FEATURES = pd.read_parquet(NLP_FEATURES_PATH)
+                NLP_REQUIRED_COLUMNS = {"texto_id", "prop_pron", "prop_adp", "prop_aux", "type_token_ratio"}
+                assert NLP_REQUIRED_COLUMNS <= set(NLP_FEATURES.columns)
+                display(NLP_FEATURES.head())
+        """,
+    },
+    {
+        "filename": "05_inferencia_series_temporais_colab.ipynb",
+        "title": "05 — Inferência em séries temporais",
+        "description": "Compara trajetórias anuais em níveis e diferenças e estima tendências com erros HAC.",
+        "method": "2026 fica fora dos modelos anuais. Correlações e tendências descrevem associação temporal, não causalidade.",
+        "preflight": """
+            INFERENCIA_FEATURES_PATH = RUN_OUTPUT_ROOT / "04_nlp" / "nlp_features.parquet"
+            assert INFERENCIA_FEATURES_PATH.exists(), "Execute o caderno 04."
+            INFERENCIA_METRICS = None  # Opcional: lista explícita de colunas numéricas.
+        """,
+        "run": """
+            from analise.discursos_plenario.inferencia import run_temporal_inference
+
+            INFERENCIA_RESULT = None
+            if RODAR_ETAPA:
+                INFERENCIA_RESULT = run_temporal_inference(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    metrics=INFERENCIA_METRICS,
+                    config_path=CONFIG_PATH,
+                )
+                print(INFERENCIA_RESULT["manifest_path"])
+            else:
+                print("Inferência temporal não executada.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            INFERENCIA_CORRELATIONS_PATH = RUN_OUTPUT_ROOT / "05_inferencia" / "correlacoes.csv"
+            if INFERENCIA_CORRELATIONS_PATH.exists():
+                INFERENCIA_CORRELATIONS = pd.read_csv(INFERENCIA_CORRELATIONS_PATH)
+                assert INFERENCIA_CORRELATIONS["year_max"].le(2025).all()
+                assert set(INFERENCIA_CORRELATIONS["scale"]) <= {"level", "first_difference"}
+                display(INFERENCIA_CORRELATIONS.head())
+        """,
+    },
+    {
+        "filename": "06_clusterizacao_discursos_colab.ipynb",
+        "title": "06 — Clusterização dos discursos",
+        "description": "Avalia `k=2…8` sem impor quantidade ou nomes de perfis.",
+        "method": "A decisão final exige leitura conjunta dos índices, da estabilidade, dos centroides e de discursos representativos; ausência de clusters estáveis é um resultado admissível.",
+        "preflight": """
+            CLUSTER_FEATURES_PATH = RUN_OUTPUT_ROOT / "04_nlp" / "nlp_features.parquet"
+            assert CLUSTER_FEATURES_PATH.exists(), "Execute o caderno 04."
+            print("Variáveis:", ANALYSIS_CONFIG.raw["clustering"]["features"])
+        """,
+        "run": """
+            from analise.discursos_plenario.clusterizacao import run_clustering
+
+            CLUSTER_RESULT = None
+            if RODAR_ETAPA:
+                CLUSTER_RESULT = run_clustering(data_root=DATA_ROOT, run_id=RUN_ID, config_path=CONFIG_PATH)
+                print(CLUSTER_RESULT["manifest_path"])
+            else:
+                print("Avaliação de k não executada.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            CLUSTER_EVALUATION_PATH = RUN_OUTPUT_ROOT / "06_clusterizacao" / "avaliacao_k.csv"
+            if CLUSTER_EVALUATION_PATH.exists():
+                CLUSTER_EVALUATION = pd.read_csv(CLUSTER_EVALUATION_PATH)
+                assert CLUSTER_EVALUATION["k"].tolist() == list(range(2, 9))
+                display(CLUSTER_EVALUATION)
+                print("Preencha decisao_k.csv somente após examinar resultados e casos representativos.")
+        """,
+    },
+    {
+        "filename": "07_topicos_bertopic_colab.ipynb",
+        "title": "07 — Tópicos com BERTopic",
+        "description": "Treina um modelo comum às três arenas usando amostra balanceada de resumos.",
+        "method": "Resumo ausente é exclusão, não convite para substituir pelo texto integral. Cobertura e outliers acompanham toda interpretação.",
+        "preflight": """
+            TOPICOS_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            assert TOPICOS_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+            TOPICOS_STABILITY_REPETITIONS = 2
+        """,
+        "run": """
+            from analise.discursos_plenario.topicos import run_topic_modeling
+
+            TOPICOS_RESULT = None
+            if RODAR_ETAPA:
+                TOPICOS_RESULT = run_topic_modeling(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    config_path=CONFIG_PATH,
+                    stability_repetitions=TOPICOS_STABILITY_REPETITIONS,
+                )
+                print(TOPICOS_RESULT["manifest_path"])
+            else:
+                print("BERTopic não executado.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            TOPICOS_COVERAGE_PATH = RUN_OUTPUT_ROOT / "07_topicos" / "cobertura.csv"
+            if TOPICOS_COVERAGE_PATH.exists():
+                TOPICOS_COVERAGE = pd.read_csv(TOPICOS_COVERAGE_PATH)
+                assert TOPICOS_COVERAGE.loc[TOPICOS_COVERAGE["ano"].eq(2026), "ytd"].all()
+                display(TOPICOS_COVERAGE.tail(12))
+        """,
+    },
+    {
+        "filename": "08_figuras_linguagem_gpt56_colab.ipynb",
+        "title": "08 — Figuras de linguagem com GPT-5.6",
+        "description": "Prepara codebook e piloto humano, compara modelos e gera produção estruturada por Batch API.",
+        "method": "GPT-5.6 Sol é o padrão. Luna ou Terra só podem substituí-lo após não inferioridade pareada contra o mesmo piloto humano adjudicado.",
+        "preflight": """
+            FIGURAS_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            assert FIGURAS_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+            FIGURAS_MODELS = ANALYSIS_CONFIG.raw["openai"]["figures_candidate_models"]
+            FIGURAS_DEFAULT_MODEL = ANALYSIS_CONFIG.raw["openai"]["figures_default_model"]
+            FIGURAS_SAMPLE_LIMIT = None
+            GERAR_JSONL = False
+            ENVIAR_BATCH = False
+            BAIXAR_BATCH_FIGURAS = False
+            PROCESSAR_BATCH_FIGURAS = False
+            FIGURAS_MODEL_FOR_BATCH = FIGURAS_DEFAULT_MODEL
+            FIGURAS_BATCH_SCOPE = "piloto"  # piloto | producao
+            print("Modelos do piloto:", FIGURAS_MODELS)
+        """,
+        "run": """
+            from analise.discursos_plenario.figuras import prepare_figures_stage
+
+            FIGURAS_SETUP_RESULT = None
+            if RODAR_ETAPA:
+                FIGURAS_SETUP_RESULT = prepare_figures_stage(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    config_path=CONFIG_PATH,
+                    sample_limit=FIGURAS_SAMPLE_LIMIT,
+                )
+                print(FIGURAS_SETUP_RESULT["manifest_path"])
+            else:
+                print("Setup não executado. Complete codebook e piloto antes do Batch.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            FIGURAS_CODEBOOK_PATH = RUN_OUTPUT_ROOT / "08_figuras" / "codebook.csv"
+            FIGURAS_PILOT_PATH = RUN_OUTPUT_ROOT / "08_figuras" / "piloto_humano.csv"
+            if FIGURAS_CODEBOOK_PATH.exists():
+                FIGURAS_CODEBOOK = pd.read_csv(FIGURAS_CODEBOOK_PATH)
+                assert set(FIGURAS_CODEBOOK["categoria"]) == set(ANALYSIS_CONFIG.raw["rhetorical_figures"])
+                display(FIGURAS_CODEBOOK)
+        """,
+        "extra": [
+            (
+                "Preparar o JSONL do Batch",
+                "A geração exige codebook preenchido. Crie arquivos separados para cada modelo do piloto e para a produção escolhida.",
+                """
+                import pandas as pd
+                from analise.discursos_plenario.figuras import write_batch_jsonl
+
+                FIGURAS_BATCH_REQUEST_PATH = RUN_OUTPUT_ROOT / "08_figuras" / f"batch_{FIGURAS_MODEL_FOR_BATCH}.jsonl"
+                if GERAR_JSONL:
+                    FIGURAS_CODEBOOK_READY = pd.read_csv(FIGURAS_CODEBOOK_PATH).fillna("")
+                    FIGURAS_CODEBOOK_FIELDS = ["definicao_operacional", "criterio_positivo", "criterio_negativo", "caso_limitrofe"]
+                    assert FIGURAS_CODEBOOK_READY[FIGURAS_CODEBOOK_FIELDS].apply(lambda column: column.str.strip().ne("").all()).all(), "Complete o codebook."
+                    assert FIGURAS_BATCH_SCOPE in {"piloto", "producao"}
+                    FIGURAS_SAMPLE_FILENAME = "amostra_piloto.parquet" if FIGURAS_BATCH_SCOPE == "piloto" else "amostra_elegivel.parquet"
+                    FIGURAS_SAMPLE = pd.read_parquet(RUN_OUTPUT_ROOT / "08_figuras" / FIGURAS_SAMPLE_FILENAME)
+                    FIGURAS_CODEBOOK_TEXT = FIGURAS_CODEBOOK_READY.to_csv(index=False)
+                    write_batch_jsonl(
+                        FIGURAS_SAMPLE,
+                        FIGURAS_BATCH_REQUEST_PATH,
+                        codebook=FIGURAS_CODEBOOK_TEXT,
+                        config=ANALYSIS_CONFIG,
+                        model=FIGURAS_MODEL_FOR_BATCH,
+                    )
+                    print(FIGURAS_BATCH_SCOPE, FIGURAS_MODEL_FOR_BATCH, len(FIGURAS_SAMPLE), FIGURAS_BATCH_REQUEST_PATH)
+                else:
+                    print("JSONL não gerado.")
+                """,
+            ),
+            (
+                "Enviar o Batch explicitamente",
+                "A chave é lida do ambiente ou dos Secrets do Colab e não é persistida. Guarde o Batch ID no arquivo de controle.",
+                """
+                import os
+                from openai import OpenAI
+                from analise.discursos_plenario.figuras import submit_responses_batch
+                from analise.discursos_plenario.io import write_json_atomic
+
+                FIGURAS_BATCH_SUBMISSION = None
+                if ENVIAR_BATCH:
+                    assert FIGURAS_BATCH_REQUEST_PATH.exists(), "Gere e inspecione o JSONL primeiro."
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            FIGURAS_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            FIGURAS_SECRET = None
+                        if FIGURAS_SECRET:
+                            os.environ["OPENAI_API_KEY"] = FIGURAS_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    FIGURAS_CLIENT = OpenAI()
+                    FIGURAS_BATCH_SUBMISSION = submit_responses_batch(
+                        FIGURAS_CLIENT,
+                        FIGURAS_BATCH_REQUEST_PATH,
+                        description=f"{RUN_ID}:{FIGURAS_MODEL_FOR_BATCH}",
+                    )
+                    FIGURAS_BATCH_CONTROL = {
+                        "batch_id": FIGURAS_BATCH_SUBMISSION.id,
+                        "model": FIGURAS_MODEL_FOR_BATCH,
+                        "request_path": str(FIGURAS_BATCH_REQUEST_PATH),
+                    }
+                    write_json_atomic(RUN_OUTPUT_ROOT / "08_figuras" / f"batch_{FIGURAS_MODEL_FOR_BATCH}.json", FIGURAS_BATCH_CONTROL)
+                    print("Batch criado:", FIGURAS_BATCH_SUBMISSION.id)
+                else:
+                    print("Envio desativado.")
+                """,
+            ),
+            (
+                "Avaliar concordância e não inferioridade",
+                "Depois de reconciliar as respostas, compare todos os modelos nos mesmos discursos e oradores. Defina a margem antes de olhar o resultado.",
+                """
+                from analise.discursos_plenario.figuras import compare_models_against_human
+
+                FIGURAS_NONINFERIORITY_MARGIN = 0.03
+                FIGURAS_EVALUATION_READY = False
+                FIGURAS_MODEL_SUMMARY = None
+                FIGURAS_MODEL_COMPARISONS = None
+                if FIGURAS_EVALUATION_READY:
+                    FIGURAS_MODEL_SUMMARY, FIGURAS_MODEL_COMPARISONS = compare_models_against_human(
+                        FIGURAS_HUMAN_LONG,
+                        FIGURAS_RESULTS_LONG,
+                        FIGURAS_METADATA,
+                        ANALYSIS_CONFIG.raw["rhetorical_figures"],
+                        reference_model=FIGURAS_DEFAULT_MODEL,
+                        noninferiority_margin=FIGURAS_NONINFERIORITY_MARGIN,
+                        repetitions=ANALYSIS_CONFIG.raw["bootstrap_repetitions"],
+                        seed=ANALYSIS_CONFIG.seed,
+                    )
+                    display(FIGURAS_MODEL_SUMMARY)
+                    display(FIGURAS_MODEL_COMPARISONS)
+                else:
+                    print("Carregue piloto humano e resultados reconciliados antes de habilitar a avaliação.")
+                """,
+            ),
+            (
+                "Baixar e consolidar o Batch de figuras",
+                "A consolidação reconcilia `custom_id`, calcula prevalência por mil palavras, avalia o piloto adjudicado e estima custo somente se a tabela oficial de preços estiver preenchida.",
+                """
+                import json
+                import os
+                from openai import OpenAI
+                from analise.discursos_plenario.figuras import download_completed_batch, run_figures_results
+
+                FIGURAS_BATCH_CONTROL_PATH = RUN_OUTPUT_ROOT / "08_figuras" / f"batch_{FIGURAS_MODEL_FOR_BATCH}.json"
+                FIGURAS_BATCH_OUTPUT_PATH = RUN_OUTPUT_ROOT / "08_figuras" / f"batch_{FIGURAS_MODEL_FOR_BATCH}_output.jsonl"
+                if BAIXAR_BATCH_FIGURAS:
+                    assert FIGURAS_BATCH_CONTROL_PATH.exists(), FIGURAS_BATCH_CONTROL_PATH
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            FIGURAS_DOWNLOAD_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            FIGURAS_DOWNLOAD_SECRET = None
+                        if FIGURAS_DOWNLOAD_SECRET:
+                            os.environ["OPENAI_API_KEY"] = FIGURAS_DOWNLOAD_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    FIGURAS_DOWNLOAD_CLIENT = OpenAI()
+                    FIGURAS_BATCH_CONTROL_LOADED = json.loads(FIGURAS_BATCH_CONTROL_PATH.read_text(encoding="utf-8"))
+                    download_completed_batch(
+                        FIGURAS_DOWNLOAD_CLIENT,
+                        FIGURAS_BATCH_CONTROL_LOADED["batch_id"],
+                        FIGURAS_BATCH_OUTPUT_PATH,
+                    )
+                    print(FIGURAS_BATCH_OUTPUT_PATH)
+                FIGURAS_RESULTS_MANIFEST = None
+                if PROCESSAR_BATCH_FIGURAS:
+                    assert FIGURAS_BATCH_OUTPUT_PATH.exists(), FIGURAS_BATCH_OUTPUT_PATH
+                    FIGURAS_RESULTS_MANIFEST = run_figures_results(
+                        data_root=DATA_ROOT,
+                        run_id=RUN_ID,
+                        batch_output_path=FIGURAS_BATCH_OUTPUT_PATH,
+                        request_path=FIGURAS_BATCH_REQUEST_PATH,
+                        model=FIGURAS_MODEL_FOR_BATCH,
+                        config_path=CONFIG_PATH,
+                    )
+                    print(FIGURAS_RESULTS_MANIFEST["manifest_path"])
+                else:
+                    print("Consolidação da saída desativada.")
+                """,
+            ),
+        ],
+    },
+    {
+        "filename": "09_sintese_comparativa_colab.ipynb",
+        "title": "09 — Síntese comparativa",
+        "description": "Integra somente artefatos anteriores e exporta tabelas, HTML e figuras finais.",
+        "method": "Resultados permanecem separados por arena; comparações padronizadas são secundárias. Reprodução, robustez e exploração aparecem identificadas.",
+        "preflight": """
+            SINTESE_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            assert SINTESE_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+            SINTESE_MANIFESTS = sorted(RUN_OUTPUT_ROOT.glob("*/manifest*.json"))
+            print("Manifests disponíveis:", len(SINTESE_MANIFESTS))
+            for SINTESE_MANIFEST_PATH in SINTESE_MANIFESTS:
+                print(SINTESE_MANIFEST_PATH.relative_to(RUN_OUTPUT_ROOT))
+        """,
+        "run": """
+            from analise.discursos_plenario.sintese import run_synthesis
+
+            SINTESE_RESULT = None
+            if RODAR_ETAPA:
+                SINTESE_RESULT = run_synthesis(data_root=DATA_ROOT, run_id=RUN_ID, config_path=CONFIG_PATH)
+                print(SINTESE_RESULT["manifest_path"])
+            else:
+                print("Síntese não executada.")
+        """,
+        "validate": """
+            import pandas as pd
+
+            SINTESE_COVERAGE_PATH = RUN_OUTPUT_ROOT / "09_sintese" / "cobertura.csv"
+            if SINTESE_COVERAGE_PATH.exists():
+                SINTESE_COVERAGE = pd.read_csv(SINTESE_COVERAGE_PATH)
+                assert SINTESE_COVERAGE.loc[SINTESE_COVERAGE["ano"].eq(2026), "ytd"].all()
+                SINTESE_EXPECTED = ["cobertura.parquet", "sintese.html", "discursos_por_arena.svg", "discursos_por_arena.png"]
+                assert all((RUN_OUTPUT_ROOT / "09_sintese" / name).exists() for name in SINTESE_EXPECTED)
+                display(SINTESE_COVERAGE.tail(12))
+        """,
+    },
+]
+
+
+def build_notebook(spec: dict[str, object]) -> nbformat.NotebookNode:
+    stem = Path(str(spec["filename"])).stem
+    cells = [
+        md(f"# {spec['title']}\n\n{spec['description']}", f"{stem}.title"),
+        DRIVE_CELL,
+        SETUP_CELL,
+        md("## Configuração\n\nUse o mesmo `RUN_ID` em toda a suíte. A configuração versionada é a fonte de verdade.", f"{stem}.configuration"),
+        CONTROL_CELL,
+        md(f"## Decisão metodológica\n\n{spec['method']}", f"{stem}.method"),
+        code(str(spec["preflight"]), "preflight"),
+        md("## Execução\n\nA etapa cara permanece desativada até a inspeção das entradas e dos parâmetros acima.", f"{stem}.execution"),
+        code(str(spec["run"]), "run_stage"),
+        md("## Validação imediata\n\nEsta checagem não substitui os testes sintéticos nem a revisão dos manifests.", f"{stem}.validation"),
+        code(str(spec["validate"]), "validate_stage"),
+    ]
+    for index, (title, description, source) in enumerate(spec.get("extra", []), start=1):
+        cells.extend(
+            [
+                md(f"## {title}\n\n{description}", f"{stem}.extra.{index}"),
+                code(source, f"extra_{index}"),
+            ]
+        )
+    notebook = nbformat.v4.new_notebook()
+    notebook.metadata.update(
+        {
+            "colab": {"name": str(spec["filename"]), "provenance": []},
+            "falando_nela": {
+                "narrative_language": "pt-BR",
+                "analysis_config": "analise/discursos_plenario/config.v1.json",
+                "markdown_source_of_truth": True,
+            },
+            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+            "language_info": {"name": "python", "version": "3.11"},
+        }
+    )
+    notebook.cells = cells
+    return notebook
+
+
+def serialize_notebook(path: Path, notebook: nbformat.NotebookNode) -> str:
+    relative = path.relative_to(ROOT).as_posix()
+    for index, cell in enumerate(notebook.cells):
+        stable_key = f"{relative}:{index}:{cell.cell_type}:{cell.source}".encode("utf-8")
+        cell["id"] = sha256(stable_key).hexdigest()[:16]
+    nbformat.validate(notebook)
+    return nbformat.writes(notebook) + "\n"
+
+
+def generate(*, check: bool = False) -> list[Path]:
+    changed: list[Path] = []
+    for spec in NOTEBOOKS:
+        path = OUTPUT_DIR / str(spec["filename"])
+        content = serialize_notebook(path, build_notebook(spec))
+        current = path.read_text(encoding="utf-8") if path.exists() else None
+        if current != content:
+            changed.append(path)
+            if not check:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+        print(path.relative_to(ROOT), "OK" if current == content else ("DIFF" if check else "WRITTEN"))
+    return changed
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    changed = generate(check=args.check)
+    if args.check and changed:
+        raise SystemExit("Cadernos fora de sincronia com o gerador")
+
+
+if __name__ == "__main__":
+    main()

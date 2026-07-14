@@ -57,9 +57,33 @@ A maquina local deve manter apenas uma amostra estratificada suficiente para des
 
 - pandas ou Polars para manipulacao tabular, conforme tamanho dos dados e ergonomia da etapa.
 - Altair como biblioteca principal de visualizacao estatistica.
-- Metodos estatisticos e NLP serao adicionados por specs especificas, de acordo com os cadernos por artigo constitucional.
+- `numpy`, `scipy` e `statsmodels` para estatistica descritiva, testes de
+  associacao, correcoes multiplas e tendencias HAC/Newey-West.
+- `scikit-learn` para padronizacao, K-Means, metricas internas e estabilidade.
+- spaCy com `pt_core_news_lg` e TextDescriptives para leiturabilidade,
+  morfossintaxe, dependencia e diversidade lexical.
+- BERTopic, sentence-transformers, UMAP e HDBSCAN para modelagem exploratoria
+  de topicos em resumos, com configuracao e sementes explicitas.
+- SDK oficial da OpenAI para pesquisa com web search, Responses API,
+  Structured Outputs e Batch API; credenciais vem somente do ambiente e nao
+  entram em notebooks, manifests ou artefatos.
+- Matplotlib para exportacoes estaticas SVG e PNG da sintese.
 - Auditorias metodologicas, como diagnostico de separadores em discursos
   antigos, devem usar Parquets completos no Drive como entrada primaria e gravar
   apenas artefatos derivados em `processed/audits/`.
 
-Nenhuma dependencia operacional fica fixada nesta spec inicial; a lista de pacotes deve ser criada apenas quando houver codigo ou notebooks correspondentes.
+Dependencias genericas permanecem em `requirements.txt`; a suite comparativa
+usa `requirements-analise.txt`. O modelo `pt_core_news_lg` e instalado pelo
+caderno de NLP porque os pipelines spaCy nao sao distribuidos como dependencia
+Python ordinaria do projeto.
+
+## Notebooks e portabilidade
+
+- Jupyter/Colab e o formato primario da primeira entrega analitica.
+- Notebooks sao orquestradores finos e nao concentram algoritmos cientificos.
+- `nbformat` valida JSON e `ast` compila cada celula Python nos testes.
+- Celulas Markdown tem IDs estaveis e idioma `pt-BR`; variantes inglesas
+  futuras preservam hashes das celulas de codigo.
+- Marimo e alvo futuro de portabilidade. A conversao deve ser revisada para o
+  grafo reativo e demonstrar equivalencia de configuracao, contagens, schemas,
+  manifests e metricas antes de ser aceita.
