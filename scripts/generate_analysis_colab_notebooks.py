@@ -58,9 +58,44 @@ SETUP_CELL = code(
 
     os.chdir(REPO_DIR)
     os.environ["FALANDO_NELA_DATA_ROOT"] = str(DATA_ROOT)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--upgrade",
+            "--force-reinstall",
+            "--no-cache-dir",
+            "numpy==2.0.2",
+            "pandas==2.2.3",
+        ],
+        check=True,
+    )
     subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements-analise.txt"], check=True)
+    ABI_CHECK = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import numpy as np; import pandas as pd; "
+                "assert np.__version__ == '2.0.2', np.__version__; "
+                "assert pd.__version__ == '2.2.3', pd.__version__; "
+                "print(f'NumPy {{np.__version__}}; pandas {{pd.__version__}}')"
+            ),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    import numpy as np
+    import pandas as pd
+
+    assert np.__version__ == "2.0.2", f"Reinicie a sessao do Colab: NumPy carregado={{np.__version__}}"
+    assert pd.__version__ == "2.2.3", f"Reinicie a sessao do Colab: pandas carregado={{pd.__version__}}"
     print("Data root:", DATA_ROOT)
     print("Commit:", subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True, capture_output=True).stdout.strip())
+    print("ABI:", ABI_CHECK.stdout.strip())
     """,
     "setup_repository",
 )

@@ -35,6 +35,10 @@ def test_analysis_notebooks_are_valid_colab_orchestrators() -> None:
         code_cells = [cell for cell in notebook.cells if cell.cell_type == "code"]
         assert "drive.mount" in code_cells[0].source
         assert "git" in code_cells[1].source and "requirements-analise.txt" in code_cells[1].source
+        assert "--force-reinstall" in code_cells[1].source
+        assert '"numpy==2.0.2"' in code_cells[1].source
+        assert '"pandas==2.2.3"' in code_cells[1].source
+        assert "ABI_CHECK" in code_cells[1].source
         source = "\n".join(cell.source for cell in code_cells)
         assert "RODAR_ETAPA = False" in source
         assert "2010-02-02" in source
@@ -61,6 +65,12 @@ def test_analysis_notebooks_match_generator() -> None:
         check=False,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_analysis_requirements_pin_colab_binary_stack() -> None:
+    requirements = (ROOT / "requirements-analise.txt").read_text(encoding="utf-8").splitlines()
+    assert "numpy==2.0.2" in requirements
+    assert "pandas==2.2.3" in requirements
 
 
 def test_analysis_sources_do_not_contain_removed_dependencies() -> None:

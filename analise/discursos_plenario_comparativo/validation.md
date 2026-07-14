@@ -10,6 +10,10 @@
 - Abrir cada `.ipynb` com `nbformat`.
 - Compilar por `ast.parse` todas as células Python.
 - Confirmar Drive na primeira célula executável.
+- Confirmar `numpy==2.0.2` e `pandas==2.2.3` em `requirements-analise.txt` e
+  na célula compartilhada de preparação dos dez cadernos.
+- Confirmar reinstalação sem cache e smoke de importação no kernel e em
+  subprocesso antes de `analise.discursos_plenario`.
 - Confirmar IDs únicos, metadados `language=pt-BR` e controle explícito das etapas caras.
 - Confirmar ausência de magias indispensáveis e credenciais literais.
 - Executar o gerador em modo de conferência e exigir árvore limpa.
@@ -109,14 +113,16 @@
 
 ## Execução completa no Colab
 
-1. Rodar 00 e revisar inventário, duplicações e junção temporal.
-2. Congelar o manifest do snapshot.
-3. Rodar 01, realizar revisão humana e publicar somente aprovados.
-4. Rodar 02–07, revisando cada manifest antes da etapa seguinte.
-5. Completar codebook e piloto do 08 antes de qualquer Batch de produção.
-6. Registrar a decisão entre Luna, Terra e Sol.
-7. Rodar 09 e conferir CSV, Parquet, HTML, SVG e PNG.
-8. Reexecutar top-to-bottom com o mesmo config; exigir mesmas contagens e
+1. Em uma sessão nova, rodar a preparação e exigir a linha
+   `ABI: NumPy 2.0.2; pandas 2.2.3`.
+2. Rodar 00 e revisar inventário, duplicações e junção temporal.
+3. Congelar o manifest do snapshot.
+4. Rodar 01, realizar revisão humana e publicar somente aprovados.
+5. Rodar 02–07, revisando cada manifest antes da etapa seguinte.
+6. Completar codebook e piloto do 08 antes de qualquer Batch de produção.
+7. Registrar a decisão entre Luna, Terra e Sol.
+8. Rodar 09 e conferir CSV, Parquet, HTML, SVG e PNG.
+9. Reexecutar top-to-bottom com o mesmo config; exigir mesmas contagens e
    equivalência numérica dentro das tolerâncias registradas.
 
 ## Portabilidade futura

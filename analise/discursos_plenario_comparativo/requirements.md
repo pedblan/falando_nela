@@ -11,6 +11,17 @@
 - Runs existentes não podem ser sobrescritos silenciosamente.
 - Manifests e saídas não podem conter credenciais ou o valor de variáveis de ambiente.
 
+## Ambiente Colab
+
+- `requirements-analise.txt` deve fixar conjuntamente `numpy==2.0.2` e
+  `pandas==2.2.3`; o par não pode ser afrouxado ou atualizado isoladamente.
+- A preparação deve reinstalar esse par sem usar o cache antes de instalar as
+  demais dependências.
+- Cada caderno deve validar as versões e importar NumPy e pandas no kernel e
+  em um subprocesso antes de importar `analise.discursos_plenario`.
+- Uma sessão que já tenha outra versão do NumPy carregada deve falhar cedo e
+  orientar a reinicialização, sem prosseguir para as etapas analíticas.
+
 ## Snapshot
 
 - Exigir as colunas mínimas `texto_id`, `source`, `dataset`, `ambito`, `data` e `texto`.

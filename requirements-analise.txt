@@ -1,7 +1,10 @@
 -r requirements.txt
 
 # Estatistica e visualizacao cientifica
-numpy>=1.26,<3
+# Par ABI validado no runtime Colab 2026.04. Nao afrouxar separadamente:
+# pandas anterior a 2.2.2 nao e compativel com NumPy 2.x.
+numpy==2.0.2
+pandas==2.2.3
 scipy>=1.13,<2
 statsmodels>=0.14,<1
 scikit-learn>=1.5,<2

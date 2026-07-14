@@ -41,6 +41,12 @@ O contrato central está em `analise/discursos_plenario/config.v1.json`. Cada
 execução recebe `run_id`, lê entradas imutáveis, grava artefatos de etapa e um
 manifest com configuração, checksums, contagens e caminhos.
 
+O ambiente Colab usa o par binário fixo `numpy==2.0.2` e `pandas==2.2.3`,
+compatível com o runtime 2026.04. A célula compartilhada de preparação
+reinstala esse par sem cache, instala `requirements-analise.txt` e valida as
+duas importações tanto no kernel quanto em um subprocesso antes de carregar
+qualquer módulo analítico.
+
 Módulos:
 
 - `snapshot.py`: filtros, limpeza aprovada, auditoria de duplicação e junção temporal;

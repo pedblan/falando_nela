@@ -24,6 +24,13 @@ instala `requirements-analise.txt`. O corpus completo esperado está em:
 /content/drive/MyDrive/falando_nela/data
 ```
 
+A preparação reinstala e valida o par binário `numpy==2.0.2` e
+`pandas==2.2.3`, compatível com o runtime Colab 2026.04, antes de importar a
+lógica analítica. A saída da célula deve terminar com
+`ABI: NumPy 2.0.2; pandas 2.2.3`. Se outra versão já estiver carregada ou a
+sessão tiver sido alterada por uma execução anterior, desconecte e exclua o
+runtime, conecte uma sessão nova e rode o caderno desde o início.
+
 Cada etapa cara começa com `RODAR_ETAPA = False`. Revise configuração,
 entradas e cadernos anteriores; mude para `True` apenas quando desejar criar os
 artefatos. O caderno de figuras lê `OPENAI_API_KEY` do ambiente no momento da
