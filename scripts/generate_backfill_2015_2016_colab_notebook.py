@@ -306,6 +306,17 @@ def build_notebook() -> nbformat.NotebookNode:
                     "--data-root", DATA_ROOT, "--cycle-dir", CYCLE_DIR, "--phase", "pre",
                 ])
                 assert result.returncode == 0
+                pre_summary = json.loads((CYCLE_DIR / "summary.json").read_text(encoding="utf-8"))
+                camara_gates = {
+                    name: passed
+                    for name, passed in pre_summary["gates"].items()
+                    if name.startswith("camara_")
+                }
+                assert camara_gates and all(camara_gates.values()), {
+                    "gates": camara_gates,
+                    "controle": pre_summary.get("camara_control"),
+                }
+                display(pre_summary["camara_control"])
             """,
             "audit_pre",
         ),

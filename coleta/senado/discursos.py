@@ -25,7 +25,7 @@ SESSION_NOTES_ENDPOINT = "dadosabertos/taquigrafia/notas/sessao/{codigo_sessao}.
 VIDEOS_SESSAO_ENDPOINT = "dadosabertos/taquigrafia/videos/sessao/{codigo_sessao}"
 DISCOVERY_PERIOD_SESSION = "period-session"
 DISCOVERY_HISTORICAL_OFFICIAL = "historical-official"
-HISTORICAL_ADAPTER_VERSION = "portal-pronunciamentos-v1"
+HISTORICAL_ADAPTER_VERSION = "portal-pronunciamentos-v2"
 
 
 def collect_discursos(

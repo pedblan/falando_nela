@@ -40,6 +40,13 @@ da consulta e o checksum.
   - `senado/plenario_discursos`, com casa `SF` e arena `senado`;
   - `senado/congresso_discursos`, com casa `CN` e arena `congresso`.
 - Base de controle, sem mutação: `camara/plenario_discursos`.
+- Antes de qualquer coleta histórica, o Parquet canônico da Câmara deve provar
+  cobertura não vazia em 2015 e 2016, `texto_id` único e texto não vazio. Essa
+  matriz também deve confirmar nomes e textos com diacríticos e ausência do
+  caractere de substituição Unicode `�`.
+  A verificação deve ser persistida em `camara_control_pre.csv`; a mesma matriz
+  em `camara_control_post.csv` e o fingerprint integral devem confirmar que o
+  backfill não alterou a Câmara.
 - Anos de controle da fonte: pelo menos um mês não vazio antes e outro depois
   da lacuna para cada casa.
 - Outros anos e datasets ficam fora da coleta histórica e devem permanecer
@@ -208,6 +215,7 @@ Sob `operations/atualizacao/ciclos/{cycle_id}/`, persistir no mínimo:
 - `config.json`;
 - `source_probes.jsonl`;
 - `coverage_pre.csv` e `coverage_post.csv`;
+- `camara_control_pre.csv` e `camara_control_post.csv`;
 - `reconciliation_ids.parquet`;
 - `source_conflicts.jsonl`;
 - cópias dos manifests de coleta e processamento;

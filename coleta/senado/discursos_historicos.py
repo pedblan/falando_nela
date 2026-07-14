@@ -270,6 +270,7 @@ def discover_portal_pronunciamentos(
     for author in authors:
         if limit is not None and len(discovered) >= limit:
             break
+        author_codes: set[str] = set()
         first = client.get_text(author.url)
         first_url = str(first.response_metadata.get("url") or author.url)
         first_html = str(first.data)
@@ -299,10 +300,18 @@ def discover_portal_pronunciamentos(
         if page_count == 1 and author.expected_count > len(author_items) and author_items:
             page_count = math.ceil(author.expected_count / len(author_items))
         for item in author_items:
+            author_codes.add(str(item["codigo_pronunciamento"]))
             duplicate_count += _insert_discovered(discovered, item)
 
-        for page_number in range(2, page_count + 1):
+        # O paginador legado do portal pode anunciar a ultima pagina como N,
+        # repetir a primeira em ``p=2`` e servir a ultima somente em ``p=N+1``.
+        # A contagem oficial por autor permite avançar uma pagina sentinela sem
+        # depender dessa numeração inconsistente.
+        last_page_to_probe = page_count + 1
+        for page_number in range(2, last_page_to_probe + 1):
             if limit is not None and len(discovered) >= limit:
+                break
+            if limit is None and len(author_codes) >= author.expected_count:
                 break
             page_url = set_page_number(first_url, page_number)
             result = client.get_text(page_url)
@@ -318,20 +327,17 @@ def discover_portal_pronunciamentos(
                     html=html,
                 )
             )
-            for item in extract_portal_pronunciamentos(
+            page_items = extract_portal_pronunciamentos(
                 html,
                 page_url=resolved_url,
                 author=author.name,
                 author_url=author.url,
-            ):
+            )
+            for item in page_items:
+                author_codes.add(str(item["codigo_pronunciamento"]))
                 duplicate_count += _insert_discovered(discovered, item)
 
         if limit is None:
-            author_codes = {
-                code
-                for code, item in discovered.items()
-                if item["metadata"]["descoberta_historica"]["autor_url"] == author.url
-            }
             if len(author_codes) != author.expected_count:
                 raise ValueError(
                     f"Descoberta incompleta para {author.name}: esperado={author.expected_count}, obtido={len(author_codes)}"

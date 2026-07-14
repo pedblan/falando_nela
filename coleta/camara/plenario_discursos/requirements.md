@@ -89,6 +89,9 @@
   rapido sem aguardar todos os retries do cliente HTTP padrao.
 - `transcricao` deve ser preservada como texto prioritario quando estiver
   disponivel.
+- Nomes e transcrições devem preservar Unicode/UTF-8, inclusive diacríticos
+  como `ç`, `ã`, `ô` e `í`; o caractere de substituição `�` indica corrupção e
+  deve reprovar a validação.
 - URL final, status HTTP, payload e checksum.
 - O manifest deve registrar `deputados_periodos_carregados` quando o plano por
   mandato for usado.

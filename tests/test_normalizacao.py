@@ -73,7 +73,7 @@ def test_normalize_camara_discursos_page_uses_deputado_index(tmp_path: Path) -> 
                 {
                     "dataHoraInicio": "2026-05-18T10:30",
                     "tipoDiscurso": "PELA ORDEM",
-                    "transcricao": "Fala da deputada.",
+                    "transcricao": "A SRA. CONCEIÇÃO SAMPAIO — ação, saúde e Constituição.",
                     "sumario": "Resumo",
                     "keywords": "tema",
                     "faseEvento": {"titulo": "Breves Comunicacoes"},
@@ -89,14 +89,15 @@ def test_normalize_camara_discursos_page_uses_deputado_index(tmp_path: Path) -> 
         raw_record,
         raw_path=raw_path,
         data_root=tmp_path,
-        deputados_index={"999": {"nome": "Deputada Teste", "siglaPartido": "XYZ", "siglaUf": "RJ"}},
+        deputados_index={"999": {"nome": "Conceição Sampaio", "siglaPartido": "XYZ", "siglaUf": "RJ"}},
     )
 
     assert len(normalized) == 1
     record = normalized[0]
     assert record["source"] == "camara"
     assert record["parlamentar_id"] == "999"
-    assert record["parlamentar_nome"] == "Deputada Teste"
+    assert record["parlamentar_nome"] == "Conceição Sampaio"
+    assert record["texto"] == "A SRA. CONCEIÇÃO SAMPAIO — ação, saúde e Constituição."
     assert record["evento_id"] == "111"
     assert record["texto_status"] == "disponivel"
 

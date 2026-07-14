@@ -85,6 +85,14 @@ Se notebooks forem alterados:
 
 ## 3. Probes oficiais antes da produção
 
+Antes dos probes do Senado, a auditoria `pre` deve ler
+`camara__plenario_discursos.parquet`, persistir `camara_control_pre.csv` e
+bloquear o ciclo se 2015 ou 2016 estiver vazio, se houver `texto_id` ausente ou
+duplicado, se alguma linha estiver sem texto, se nenhum nome/texto preservar
+diacríticos ou se aparecer `�`. Isso verifica explicitamente
+se a lacuna observada também afetou a Câmara, sem iniciar uma nova coleta da
+Câmara.
+
 Repetir e arquivar os probes mensais da janela alvo para `SF` e `CN`. A
 validação deve inspecionar o conteúdo, não apenas o status HTTP.
 
@@ -213,6 +221,8 @@ Comparar a fotografia anterior e a nova:
   idênticos;
 - em 2015–2016, adições, alterações e remoções são listadas por `texto_id`;
 - Câmara é invariável em todos os anos;
+- `camara_control_pre.csv` e `camara_control_post.csv` mantêm as mesmas
+  contagens válidas para 2015 e 2016;
 - nenhum dos sete Parquets esperados desaparece;
 - o manifest de normalização incorpora os `run_id`s históricos novos.
 

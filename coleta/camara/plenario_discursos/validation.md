@@ -74,6 +74,7 @@ Os testes devem cobrir:
 - registro `discursos_page_error` em `metadata/` para paginas persistentes que
   continuam quebrando mesmo com `itens=1`;
 - preservacao de `transcricao` em paginas mensais;
+- preservação exata de nomes e transcrições com diacríticos em UTF-8, sem `�`;
 - escrita mensal exclusivamente em `ano=YYYY/mes=MM/`.
 - aceite da retomada rapida quando o ultimo `partition_started` possui
   `partition_completed`, e recusa quando uma particao da janela permanece

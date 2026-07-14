@@ -21,7 +21,9 @@ from coleta.senado.discursos_historicos import (
 from processamento.reconciliacao_discursos import (
     LAYERS,
     TARGETS,
+    build_camara_control,
     build_reconciliation,
+    camara_control_gates,
     reconcile_discursos,
     reconciliation_gates,
 )
@@ -139,6 +141,42 @@ def test_portal_discovery_follows_all_pages_and_reconciles_houses() -> None:
     assert [item["codigo_pronunciamento"] for item in congress] == ["411219"]
     assert senate_audit["primary_empty_portal_nonempty"]
     assert congress_audit["primary_empty_portal_nonempty"]
+
+
+def test_portal_discovery_probes_page_after_legacy_paginator_repeats_first_page() -> None:
+    index_html = INDEX_HTML.replace(">2</td>", ">3</td>")
+
+    def results_html(codes: list[str], *, total: int = 3, max_page: int | None = None) -> str:
+        rows = "".join(
+            f'<tr><td><a href="/web/atividade/pronunciamentos/-/p/pronunciamento/{code}">'
+            f'30/03/2015</a></td><td>Senado Federal</td><td>PT/RS</td><td>Resumo.</td></tr>'
+            for code in codes
+        )
+        pagination = (
+            '<a href="https://www25.senado.leg.br/web/atividade/pronunciamentos?'
+            f'_pronunciamentos_WAR_atividadeportlet_p={max_page}">Última</a>'
+            if max_page is not None
+            else ""
+        )
+        return f"<p>Total de {total} registros encontrados</p><table>{rows}</table>{pagination}"
+
+    class RepeatingFirstPageClient:
+        def get_text(self, path: str, *, params: dict[str, object] | None = None) -> HttpResult:
+            if path == "web/atividade/pronunciamentos":
+                return HttpResult("https://www25.senado.leg.br/web/atividade/pronunciamentos", 200, {}, index_html)
+            page = parse_qs(urlsplit(path).query).get("_pronunciamentos_WAR_atividadeportlet_p", ["1"])[0]
+            if page == "3":
+                return HttpResult(path, 200, {}, results_html(["414850", "414851"]))
+            return HttpResult(path, 200, {}, results_html(["414849"], max_page=2))
+
+    discovery = discover_portal_pronunciamentos(
+        RepeatingFirstPageClient(), start=date(2015, 3, 1), end=date(2015, 3, 31)
+    )
+
+    assert discovery.expected_count == 3
+    assert discovery.discovered_count == 3
+    assert discovery.duplicate_count == 1
+    assert [page.page for page in discovery.pages] == [1, 1, 2, 3]
 
 
 def test_historical_parity_rejects_primary_identifier_missing_from_portal() -> None:
@@ -282,6 +320,39 @@ def test_reconciliation_classifies_each_loss_and_requires_sentinels() -> None:
     assert gates["sentinels"] is False
 
 
+def test_camara_control_requires_both_target_years_unique_ids_and_text(tmp_path: Path) -> None:
+    parquet_path = (
+        tmp_path
+        / "processed"
+        / "textos_parlamentares"
+        / "v1"
+        / "parquet"
+        / "camara__plenario_discursos.parquet"
+    )
+    parquet_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        [
+            {
+                "texto_id": "camara:2015",
+                "data": "2015-06-01",
+                "texto": "Ação e Constituição em 2015.",
+                "parlamentar_nome": "Conceição Sampaio",
+            },
+            {
+                "texto_id": "camara:2016",
+                "data": "2016-06-01",
+                "texto": "Cidadãs e cidadãos em 2016.",
+                "parlamentar_nome": "Conceição Sampaio",
+            },
+        ]
+    ).to_parquet(parquet_path, index=False)
+
+    control = build_camara_control(tmp_path, phase="pre")
+
+    assert control.set_index("ano")["rows"].to_dict() == {2015: 1, 2016: 1}
+    assert all(camara_control_gates(control).values())
+
+
 def test_reconciliation_writes_required_artifacts_and_passes_complete_chain(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
     speeches = {
@@ -374,6 +445,29 @@ def test_reconciliation_writes_required_artifacts_and_passes_complete_chain(tmp_
         pd.DataFrame([row for row in processed_rows if row["dataset"] == dataset]).to_parquet(
             parquet_root / f"senado__{dataset}.parquet", index=False
         )
+    camara_rows = [
+        {
+            "texto_id": f"camara:plenario_discursos:discurso:{year}",
+            "source": "camara",
+            "dataset": "plenario_discursos",
+            "data": f"{year}-06-01",
+            "texto": f"Ação da Câmara em {year}",
+            "parlamentar_nome": "Conceição Sampaio",
+        }
+        for year in (2015, 2016)
+    ]
+    pd.DataFrame(camara_rows).to_parquet(
+        parquet_root / "camara__plenario_discursos.parquet", index=False
+    )
+    snapshot_rows.extend(
+        {
+            "texto_id": row["texto_id"],
+            "arena": "camara",
+            "data": row["data"],
+            "data_analise": row["data"],
+        }
+        for row in camara_rows
+    )
     snapshot_path = data_root / "analises" / "run" / "00_snapshot" / "discursos_plenario_snapshot.parquet"
     snapshot_path.parent.mkdir(parents=True)
     pd.DataFrame(snapshot_rows).to_parquet(snapshot_path, index=False)
@@ -398,6 +492,8 @@ def test_reconciliation_writes_required_artifacts_and_passes_complete_chain(tmp_
         "coverage_pre.csv",
         "inventory_pre.json",
         "coverage_post.csv",
+        "camara_control_pre.csv",
+        "camara_control_post.csv",
         "inventory_post.json",
         "reconciliation_ids.parquet",
         "source_probes.jsonl",

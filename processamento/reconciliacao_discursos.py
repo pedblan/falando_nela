@@ -74,6 +74,8 @@ def reconcile_discursos(
     coverage = build_coverage(layers, phase=phase)
     gates = reconciliation_gates(reconciliation, snapshot_required=snapshot_path is not None)
     parquet_fingerprints = parquet_scope_fingerprints(data_root)
+    camara_control = build_camara_control(data_root, phase=phase)
+    gates.update(camara_control_gates(camara_control))
     drift = {"compared_to": None, "out_of_scope_changes": []}
     if phase == "post":
         pre_inventory_path = cycle_dir / "inventory_pre.json"
@@ -101,6 +103,9 @@ def reconcile_discursos(
     coverage_path = cycle_dir / f"coverage_{phase}.csv"
     _write_dataframe(coverage, coverage_path)
     outputs = [artifact(coverage_path, rows=len(coverage))]
+    camara_control_path = cycle_dir / f"camara_control_{phase}.csv"
+    _write_dataframe(camara_control, camara_control_path)
+    outputs.append(artifact(camara_control_path, rows=len(camara_control)))
     inventory_path = cycle_dir / f"inventory_{phase}.json"
     inventory = {
         "phase": phase,
@@ -146,6 +151,7 @@ def reconcile_discursos(
             "pre": _coverage_totals(coverage_pre),
             phase: _coverage_totals(coverage),
         },
+        "camara_control": camara_control.to_dict("records"),
         "statuses": reconciliation["status"].value_counts(dropna=False).to_dict(),
         "source_classifications": dict(sorted(classifications.items())),
         "source_classification": (
@@ -479,6 +485,90 @@ def build_coverage(
                         }
                     )
     return pd.DataFrame(rows)
+
+
+def build_camara_control(data_root: Path, *, phase: str) -> pd.DataFrame:
+    path = (
+        data_root
+        / "processed"
+        / "textos_parlamentares"
+        / "v1"
+        / "parquet"
+        / "camara__plenario_discursos.parquet"
+    )
+    frame = pd.read_parquet(path) if path.exists() else pd.DataFrame()
+    dates = (
+        pd.to_datetime(frame["data"], errors="coerce")
+        if "data" in frame
+        else pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns]")
+    )
+    texto_ids = (
+        frame["texto_id"].fillna("").astype(str)
+        if "texto_id" in frame
+        else pd.Series("", index=frame.index, dtype="object")
+    )
+    textos = (
+        frame["texto"].fillna("").astype(str).str.strip()
+        if "texto" in frame
+        else pd.Series("", index=frame.index, dtype="object")
+    )
+    nomes = (
+        frame["parlamentar_nome"].fillna("").astype(str).str.strip()
+        if "parlamentar_nome" in frame
+        else pd.Series("", index=frame.index, dtype="object")
+    )
+    diacritic_text = textos.map(lambda value: any(not character.isascii() for character in value))
+    diacritic_names = nomes.map(lambda value: any(not character.isascii() for character in value))
+    unicode_replacement = textos.str.contains("\ufffd", regex=False) | nomes.str.contains("\ufffd", regex=False)
+    rows: list[dict[str, Any]] = []
+    for year in TARGET_YEARS:
+        selected = dates.dt.year.eq(year)
+        year_ids = texto_ids.loc[selected]
+        year_dates = dates.loc[selected].dropna()
+        rows.append(
+            {
+                "phase": phase,
+                "source": "camara",
+                "dataset": "plenario_discursos",
+                "arena": "camara",
+                "ano": year,
+                "rows": int(selected.sum()),
+                "unique_texto_ids": int(year_ids.loc[year_ids.ne("")].nunique()),
+                "duplicate_texto_ids": int(year_ids.loc[year_ids.ne("")].duplicated().sum()),
+                "missing_texto_ids": int(year_ids.eq("").sum()),
+                "nonempty_text_rows": int(textos.loc[selected].ne("").sum()),
+                "diacritic_text_rows": int(diacritic_text.loc[selected].sum()),
+                "diacritic_name_rows": int(diacritic_names.loc[selected].sum()),
+                "unicode_replacement_rows": int(unicode_replacement.loc[selected].sum()),
+                "min_data": year_dates.min().date().isoformat() if not year_dates.empty else None,
+                "max_data": year_dates.max().date().isoformat() if not year_dates.empty else None,
+                "parquet_path": str(path),
+                "parquet_exists": path.exists(),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def camara_control_gates(frame: pd.DataFrame) -> dict[str, bool]:
+    expected_years = set(TARGET_YEARS)
+    observed_years = set(frame.loc[frame["rows"].gt(0), "ano"]) if not frame.empty else set()
+    return {
+        "camara_2015_2016_present": expected_years.issubset(observed_years),
+        "camara_text_ids_unique": bool(
+            not frame.empty
+            and frame["missing_texto_ids"].eq(0).all()
+            and frame["duplicate_texto_ids"].eq(0).all()
+        ),
+        "camara_text_nonempty": bool(
+            not frame.empty and frame["nonempty_text_rows"].eq(frame["rows"]).all()
+        ),
+        "camara_diacritics_preserved": bool(
+            not frame.empty
+            and frame["diacritic_text_rows"].gt(0).all()
+            and frame["diacritic_name_rows"].gt(0).all()
+            and frame["unicode_replacement_rows"].eq(0).all()
+        ),
+    }
 
 
 def reconciliation_gates(

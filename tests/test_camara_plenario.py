@@ -158,7 +158,7 @@ def test_collect_discursos_deputado_writes_monthly_pages_and_counts_transcricoes
             "dados": [
                 {
                     "dataHoraInicio": "2026-05-02T10:00",
-                    "transcricao": "texto integral do discurso",
+                    "transcricao": "A SRA. CONCEIÇÃO SAMPAIO — ação, saúde e Constituição.",
                     "sumario": "resumo auxiliar",
                     "keywords": "palavras auxiliares",
                 }
@@ -204,7 +204,9 @@ def test_collect_discursos_deputado_writes_monthly_pages_and_counts_transcricoes
     ]
     assert records[0]["periodo"] == {"data_inicio": "2026-05-01", "data_fim": "2026-05-18"}
     assert records[0]["record_type"] == "discursos_page"
-    assert records[0]["payload"]["dados"][0]["transcricao"] == "texto integral do discurso"
+    assert records[0]["payload"]["dados"][0]["transcricao"] == (
+        "A SRA. CONCEIÇÃO SAMPAIO — ação, saúde e Constituição."
+    )
     assert records[0]["payload"]["dados"][0]["sumario"] == "resumo auxiliar"
 
 
