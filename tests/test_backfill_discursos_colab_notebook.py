@@ -21,6 +21,9 @@ def test_backfill_notebook_is_valid_guarded_and_complete() -> None:
         ast.parse(source, filename=f"{NOTEBOOK_PATH.name}:{index}")
 
     combined = "\n".join(code_cells)
+    assert 'REPO_REF = "2015_2016"' in combined
+    assert '"clone", "--branch", REPO_REF, "--single-branch"' in combined
+    assert 'required_module = REPO_DIR / "processamento" / "reconciliacao_discursos.py"' in combined
     for flag in (
         "RODAR_CONFIGURACAO",
         "ATIVAR_CICLO",

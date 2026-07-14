@@ -56,13 +56,42 @@ def build_notebook() -> nbformat.NotebookNode:
             import sys
 
             REPO_URL = "https://github.com/pedblan/falando_nela.git"
+            REPO_REF = "2015_2016"
             REPO_DIR = Path("/content/falando_nela")
             if not REPO_DIR.exists():
-                subprocess.run(["git", "clone", REPO_URL, str(REPO_DIR)], check=True)
+                subprocess.run(
+                    ["git", "clone", "--branch", REPO_REF, "--single-branch", REPO_URL, str(REPO_DIR)],
+                    check=True,
+                )
             else:
-                subprocess.run(["git", "-C", str(REPO_DIR), "pull", "--ff-only"], check=True)
+                dirty = subprocess.check_output(
+                    ["git", "-C", str(REPO_DIR), "status", "--porcelain"], text=True
+                ).strip()
+                assert not dirty, f"Clone efêmero com alterações locais; revise antes de trocar de branch:\\n{dirty}"
+                subprocess.run(["git", "-C", str(REPO_DIR), "fetch", "origin", REPO_REF], check=True)
+                local_refs = subprocess.check_output(
+                    ["git", "-C", str(REPO_DIR), "branch", "--format=%(refname:short)"], text=True
+                ).splitlines()
+                if REPO_REF in local_refs:
+                    subprocess.run(["git", "-C", str(REPO_DIR), "switch", REPO_REF], check=True)
+                else:
+                    subprocess.run(
+                        ["git", "-C", str(REPO_DIR), "switch", "--track", f"origin/{REPO_REF}"],
+                        check=True,
+                    )
+                subprocess.run(
+                    ["git", "-C", str(REPO_DIR), "pull", "--ff-only", "origin", REPO_REF], check=True
+                )
+            current_ref = subprocess.check_output(
+                ["git", "-C", str(REPO_DIR), "branch", "--show-current"], text=True
+            ).strip()
+            assert current_ref == REPO_REF, (current_ref, REPO_REF)
+            required_module = REPO_DIR / "processamento" / "reconciliacao_discursos.py"
+            assert required_module.exists(), f"Módulo ausente em {REPO_REF}: {required_module}"
             subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(REPO_DIR / "requirements.txt")], check=True)
             sys.path.insert(0, str(REPO_DIR))
+            print("Branch carregada:", current_ref)
+            print("Commit:", subprocess.check_output(["git", "-C", str(REPO_DIR), "rev-parse", "HEAD"], text=True).strip())
             """,
             "setup_repository",
         ),
