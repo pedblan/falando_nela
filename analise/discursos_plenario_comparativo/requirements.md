@@ -31,6 +31,10 @@
 - Registrar regra aplicada, hash normalizado, palavras e elegibilidade.
 - Marcar 2026 como YTD e excluir 2026 da elegibilidade anual completa.
 - Manter `arena` e `casa_origem` em colunas distintas.
+- A validação final deve exigir exatamente `camara`, `senado` e `congresso`,
+  mostrar contagens completas por arena-ano e listar anos sem discursos.
+- A célula de validação deve poder ler o snapshot pronto em uma sessão Colab
+  já aberta, sem reinstalar dependências nem reexecutar a etapa 00.
 
 ## Duplicações
 

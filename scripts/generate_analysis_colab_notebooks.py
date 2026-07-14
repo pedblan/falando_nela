@@ -11,6 +11,8 @@ import nbformat
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "notebooks" / "analise"
 REPO_URL = "https://github.com/pedblan/falando_nela.git"
+SNAPSHOT_VALIDATION_CELL_PATH = OUTPUT_DIR / "celulas" / "00_validacao_snapshot.py"
+SNAPSHOT_VALIDATION_CELL = SNAPSHOT_VALIDATION_CELL_PATH.read_text(encoding="utf-8")
 
 
 def md(source: str, key: str) -> nbformat.NotebookNode:
@@ -156,18 +158,7 @@ NOTEBOOKS = [
             else:
                 print("Etapa não executada. Revise o inventário e defina RODAR_ETAPA=True.")
         """,
-        "validate": """
-            import pandas as pd
-
-            SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
-            if SNAPSHOT_PATH.exists():
-                SNAPSHOT_FRAME = pd.read_parquet(SNAPSHOT_PATH)
-                assert set(SNAPSHOT_FRAME["arena"].unique()) <= {"camara", "senado", "congresso"}
-                assert SNAPSHOT_FRAME["data_analise"].min() >= pd.Timestamp("2010-02-02")
-                assert SNAPSHOT_FRAME["data_analise"].max() <= pd.Timestamp("2026-07-13")
-                assert not SNAPSHOT_FRAME.loc[SNAPSHOT_FRAME["ano"].eq(2026), "elegivel_inferencia_anual"].any()
-                display(SNAPSHOT_FRAME.groupby(["arena", "ano"]).size().rename("discursos").tail(12))
-        """,
+        "validate": SNAPSHOT_VALIDATION_CELL,
     },
     {
         "filename": "01_enriquecimento_genero_colab.ipynb",

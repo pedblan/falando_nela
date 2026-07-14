@@ -53,6 +53,23 @@ analises/discursos_plenario/v1/{RUN_ID}/
 O snapshot e o manifest 00 devem ser considerados imutáveis após a revisão. Se
 o corpus ou a configuração mudar, use outro `RUN_ID`.
 
+A validação final do caderno 00 também está disponível como célula autônoma em
+`notebooks/analise/celulas/00_validacao_snapshot.py`. Ela pode ser adicionada
+diretamente a uma sessão Colab que já tenha o Drive montado: usa `RUN_ID`,
+`DATA_ROOT` e `RUN_OUTPUT_ROOT` quando existirem e, caso contrário, aplica os
+valores padrão da análise. Ela apenas lê o snapshot pronto; não reinstala
+dependências nem reexecuta a geração.
+
+Depois de publicar a versão no GitHub, a célula pode ser carregada diretamente
+em um caderno Colab já aberto com uma única célula auxiliar:
+
+```python
+from urllib.request import urlopen
+
+CELL_URL = "https://raw.githubusercontent.com/pedblan/falando_nela/main/notebooks/analise/celulas/00_validacao_snapshot.py"
+exec(compile(urlopen(CELL_URL).read().decode("utf-8"), CELL_URL, "exec"))
+```
+
 ## Marimo e inglês
 
 Os notebooks mantêm lógica substantiva fora das células, IDs Markdown estáveis

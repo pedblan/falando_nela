@@ -5,10 +5,12 @@ import subprocess
 from pathlib import Path
 
 import nbformat
+import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_DIR = ROOT / "notebooks" / "analise"
+SNAPSHOT_VALIDATION_CELL_PATH = NOTEBOOK_DIR / "celulas" / "00_validacao_snapshot.py"
 EXPECTED = [
     "00_snapshot_discursos_plenario_colab.ipynb",
     "01_enriquecimento_genero_colab.ipynb",
@@ -65,6 +67,61 @@ def test_analysis_notebooks_match_generator() -> None:
         check=False,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_snapshot_validation_cell_is_standalone_and_synchronized() -> None:
+    notebook = nbformat.read(NOTEBOOK_DIR / EXPECTED[0], as_version=4)
+    validation_cell = next(
+        cell
+        for cell in notebook.cells
+        if cell.get("metadata", {}).get("falando_nela", {}).get("role") == "validate_stage"
+    )
+    standalone_source = SNAPSHOT_VALIDATION_CELL_PATH.read_text(encoding="utf-8").strip()
+    assert validation_cell.source == standalone_source
+    assert 'globals().get("RUN_ID"' in standalone_source
+    assert 'globals().get("DATA_ROOT"' in standalone_source
+    assert "SNAPSHOT_OBSERVED_ARENAS == set(SNAPSHOT_EXPECTED_ARENAS)" in standalone_source
+    assert "SNAPSHOT_COVERAGE" in standalone_source
+    assert "SNAPSHOT_MISSING_YEARS" in standalone_source
+    assert ".tail(" not in standalone_source
+    ast.parse(standalone_source, filename=str(SNAPSHOT_VALIDATION_CELL_PATH))
+
+
+def test_snapshot_validation_cell_runs_against_existing_artifact(tmp_path: Path) -> None:
+    run_id = "snapshot-validacao-teste"
+    snapshot_path = (
+        tmp_path
+        / "analises"
+        / "discursos_plenario"
+        / "v1"
+        / run_id
+        / "00_snapshot"
+        / "discursos_plenario_snapshot.parquet"
+    )
+    snapshot_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "arena": ["camara", "senado", "congresso", "camara"],
+            "ano": [2010, 2010, 2010, 2026],
+            "data_analise": ["2010-02-02", "2010-02-03", "2010-02-04", "2026-07-13"],
+            "elegivel_inferencia_anual": [True, True, True, False],
+        }
+    ).to_parquet(snapshot_path, index=False)
+
+    displayed: list[pd.DataFrame] = []
+    namespace = {
+        "DATA_ROOT": tmp_path,
+        "RUN_ID": run_id,
+        "display": displayed.append,
+    }
+    source = SNAPSHOT_VALIDATION_CELL_PATH.read_text(encoding="utf-8")
+    exec(compile(source, str(SNAPSHOT_VALIDATION_CELL_PATH), "exec"), namespace)
+
+    assert namespace["SNAPSHOT_PATH"] == snapshot_path
+    assert namespace["SNAPSHOT_OBSERVED_ARENAS"] == {"camara", "senado", "congresso"}
+    assert namespace["SNAPSHOT_COVERAGE"].loc[2010].tolist() == [1, 1, 1]
+    assert namespace["SNAPSHOT_COVERAGE"].loc[2026].tolist() == [1, 0, 0]
+    assert len(displayed) == 2
 
 
 def test_analysis_requirements_pin_colab_binary_stack() -> None:

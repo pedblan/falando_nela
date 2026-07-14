@@ -24,6 +24,11 @@
 - Excluir `2010-02-01` e `2026-07-14`.
 - Excluir fontes, datasets e âmbitos incompatíveis com a arena.
 - Preservar Câmara, Senado e Congresso separadamente.
+- Exigir a presença exata das três arenas, sem aceitar subconjuntos.
+- Mostrar resumo por arena, matriz completa de 2010–2026 e lista explícita de
+  anos sem discursos em cada arena; não truncar a tabela com `tail`.
+- Executar a célula autônoma contra um snapshot já pronto sem reexecutar a
+  geração nem a instalação de dependências.
 - Marcar 2026 YTD e nunca elegível à inferência anual completa.
 - Demonstrar que `texto_original` não muda após um `hard_cut` aprovado.
 - Rejeitar regra não aprovada ou com ação diferente.
