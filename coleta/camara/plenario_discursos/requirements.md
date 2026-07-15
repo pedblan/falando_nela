@@ -123,6 +123,10 @@
   `manifest.autosave.json` devem ser atualizados durante a execucao.
 - `try/except` deve isolar falhas de deputado ou particao sem derrubar o fluxo
   inteiro.
+- Uma falha de deputado ou pagina dentro de um ano impede que aquela particao
+  seja marcada como concluida. O checkpoint deve registrá-la como falha para
+  que o mesmo `run_id --resume` volte a tentar somente essa particao; uma
+  cobertura parcial não pode parecer completa.
 - Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo
   `run_id` e registros ja presentes no JSONL do mesmo `run_id`.
 - A varredura de registros existentes deve emitir progresso no stdout no

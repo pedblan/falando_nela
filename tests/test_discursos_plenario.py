@@ -50,7 +50,12 @@ from analise.discursos_plenario.genero import (
     select_unknown_parliamentarians,
 )
 from analise.discursos_plenario.inferencia import paired_trajectory_correlations
-from analise.discursos_plenario.snapshot import apply_cleaning_rules, build_snapshot, run_snapshot
+from analise.discursos_plenario.snapshot import (
+    apply_cleaning_rules,
+    build_snapshot,
+    coverage_required_years,
+    run_snapshot,
+)
 from analise.discursos_plenario.topicos import balanced_summary_sample
 
 
@@ -215,6 +220,52 @@ def test_run_snapshot_persists_coverage_diagnostics_before_gate_failure(tmp_path
     assert missing.to_dict("records") == [{"arena": "senado", "ano": 2015, "discursos": 0}]
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["coverage_gate"]["passed"] is False
+
+
+def test_snapshot_can_gate_only_explicit_non_contiguous_recovery_years(tmp_path: Path) -> None:
+    config_payload = json.loads(json.dumps(CONFIG.raw))
+    config_payload.update(
+        {
+            "date_start": "2010-01-01",
+            "date_end": "2016-12-31",
+            "complete_year_start": 2015,
+            "complete_year_end": 2016,
+            "ytd_year": 2017,
+            "coverage_required_years": {
+                "camara": [2010, 2015, 2016],
+                "senado": [2010, 2015, 2016],
+                "congresso": [2010, 2015, 2016],
+            },
+        }
+    )
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    config = load_config(config_path)
+    assert coverage_required_years(config)["camara"] == [2010, 2015, 2016]
+
+    for arena in config_payload["arenas"]:
+        path = tmp_path / config_payload["arenas"][arena]["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rows = [
+            _speech(arena=arena, text_id=f"{arena}-{year}", date=f"{year}-02-02", text="texto")
+            for year in [2010, 2015, 2016]
+        ]
+        pd.DataFrame(rows).to_parquet(path, index=False)
+
+    result = run_snapshot(data_root=tmp_path, run_id="non-contiguous", config_path=config_path)
+    assert result["coverage_gate"]["passed"] is True
+    assert result["coverage_gate"]["required_years_by_arena"] == config_payload["coverage_required_years"]
+
+    missing_path = tmp_path / config_payload["arenas"]["camara"]["path"]
+    missing = pd.read_parquet(missing_path)
+    missing = missing.loc[~missing["data"].eq("2010-02-02")]
+    missing.to_parquet(missing_path, index=False)
+    with pytest.raises(ValueError, match="camara/2010"):
+        run_snapshot(
+            data_root=tmp_path,
+            run_id="non-contiguous-missing",
+            config_path=config_path,
+        )
 
 
 def test_gender_candidates_require_evidence_and_human_approval() -> None:

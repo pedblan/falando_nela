@@ -161,6 +161,7 @@ def collect(argv: Sequence[str] | None = None) -> None:
 
                 periodo = {"data_inicio": start.isoformat(), "data_fim": end.isoformat()}
                 try:
+                    partition_errors = 0
                     if periodos_by_deputado:
                         deputados = active_parlamentares_for_window(
                             periodos_by_deputado,
@@ -222,6 +223,7 @@ def collect(argv: Sequence[str] | None = None) -> None:
                                 )
                             except Exception as exc:
                                 errors += 1
+                                partition_errors += 1
                                 status = "completed_with_errors"
                                 run.log(
                                     "deputy_discourses_failed",
@@ -230,7 +232,9 @@ def collect(argv: Sequence[str] | None = None) -> None:
                                 )
                                 continue
                             if stats.get("page_errors", 0):
-                                errors += int(stats["page_errors"])
+                                page_errors = int(stats["page_errors"])
+                                errors += page_errors
+                                partition_errors += page_errors
                                 status = "completed_with_errors"
                             preflight_stats.update(stats["preflight"])
                             processed_deputados += 1
@@ -256,26 +260,30 @@ def collect(argv: Sequence[str] | None = None) -> None:
                                 run.log("deputy_progress", **progress)
                                 run.write_autosave(status="running", active_partition=partition, **progress)
 
-                    run.mark_partition_complete(
-                        partition,
-                        periodo=periodo,
-                        deputados=len(deputados),
-                        deputados_processados=processed_deputados,
-                        paginas_discursos=processed_discourse_pages,
-                        discursos=processed_discourses,
-                        discursos_com_transcricao=processed_transcricoes,
-                        preflight=dict(preflight_stats),
-                    )
-                    run.log(
-                        "partition_completed",
-                        partition=partition,
-                        deputados=len(deputados),
-                        deputados_processados=processed_deputados,
-                        paginas_discursos=processed_discourse_pages,
-                        discursos=processed_discourses,
-                        discursos_com_transcricao=processed_transcricoes,
-                        preflight=dict(preflight_stats),
-                    )
+                    partition_metadata = {
+                        "periodo": periodo,
+                        "deputados": len(deputados),
+                        "deputados_processados": processed_deputados,
+                        "paginas_discursos": processed_discourse_pages,
+                        "discursos": processed_discourses,
+                        "discursos_com_transcricao": processed_transcricoes,
+                        "preflight": dict(preflight_stats),
+                    }
+                    if partition_errors:
+                        run.mark_partition_failed(
+                            partition,
+                            errors=partition_errors,
+                            **partition_metadata,
+                        )
+                        run.log(
+                            "partition_completed_with_errors",
+                            partition=partition,
+                            errors=partition_errors,
+                            **partition_metadata,
+                        )
+                    else:
+                        run.mark_partition_complete(partition, **partition_metadata)
+                        run.log("partition_completed", partition=partition, **partition_metadata)
                 except Exception as exc:
                     errors += 1
                     status = "completed_with_errors"

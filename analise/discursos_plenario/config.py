@@ -74,6 +74,19 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("bootstrap_repetitions deve ser positivo")
     if set(config["arenas"]) != {"camara", "senado", "congresso"}:
         raise ValueError("As arenas devem ser camara, senado e congresso")
+    coverage_years = config.get("coverage_required_years")
+    if coverage_years is not None:
+        if not isinstance(coverage_years, Mapping) or set(coverage_years) != set(config["arenas"]):
+            raise ValueError(
+                "coverage_required_years deve mapear exatamente camara, senado e congresso"
+            )
+        for arena, years in coverage_years.items():
+            if not isinstance(years, list) or not years:
+                raise ValueError(f"coverage_required_years[{arena}] deve ser uma lista não vazia")
+            if any(isinstance(year, bool) or not isinstance(year, int) for year in years):
+                raise ValueError(f"coverage_required_years[{arena}] deve conter apenas anos inteiros")
+            if len(set(years)) != len(years):
+                raise ValueError(f"coverage_required_years[{arena}] não pode repetir anos")
     if len(config["rhetorical_figures"]) != 14:
         raise ValueError("A ontologia deve conter exatamente 14 figuras")
     if len(config["interjection_speech_acts"]) != 10:

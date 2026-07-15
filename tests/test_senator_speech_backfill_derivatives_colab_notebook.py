@@ -44,6 +44,10 @@ def test_derivatives_notebook_is_valid_guarded_and_gated_by_post_audit() -> None
     assert "write_backfill_snapshot_config" in combined
     assert 'config["complete_year_start"] = 2015' in combined
     assert 'config["complete_year_end"] = 2016' in combined
+    assert 'config["coverage_required_years"]' in combined
+    assert "assert_2010_recovery_complete" in combined
+    assert '"camara/plenario_discursos"' in combined
+    assert "TARGET_YEARS = [2010, 2015, 2016]" in combined
     assert "2015" in combined and "2016" in combined
     assert "coleta.senado" not in combined
 

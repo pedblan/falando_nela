@@ -122,6 +122,10 @@ Os testes devem cobrir:
   execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de
   particao, em `failed_partitions` no checkpoint.
+- Erro de deputado ou de página mensal deve deixar o ano em
+  `failed_partitions`, nunca em `completed_partitions`; depois de uma retomada
+  bem-sucedida, a conclusão posterior do mesmo ano é a única autorização para
+  pulá-lo.
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular
   particoes/registros ja gravados desse `run_id`, sem pular particoes
   concluidas por outro `run_id`.

@@ -72,11 +72,12 @@ def build_snapshot(
         snapshot = add_unmatched_temporal_columns(snapshot)
 
     snapshot = snapshot.sort_values(["data_analise", "arena", "texto_id"], kind="stable").reset_index(drop=True)
+    required_years_by_arena = coverage_required_years(config)
     annual_coverage = build_annual_coverage(
         snapshot,
         arenas=list(config.raw["arenas"]),
-        year_start=int(config.raw["complete_year_start"]),
-        year_end=int(config.raw["complete_year_end"]),
+        year_start=min(year for years in required_years_by_arena.values() for year in years),
+        year_end=max(year for years in required_years_by_arena.values() for year in years),
     )
     audits = {
         "duplicate_audit": duplicate_audit,
@@ -84,9 +85,35 @@ def build_snapshot(
         "near_duplicate_candidates": near_duplicates,
         "temporal_join_summary": temporal_join_summary(snapshot),
         "annual_coverage": annual_coverage,
-        "missing_complete_years": missing_annual_coverage(annual_coverage),
+        "missing_complete_years": missing_annual_coverage(
+            annual_coverage,
+            required_years_by_arena=required_years_by_arena,
+        ),
     }
     return snapshot, audits
+
+
+def coverage_required_years(config: AnalysisConfig) -> dict[str, list[int]]:
+    """Return the annual coverage gate, defaulting to the continuous complete range.
+
+    A recovery can require a small, non-contiguous set of years without
+    pretending that the entire interval between them has been repaired.  The
+    analytical eligibility range remains controlled by complete_year_*.
+    """
+
+    configured = config.raw.get("coverage_required_years")
+    if configured is None:
+        years = list(
+            range(
+                int(config.raw["complete_year_start"]),
+                int(config.raw["complete_year_end"]) + 1,
+            )
+        )
+        return {arena: years for arena in config.raw["arenas"]}
+    return {
+        arena: sorted(int(year) for year in years)
+        for arena, years in configured.items()
+    }
 
 
 def prepare_arena_frame(frame: pd.DataFrame, arena: str, config: AnalysisConfig) -> pd.DataFrame:
@@ -393,15 +420,24 @@ def build_annual_coverage(
     return coverage.reset_index()
 
 
-def missing_annual_coverage(coverage: pd.DataFrame) -> pd.DataFrame:
+def missing_annual_coverage(
+    coverage: pd.DataFrame,
+    *,
+    required_years_by_arena: Mapping[str, Sequence[int]] | None = None,
+) -> pd.DataFrame:
     if "ano" not in coverage:
         raise ValueError("Matriz de cobertura sem coluna ano")
     arenas = [column for column in coverage.columns if column != "ano"]
+    required = {
+        arena: {int(year) for year in years}
+        for arena, years in (required_years_by_arena or {}).items()
+    }
     rows = [
         {"arena": arena, "ano": int(row["ano"]), "discursos": int(row[arena])}
         for _, row in coverage.iterrows()
         for arena in arenas
-        if int(row[arena]) == 0
+        if (not required or int(row["ano"]) in required.get(arena, set()))
+        and int(row[arena]) == 0
     ]
     return pd.DataFrame(rows, columns=["arena", "ano", "discursos"])
 
@@ -412,6 +448,7 @@ def validate_annual_coverage(
     arenas: Sequence[str],
     year_start: int,
     year_end: int,
+    required_years_by_arena: Mapping[str, Sequence[int]] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     observed = set(snapshot["arena"].dropna().astype(str).unique())
     expected = set(arenas)
@@ -423,7 +460,7 @@ def validate_annual_coverage(
         year_start=year_start,
         year_end=year_end,
     )
-    missing = missing_annual_coverage(coverage)
+    missing = missing_annual_coverage(coverage, required_years_by_arena=required_years_by_arena)
     if not missing.empty:
         details = ", ".join(
             f"{row.arena}/{int(row.ano)}" for row in missing.itertuples(index=False)
@@ -448,6 +485,7 @@ def run_snapshot(
     periods = read_optional_parquet(paths["parliamentarian_periods"])
     rules = load_cleaning_rules(config, data_root)
     snapshot, audits = build_snapshot(frames, config, parliamentarian_periods=periods, cleaning_rules=rules)
+    required_years_by_arena = coverage_required_years(config)
 
     artifacts: list[dict[str, Any]] = []
     snapshot_path = write_dataframe_atomic(snapshot, output_root / "00_snapshot" / "discursos_plenario_snapshot.parquet")
@@ -483,6 +521,7 @@ def run_snapshot(
         "observed_arenas": sorted(observed_arenas),
         "complete_year_start": int(config.raw["complete_year_start"]),
         "complete_year_end": int(config.raw["complete_year_end"]),
+        "required_years_by_arena": required_years_by_arena,
         "missing": missing_complete_years.to_dict("records"),
     }
     manifest_path = write_json_atomic(output_root / "00_snapshot" / "manifest.json", manifest)

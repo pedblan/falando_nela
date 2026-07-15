@@ -31,6 +31,23 @@ O run incompleto `prod-historico-camara-plenario` e seus artefatos permanecem
 no Drive, fora dos gates desse ciclo. Uma retomada desde 1946 exige tarefa e
 runtime proprios e nao pode bloquear a incorporacao da nova janela.
 
+### Recuperacao Prioritaria De 2010
+
+- A lacuna `camara/2010` deve ser recuperada em um run anual proprio, com
+  `data_inicio=2010-01-01`, `data_fim=2010-12-31` e `run_id` novo. Ela nao
+  deve reutilizar nem apagar o run historico incompleto.
+- A populacao deve ser formada por `parlamentares_periodos` oficial, quando
+  disponivel, usando `parlamentar_id`; o fallback permitido e
+  `GET /api/v2/deputados` no mesmo periodo, que tambem retorna o `id` oficial.
+  Nome nao e chave de descoberta, de deduplicacao ou de validacao.
+- O caderno `09_recuperacao_discursos_plenario_2010_colab.ipynb` registra a
+  quantidade de deputados por id, paginas, discursos e transcricoes. O run so
+  pode seguir aos derivados com `status=completed`, `errors=0`, zero anos
+  falhos e ao menos uma transcricao de 2010.
+- Um snapshot de recuperacao pode exigir explicitamente os anos 2010, 2015 e
+  2016 por arena. Essa exigencia pontual nao declara cobertura dos anos entre
+  eles nem altera a faixa de elegibilidade inferencial completa.
+
 ## Fluxo
 
 1. Particionar o periodo por ano.

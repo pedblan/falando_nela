@@ -42,7 +42,9 @@ def build_notebook() -> nbformat.NotebookNode:
             Este caderno só deve ser executado depois de o caderno 08 concluir
             a reauditoria com cobertura completa. Ele não coleta dados e não
             altera raw: reconstrói os derivados canônicos a partir de todo o
-            raw cumulativo, cria um snapshot imutável e valida 2015 e 2016.
+            raw cumulativo, cria um snapshot imutável e valida 2010, 2015 e
+            2016. Antes disso, o caderno 09 deve ter recuperado Câmara/2010 e
+            auditado a disponibilidade de texto de Congresso/2010.
 
             Não use o caderno 06 para estas etapas. Seus gates dependem dos
             manifests da recuperação histórica anterior, não do backfill
@@ -125,6 +127,10 @@ def build_notebook() -> nbformat.NotebookNode:
                 DATA_ROOT / "operations" / "auditorias" / "discursos_senadores" / AUDIT_ID
             )
             BACKFILL_ID = "backfill-discursos-senadores-por-codigo-2010-20260714"
+            RECOVERY_2010_ID = "backfill-discursos-plenario-2010-20260715"
+            RECOVERY_2010_DIR = (
+                DATA_ROOT / "operations" / "backfills" / "discursos_plenario_2010" / RECOVERY_2010_ID
+            )
             DERIVATION_ID = f"{BACKFILL_ID}-derivados"
             DERIVATION_DIR = (
                 DATA_ROOT / "operations" / "backfills" / "discursos_senadores_por_codigo" / DERIVATION_ID
@@ -138,7 +144,7 @@ def build_notebook() -> nbformat.NotebookNode:
             SNAPSHOT_PATH = SNAPSHOT_DIR / "discursos_plenario_snapshot.parquet"
             SNAPSHOT_MANIFEST = SNAPSHOT_DIR / "manifest.json"
             SNAPSHOT_BASE_CONFIG = REPO_DIR / "analise" / "discursos_plenario" / "config.v1.json"
-            BACKFILL_SNAPSHOT_CONFIG = DERIVATION_DIR / "snapshot_config_2015_2016.json"
+            BACKFILL_SNAPSHOT_CONFIG = DERIVATION_DIR / "snapshot_config_2010_2015_2016.json"
 
             RODAR_DERIVADOS = False
             RODAR_SNAPSHOT = False
@@ -166,9 +172,11 @@ def build_notebook() -> nbformat.NotebookNode:
             from processamento.normalizacao import validate_jsonl_file
 
             TARGETS = {
-                "plenario_discursos": {"arena": "senado", "parquet": "senado__plenario_discursos.parquet"},
-                "congresso_discursos": {"arena": "congresso", "parquet": "senado__congresso_discursos.parquet"},
+                "camara/plenario_discursos": {"arena": "camara", "parquet": "camara__plenario_discursos.parquet"},
+                "senado/plenario_discursos": {"arena": "senado", "parquet": "senado__plenario_discursos.parquet"},
+                "senado/congresso_discursos": {"arena": "congresso", "parquet": "senado__congresso_discursos.parquet"},
             }
+            TARGET_YEARS = [2010, 2015, 2016]
 
             def confirmed():
                 assert CONFIRM_DERIVATION_ID == DERIVATION_ID, (
@@ -206,6 +214,20 @@ def build_notebook() -> nbformat.NotebookNode:
                 assert set(summary["coverage_status_counts"]) == {"complete"}, summary
                 return summary
 
+            def assert_2010_recovery_complete():
+                summary_path = RECOVERY_2010_DIR / "summary.json"
+                assert summary_path.exists(), (
+                    "Execute e valide primeiro o caderno 09: " + str(summary_path)
+                )
+                summary = load_json(summary_path)
+                congress = summary.get("congresso_2010", {})
+                camara = summary.get("camara_2010", {})
+                assert congress.get("textos_disponiveis", 0) > 0, congress
+                assert camara.get("discursos", 0) > 0, camara
+                assert camara.get("discursos_com_transcricao", 0) > 0, camara
+                assert camara.get("deputados_por_id", 0) > 0, camara
+                return summary
+
             def processed_manifest_path():
                 return DATA_ROOT / "processed" / "manifests" / f"{PROCESSED_RUN_ID}.json"
 
@@ -239,6 +261,9 @@ def build_notebook() -> nbformat.NotebookNode:
                 config = load_json(SNAPSHOT_BASE_CONFIG)
                 config["complete_year_start"] = 2015
                 config["complete_year_end"] = 2016
+                config["coverage_required_years"] = {
+                    arena: TARGET_YEARS for arena in config["arenas"]
+                }
                 DERIVATION_DIR.mkdir(parents=True, exist_ok=True)
                 BACKFILL_SNAPSHOT_CONFIG.write_text(
                     json.dumps(config, ensure_ascii=False, indent=2, sort_keys=True) + chr(10),
@@ -273,10 +298,12 @@ def build_notebook() -> nbformat.NotebookNode:
         code(
             """
             audit = assert_post_audit_complete()
+            recovery_2010 = assert_2010_recovery_complete()
             display({
                 "audit_id": AUDIT_ID,
                 "missing_ids": audit["missing_ids"],
                 "coverage_status_counts": audit["coverage_status_counts"],
+                "recovery_2010": recovery_2010,
             })
             """,
             "verify_post_audit",
@@ -295,6 +322,7 @@ def build_notebook() -> nbformat.NotebookNode:
             if RODAR_DERIVADOS:
                 confirmed()
                 assert_post_audit_complete()
+                assert_2010_recovery_complete()
                 normalized = run_command([
                     sys.executable, "-u", "-m", "processamento.normalizacao",
                     "--mode", "prod", "--data-root", str(DATA_ROOT),
@@ -325,9 +353,10 @@ def build_notebook() -> nbformat.NotebookNode:
 
             O snapshot recebe um run_id novo e imutável. Reexecutá-lo com a
             mesma confirmação substitui somente esse snapshot, nunca raw ou a
-            fotografia current. A cobertura exigida nesta rodada é 2015 e
-            2016: lacunas de outros anos ou casas permanecem reportáveis, mas
-            não escondem o aceite específico do backfill de Senado/Congresso.
+            fotografia current. A cobertura exigida nesta rodada é 2010, 2015
+            e 2016 em Câmara, Senado e Congresso. O arquivo de configuração
+            registra esses anos de forma explícita, sem alegar que todos os
+            anos intermediários foram reparados.
             """
         ),
         code(
@@ -335,6 +364,7 @@ def build_notebook() -> nbformat.NotebookNode:
             if RODAR_SNAPSHOT:
                 confirmed()
                 assert_post_audit_complete()
+                assert_2010_recovery_complete()
                 assert_derivatives_complete()
                 from analise.discursos_plenario.snapshot import run_snapshot
 
@@ -363,8 +393,8 @@ def build_notebook() -> nbformat.NotebookNode:
             ## Validação final
 
             Esta etapa confirma a auditoria pós-backfill, a fotografia
-            processed, os Parquets-alvo e a cobertura do novo snapshot em 2015
-            e 2016. Ela também deixa um summary auditável no Drive.
+            processed, os Parquets-alvo e a cobertura do novo snapshot em 2010,
+            2015 e 2016. Ela também deixa um summary auditável no Drive.
             """
         ),
         code(
@@ -372,6 +402,7 @@ def build_notebook() -> nbformat.NotebookNode:
             if VALIDAR_RESULTADOS:
                 confirmed()
                 audit = assert_post_audit_complete()
+                recovery_2010 = assert_2010_recovery_complete()
                 processed, parquet_manifest = assert_derivatives_complete()
                 assert SNAPSHOT_PATH.exists() and SNAPSHOT_MANIFEST.exists()
                 snapshot_manifest = load_json(SNAPSHOT_MANIFEST)
@@ -384,14 +415,14 @@ def build_notebook() -> nbformat.NotebookNode:
                     )
                     frame = pd.read_parquet(parquet_path)
                     assert frame["texto_id"].is_unique, parquet_path
-                    for year in [2015, 2016]:
+                    for year in TARGET_YEARS:
                         rows = frame.loc[pd.to_numeric(frame["ano"], errors="coerce").eq(year)]
                         assert not rows.empty, (dataset, year)
                         target_coverage.append({"layer": "parquet", "dataset": dataset, "year": year, "rows": int(len(rows))})
 
                 snapshot = pd.read_parquet(SNAPSHOT_PATH)
                 for dataset, target in TARGETS.items():
-                    for year in [2015, 2016]:
+                    for year in TARGET_YEARS:
                         rows = snapshot.loc[
                             snapshot["arena"].eq(target["arena"])
                             & pd.to_numeric(snapshot["ano"], errors="coerce").eq(year)
@@ -401,6 +432,7 @@ def build_notebook() -> nbformat.NotebookNode:
 
                 summary_path = write_summary({
                     "audit_summary": str(AUDIT_DIR / "senator_endpoint_summary.json"),
+                    "recovery_2010_summary": str(RECOVERY_2010_DIR / "summary.json"),
                     "processed_manifest": str(processed_manifest_path()),
                     "parquet_manifest": str(parquet_manifest_path()),
                     "snapshot_manifest": str(SNAPSHOT_MANIFEST),
