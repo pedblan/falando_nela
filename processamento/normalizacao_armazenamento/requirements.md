@@ -32,6 +32,11 @@ versionada, rastreavel e pronta para cadernos analiticos.
 
 ## Saida
 
+- Gravar cada JSONL processed primeiro como arquivo parcial; publicar seu nome
+  final e o manifest somente depois de fechar e validar cada linha JSON.
+  Arquivos parciais não são entrada de Parquet e uma nova execução com
+  overwrite os remove.
+
 - Em ciclos temporais, manter uma fotografia canonica regeneravel identificada
   por `run_id`s terminados em `-current`; a entrada continua sendo todo o raw
   cumulativo, salvo filtro explicitamente registrado no manifest.

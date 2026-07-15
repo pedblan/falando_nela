@@ -40,6 +40,7 @@ def test_derivatives_notebook_is_valid_guarded_and_gated_by_post_audit() -> None
     assert '"--overwrite"' in combined
     assert "senator_endpoint_summary.json" in combined
     assert "missing_ids" in combined
+    assert "validate_jsonl_file" in combined
     assert "2015" in combined and "2016" in combined
     assert "coleta.senado" not in combined
 

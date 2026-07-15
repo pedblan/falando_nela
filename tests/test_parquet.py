@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 
 from processamento.normalizacao import DATASET_VERSION, PROCESSED_FIELDS
 from processamento.parquet import resolve_parquet_paths, write_parquet_by_dataset
@@ -90,6 +91,20 @@ def test_resolve_parquet_paths_uses_distinct_colab_and_local_sample_roots() -> N
     assert colab_output == Path("/content/drive/MyDrive/falando_nela/data/processed/textos_parlamentares/v1/parquet")
     assert colab_manifest == Path("/content/drive/MyDrive/falando_nela/data/processed/manifests/processed-textos-v1-20260522-parquet.json")
     assert colab_run_id == "processed-textos-v1-20260522-parquet"
+
+
+def test_write_parquet_rejects_invalid_processed_jsonl(tmp_path: Path) -> None:
+    input_root = tmp_path / "processed" / "textos_parlamentares" / "v1"
+    invalid_path = input_root / "ano=2026" / "mes=05" / "invalid.jsonl"
+    invalid_path.parent.mkdir(parents=True)
+    invalid_path.write_text('{"texto_id": "truncado"', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="JSONL processed inválido"):
+        write_parquet_by_dataset(
+            input_root=input_root,
+            output_root=input_root / "parquet",
+            overwrite=True,
+        )
 
 
 def _processed_row(

@@ -57,5 +57,7 @@
   processed-textos-v1-current e overwrite, sem raw-run-id.
 - A conversão Parquet usa o perfil colab, o mesmo data-root, run-id
   parquet-textos-v1-current e overwrite.
+- Processed e Parquet só são aceitos depois da validação integral dos JSONLs
+  processed; linha inválida é falha, não registro ignorável.
 - O snapshot usa um analysis run id exclusivo do backfill e pode ser refeito
   com overwrite sem alterar raw ou a fotografia current.

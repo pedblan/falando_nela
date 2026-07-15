@@ -152,7 +152,14 @@ def normalize_data_root(
     output_root = data_root / "processed" / DATASET_NAME / DATASET_VERSION
     manifest_path = data_root / "processed" / "manifests" / f"{run_id}.json"
 
-    existing_outputs = list(output_root.rglob(f"{run_id}.jsonl")) if output_root.exists() else []
+    existing_outputs = (
+        [
+            *output_root.rglob(f"{run_id}.jsonl"),
+            *output_root.rglob(f"{run_id}.jsonl.partial"),
+        ]
+        if output_root.exists()
+        else []
+    )
     if manifest_path.exists():
         existing_outputs.append(manifest_path)
     if existing_outputs and not overwrite:
@@ -171,6 +178,7 @@ def normalize_data_root(
     skipped_counts: Counter[str] = Counter()
     written = 0
 
+    completed = False
     try:
         for raw_path in raw_paths:
             if limit_records is not None and written >= limit_records:
@@ -215,8 +223,9 @@ def normalize_data_root(
                     seen_text_ids.add(text_id)
                     output_record_counts[f"{record['source']}/{record['dataset']}"] += 1
                     written += 1
+        completed = True
     finally:
-        output_files = writer.close()
+        output_files = writer.close(commit=completed)
 
     manifest = {
         "run_id": run_id,
@@ -341,16 +350,52 @@ class PartitionedJsonlWriter:
         handle = self._handles.get(path)
         if handle is None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            handle = path.open("a", encoding="utf-8")
+            handle = self._partial_path(path).open("a", encoding="utf-8")
             self._handles[path] = handle
-            self._output_files.add(str(path))
         handle.write(json.dumps(record, ensure_ascii=False, sort_keys=False, default=str) + "\n")
 
-    def close(self) -> list[str]:
-        for handle in self._handles.values():
-            handle.close()
-        self._handles.clear()
-        return sorted(self._output_files)
+    def close(self, *, commit: bool = True) -> list[str]:
+        try:
+            for handle in self._handles.values():
+                handle.flush()
+                try:
+                    os.fsync(handle.fileno())
+                except OSError:
+                    pass
+                handle.close()
+            if not commit:
+                for path in self._handles:
+                    self._partial_path(path).unlink(missing_ok=True)
+                return []
+
+            for path in self._handles:
+                validate_jsonl_file(self._partial_path(path))
+            for path in self._handles:
+                os.replace(self._partial_path(path), path)
+                self._output_files.add(str(path))
+            return sorted(self._output_files)
+        finally:
+            self._handles.clear()
+
+    @staticmethod
+    def _partial_path(path: Path) -> Path:
+        return path.with_name(f"{path.name}.partial")
+
+
+def validate_jsonl_file(path: Path) -> int:
+    records = 0
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"JSONL inválido em {path}, linha {line_number}") from exc
+            if not isinstance(value, dict):
+                raise ValueError(f"Registro JSONL não é objeto em {path}, linha {line_number}")
+            records += 1
+    return records
 
 
 def _normalize_senado_pronunciamento(record: dict[str, Any], *, raw_path: Path, data_root: Path) -> dict[str, Any]:

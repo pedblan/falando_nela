@@ -4,7 +4,13 @@ import json
 import os
 from pathlib import Path
 
-from processamento.normalizacao import normalize_data_root, normalize_raw_record
+import pytest
+
+from processamento.normalizacao import (
+    PartitionedJsonlWriter,
+    normalize_data_root,
+    normalize_raw_record,
+)
 
 
 def test_normalize_senado_pronunciamento(tmp_path: Path) -> None:
@@ -152,6 +158,39 @@ def test_normalize_data_root_can_filter_raw_run_ids(tmp_path: Path) -> None:
     assert manifest["raw_run_id_filter"] == ["new-run"]
     assert manifest["skipped_counts"]["raw_run_id_filtered"] == 1
     assert rows[0]["texto"] == "Texto novo"
+
+
+def test_partitioned_writer_only_publishes_completed_jsonl(tmp_path: Path) -> None:
+    writer = PartitionedJsonlWriter(output_root=tmp_path, run_id="atomic")
+    writer.write({"ano": "2026", "mes": "05", "texto_id": "texto-1"})
+
+    final_path = tmp_path / "ano=2026" / "mes=05" / "atomic.jsonl"
+    partial_path = final_path.with_name("atomic.jsonl.partial")
+    assert partial_path.exists()
+    assert not final_path.exists()
+
+    writer.close(commit=True)
+
+    assert final_path.exists()
+    assert not partial_path.exists()
+    assert json.loads(final_path.read_text(encoding="utf-8"))["texto_id"] == "texto-1"
+
+
+def test_partitioned_writer_rejects_invalid_partial_without_publishing(tmp_path: Path) -> None:
+    writer = PartitionedJsonlWriter(output_root=tmp_path, run_id="invalid")
+    writer.write({"ano": "2026", "mes": "05", "texto_id": "texto-1"})
+
+    final_path = tmp_path / "ano=2026" / "mes=05" / "invalid.jsonl"
+    partial_path = final_path.with_name("invalid.jsonl.partial")
+    handle = writer._handles[final_path]
+    handle.flush()
+    with partial_path.open("a", encoding="utf-8") as extra:
+        extra.write('{"texto_id": "truncado"')
+
+    with pytest.raises(ValueError, match="JSONL inválido"):
+        writer.close(commit=True)
+
+    assert not final_path.exists()
 
 
 def _camara_discursos_record(run_id: str, texto: str) -> dict[str, object]:

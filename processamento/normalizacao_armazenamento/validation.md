@@ -62,6 +62,10 @@ python -m processamento.normalizacao --mode dev --run-id smoke-processed-v1 --ov
   - `raw_run_id_filter`, quando usado;
   - duplicatas, se houver reexecucoes sobre a mesma unidade textual.
 
+Cada JSONL processed do run deve ser decodificável linha a linha; JSONL
+inválido reprova a normalização e a conversão Parquet, sem descarte silencioso
+de registros.
+
 ## Inspecao de saida
 
 Verificar que ha arquivos em:

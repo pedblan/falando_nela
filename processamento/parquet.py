@@ -258,15 +258,16 @@ def iter_processed_jsonl_paths(input_root: Path, *, output_root: Path | None = N
 
 def iter_jsonl_records(path: Path) -> Iterator[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
+        for line_number, line in enumerate(handle, start=1):
             if not line.strip():
                 continue
             try:
                 value = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, dict):
-                yield value
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"JSONL processed inválido em {path}, linha {line_number}") from exc
+            if not isinstance(value, dict):
+                raise ValueError(f"Registro processed não é objeto em {path}, linha {line_number}")
+            yield value
 
 
 class _DatasetParquetWriter:

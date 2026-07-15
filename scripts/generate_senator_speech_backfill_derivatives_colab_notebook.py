@@ -162,6 +162,7 @@ def build_notebook() -> nbformat.NotebookNode:
 
             import pandas as pd
             from IPython.display import display
+            from processamento.normalizacao import validate_jsonl_file
 
             TARGETS = {
                 "plenario_discursos": {"arena": "senado", "parquet": "senado__plenario_discursos.parquet"},
@@ -216,6 +217,14 @@ def build_notebook() -> nbformat.NotebookNode:
                 assert processed["run_id"] == PROCESSED_RUN_ID, processed
                 assert processed["raw_run_id_filter"] == [], processed
                 assert processed["output_records"] > 0, processed
+                processed_root = DATA_ROOT / "processed" / "textos_parlamentares" / "v1"
+                processed_paths = sorted(processed_root.rglob(f"{PROCESSED_RUN_ID}.jsonl"))
+                assert processed_paths, processed_root
+                valid_processed_records = sum(validate_jsonl_file(path) for path in processed_paths)
+                assert valid_processed_records == processed["output_records"], {
+                    "valid_processed_records": valid_processed_records,
+                    "manifest_output_records": processed["output_records"],
+                }
                 assert parquet["run_id"] == f"{PARQUET_RUN_ID}-parquet", parquet
                 assert parquet["output_records"] > 0, parquet
                 for dataset, target in TARGETS.items():
