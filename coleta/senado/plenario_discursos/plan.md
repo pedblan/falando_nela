@@ -73,6 +73,11 @@ senadores por legislatura, consulta discursos por CodigoParlamentar e compara
 CodigoPronunciamento com o raw. É uma auditoria separada, sem escrita no
 corpus; nomes não participam da descoberta nem da comparação.
 
+Quando essa auditoria produzir senator_endpoint_missing_ids.jsonl, recuperar
+somente sua população com coleta.senado.backfill_discursos_por_codigo. A chave
+da recuperação é CodigoPronunciamento; CodigoParlamentar permanece como
+proveniência. A reauditoria require-complete é obrigatória antes de derivados.
+
 ## Saidas
 
 - `data/raw/senado/plenario_discursos/metadata/{run_id}.jsonl`: listas mensais brutas, somente `discursos_periodo_metadata`.

@@ -20,6 +20,11 @@ Arquivos atuais:
   2010. Consulta exclusivamente por CodigoParlamentar, compara com o raw e não
   altera bases ou derivados.
 
+- 08_backfill_discursos_senadores_por_codigo_2010_colab.ipynb: recuperação
+  exclusiva da população apontada pelo caderno 07. Baixa cada texto pelo
+  CodigoPronunciamento, preserva o CodigoParlamentar como proveniência e exige
+  reauditoria completa antes de derivados.
+
 - `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
   histórico dedicado que audita a lacuna, executa as duas coletas com
   `historical-official`, regenera os derivados cumulativos e fecha a

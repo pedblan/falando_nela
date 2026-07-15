@@ -31,6 +31,9 @@
   representar deputados ou autoridades.
 - A auditoria não substitui a descoberta por sessões ou índice oficial para
   completar autores não senadores.
+- A recuperação de IDs CN da auditoria deve usar
+  coleta.senado.backfill_discursos_por_codigo, com CodigoPronunciamento como
+  chave e a origem CodigoParlamentar preservada no payload.
 
 ## Separacao de dados
 

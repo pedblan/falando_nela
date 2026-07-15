@@ -13,6 +13,11 @@ janela explícita e exigir que não haja erros, conflitos ou JSONL inválido. A
 presença de IDs ausentes é diagnóstico, não autorização para regenerar
 derivados.
 
+Para recuperar a população da auditoria, use o caderno
+08_backfill_discursos_senadores_por_codigo_2010_colab.ipynb. Exigir manifest
+completed sem errors e, depois de SF e CN, reauditoria strict
+require-complete antes de processar derivados.
+
 ## Smoke Local
 
 ```bash

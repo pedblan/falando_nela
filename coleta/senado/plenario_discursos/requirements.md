@@ -41,6 +41,10 @@
   inventário, cobertura, erros, conflitos e IDs ausentes.
 - Uma lacuna só pode entrar em backfill após estar listada no artefato
   senator_endpoint_missing_ids.jsonl.
+- Esse backfill deve chamar coleta.senado.backfill_discursos_por_codigo e
+  baixar por CodigoPronunciamento; nomes não podem ser usados como chave.
+- Cada texto recuperado deve preservar missing_path, CodigoParlamentar e data
+  da auditoria em metadata.senator_endpoint_backfill.
 
 ## Dependencias
 

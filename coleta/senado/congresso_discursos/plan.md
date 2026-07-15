@@ -46,6 +46,11 @@ Congresso: deputados e autoridades podem aparecer somente no raw ou na
 descoberta de sessões. Assim, somente IDs da fonte por senador ausentes do raw
 são lacunas; IDs adicionais no raw são informativos.
 
+Essas lacunas devem usar coleta.senado.backfill_discursos_por_codigo com house
+CN e a população fechada senator_endpoint_missing_ids.jsonl. A chave é
+CodigoPronunciamento; CodigoParlamentar é somente proveniência. Isso completa
+senadores sem substituir a descoberta de deputados e autoridades.
+
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.

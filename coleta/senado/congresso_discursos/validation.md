@@ -6,6 +6,10 @@ Para a auditoria histórica, validar separadamente que IDs por senador ausentes
 no raw são reportados em senator_endpoint_missing_ids.jsonl; não aceitar IDs
 adicionais do raw como falha, pois CN também tem autores não senadores.
 
+Os IDs ausentes devem ser recuperados pelo caderno
+08_backfill_discursos_senadores_por_codigo_2010_colab.ipynb e só podem seguir
+para derivados após reauditoria strict require-complete.
+
 ## Smoke test
 
 ```bash
