@@ -61,6 +61,34 @@ def test_normalize_senado_pronunciamento(tmp_path: Path) -> None:
     assert record["raw_path"] == "raw/senado/plenario_discursos/ano=2026/mes=05/run.jsonl"
 
 
+def test_normalize_senado_pronunciamento_uses_data_pronunciamento(tmp_path: Path) -> None:
+    raw_path = tmp_path / "raw" / "senado" / "congresso_discursos" / "ano=2010" / "mes=03" / "run.jsonl"
+    raw_path.parent.mkdir(parents=True)
+    raw_record = {
+        "run_id": "backfill-cn",
+        "source": "senado",
+        "dataset": "congresso_discursos",
+        "record_type": "pronunciamento_texto",
+        "source_id": "CN:pronunciamento:456",
+        "partition": "2010-03",
+        "payload": {
+            "codigo_pronunciamento": "456",
+            "texto": "Texto recuperado.",
+            "metadata": {
+                "sessao": {},
+                "pronunciamento": {"DataPronunciamento": "2010-03-10"},
+            },
+            "fontes": {},
+        },
+    }
+
+    normalized = normalize_raw_record(raw_record, raw_path=raw_path, data_root=tmp_path)
+
+    assert normalized[0]["data"] == "2010-03-10"
+    assert normalized[0]["ano"] == "2010"
+    assert normalized[0]["mes"] == "03"
+
+
 def test_normalize_camara_discursos_page_uses_deputado_index(tmp_path: Path) -> None:
     raw_path = tmp_path / "raw" / "camara" / "plenario_discursos" / "ano=2026" / "mes=05" / "run.jsonl"
     raw_path.parent.mkdir(parents=True)

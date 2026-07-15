@@ -406,7 +406,15 @@ def _normalize_senado_pronunciamento(record: dict[str, Any], *, raw_path: Path, 
     fontes = _dict(payload.get("fontes"))
     dataset = str(record.get("dataset"))
     codigo = _string(payload.get("codigo_pronunciamento") or payload.get("CodigoPronunciamento") or record.get("source_id"))
-    data = _date_part(_first(pronunciamento, "Data", "data")) or _date_part(_first(sessao, "DataSessao", "dataSessao"))
+    data = _date_part(
+        _first(
+            pronunciamento,
+            "Data",
+            "data",
+            "DataPronunciamento",
+            "dataPronunciamento",
+        )
+    ) or _date_part(_first(sessao, "DataSessao", "dataSessao"))
     casa = "Congresso Nacional" if dataset == "congresso_discursos" else "Senado Federal"
     ambito = "congresso" if dataset == "congresso_discursos" else "plenario"
     orgao_sigla = "CN" if dataset == "congresso_discursos" else "SF"

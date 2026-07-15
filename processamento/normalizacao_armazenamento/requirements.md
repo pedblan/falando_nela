@@ -96,6 +96,9 @@ versionada, rastreavel e pronta para cadernos analiticos.
 
 ## Normalizacao minima
 
+Para pronunciamentos do Senado, aceitar a data oficial tanto em Data quanto em
+DataPronunciamento antes de recorrer à partição mensal.
+
 Cada registro processado deve expor campos comuns para:
 
 - fonte, casa, dataset, ambito e orgao;

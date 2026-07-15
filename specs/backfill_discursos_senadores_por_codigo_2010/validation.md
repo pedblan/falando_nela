@@ -40,3 +40,5 @@ CONFIRM_DERIVATION_ID com DERIVATION_ID.
 
 O summary final deve registrar o checksum do snapshot e cobertura positiva em
 2015 e 2016 para os Parquets e snapshot de Senado e Congresso.
+Falhas de cobertura fora desse escopo devem ser registradas para tratamento
+separado, sem declarar que a Câmara ou outro dataset foi corrigido.

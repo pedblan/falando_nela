@@ -48,3 +48,6 @@ parquet-textos-v1-current a partir de todo o raw cumulativo, sem filtrar pelos
 dois runs de backfill. Criar um snapshot novo e validar que os Parquets e o
 snapshot contêm linhas de Senado e Congresso em 2015 e 2016. Essa etapa usa o
 caderno de processamento 07 e não reutiliza os gates do caderno 06.
+O snapshot preserva a janela analítica base, mas aplica gate anual somente a
+2015 e 2016. Ausências de outras casas ou anos são achados separados e não
+podem bloquear nem ser confundidas com o aceite deste backfill.

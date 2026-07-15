@@ -61,3 +61,6 @@
   processed; linha inválida é falha, não registro ignorável.
 - O snapshot usa um analysis run id exclusivo do backfill e pode ser refeito
   com overwrite sem alterar raw ou a fotografia current.
+- A configuração do snapshot é copiada para os artefatos da derivação com
+  complete_year_start igual a 2015 e complete_year_end igual a 2016. A janela
+  de análise e os dados de todas as arenas são preservados.

@@ -137,7 +137,8 @@ def build_notebook() -> nbformat.NotebookNode:
             )
             SNAPSHOT_PATH = SNAPSHOT_DIR / "discursos_plenario_snapshot.parquet"
             SNAPSHOT_MANIFEST = SNAPSHOT_DIR / "manifest.json"
-            SNAPSHOT_CONFIG = REPO_DIR / "analise" / "discursos_plenario" / "config.v1.json"
+            SNAPSHOT_BASE_CONFIG = REPO_DIR / "analise" / "discursos_plenario" / "config.v1.json"
+            BACKFILL_SNAPSHOT_CONFIG = DERIVATION_DIR / "snapshot_config_2015_2016.json"
 
             RODAR_DERIVADOS = False
             RODAR_SNAPSHOT = False
@@ -145,7 +146,7 @@ def build_notebook() -> nbformat.NotebookNode:
             CONFIRM_DERIVATION_ID = ""
 
             assert DATA_ROOT.exists(), DATA_ROOT
-            assert SNAPSHOT_CONFIG.exists(), SNAPSHOT_CONFIG
+            assert SNAPSHOT_BASE_CONFIG.exists(), SNAPSHOT_BASE_CONFIG
             print("Auditoria:", AUDIT_DIR)
             print("Derivação:", DERIVATION_DIR)
             print("Snapshot:", SNAPSHOT_PATH)
@@ -234,6 +235,17 @@ def build_notebook() -> nbformat.NotebookNode:
                     assert parquet_path.exists(), parquet_path
                 return processed, parquet
 
+            def write_backfill_snapshot_config():
+                config = load_json(SNAPSHOT_BASE_CONFIG)
+                config["complete_year_start"] = 2015
+                config["complete_year_end"] = 2016
+                DERIVATION_DIR.mkdir(parents=True, exist_ok=True)
+                BACKFILL_SNAPSHOT_CONFIG.write_text(
+                    json.dumps(config, ensure_ascii=False, indent=2, sort_keys=True) + chr(10),
+                    encoding="utf-8",
+                )
+                return BACKFILL_SNAPSHOT_CONFIG
+
             def sha256_file(path):
                 digest = hashlib.sha256()
                 with Path(path).open("rb") as handle:
@@ -313,7 +325,9 @@ def build_notebook() -> nbformat.NotebookNode:
 
             O snapshot recebe um run_id novo e imutável. Reexecutá-lo com a
             mesma confirmação substitui somente esse snapshot, nunca raw ou a
-            fotografia current.
+            fotografia current. A cobertura exigida nesta rodada é 2015 e
+            2016: lacunas de outros anos ou casas permanecem reportáveis, mas
+            não escondem o aceite específico do backfill de Senado/Congresso.
             """
         ),
         code(
@@ -324,10 +338,11 @@ def build_notebook() -> nbformat.NotebookNode:
                 assert_derivatives_complete()
                 from analise.discursos_plenario.snapshot import run_snapshot
 
+                snapshot_config = write_backfill_snapshot_config()
                 result = run_snapshot(
                     data_root=DATA_ROOT,
                     run_id=ANALYSIS_RUN_ID,
-                    config_path=SNAPSHOT_CONFIG,
+                    config_path=snapshot_config,
                     overwrite=True,
                 )
                 assert result["coverage_gate"]["passed"], result["coverage_gate"]
@@ -335,6 +350,7 @@ def build_notebook() -> nbformat.NotebookNode:
                 display({
                     "snapshot": str(archive(SNAPSHOT_PATH)),
                     "manifest": str(archive(SNAPSHOT_MANIFEST)),
+                    "config": str(archive(snapshot_config)),
                     "rows_by_arena": result["counts"]["rows_by_arena"],
                 })
             else:
@@ -388,6 +404,7 @@ def build_notebook() -> nbformat.NotebookNode:
                     "processed_manifest": str(processed_manifest_path()),
                     "parquet_manifest": str(parquet_manifest_path()),
                     "snapshot_manifest": str(SNAPSHOT_MANIFEST),
+                    "snapshot_config": str(BACKFILL_SNAPSHOT_CONFIG),
                     "snapshot_sha256": sha256_file(SNAPSHOT_PATH),
                     "target_coverage": target_coverage,
                 })

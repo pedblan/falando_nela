@@ -88,6 +88,9 @@ Conferir uma linha JSONL e confirmar campos essenciais:
 
 ## Validacao por familia textual
 
+- Pronunciamentos recuperados pela auditoria de senadores, cujo payload usa
+  DataPronunciamento, devem manter dia, ano e mês oficiais no processed.
+
 - Discursos do Senado devem preencher `pronunciamento_id` e, quando disponivel,
   `parlamentar_nome`, `parlamentar_partido` e `parlamentar_uf`.
 - Discursos da Camara devem usar o mapa de deputados de `metadata/` para
