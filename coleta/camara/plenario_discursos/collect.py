@@ -33,6 +33,7 @@ PAGE_ERROR_RECORD_TYPE = "discursos_page_error"
 DEPUTY_COMPLETE_CHECKPOINT_KIND = "discursos_deputado_complete"
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 FAST_FALLBACK_STATUS_CODES = {500}
+CAMARA_MIN_INTERVAL_SECONDS = 0.2
 
 
 def collect(argv: Sequence[str] | None = None) -> None:
@@ -152,7 +153,7 @@ def collect(argv: Sequence[str] | None = None) -> None:
     )
 
     try:
-        with OpenDataClient(BASE_URL) as client:
+        with OpenDataClient(BASE_URL, min_interval_seconds=CAMARA_MIN_INTERVAL_SECONDS) as client:
             for partition, start, end in windows:
                 if runtime.sample_limit is not None and not runtime.sample and processed_deputados >= runtime.sample_limit:
                     break
@@ -752,7 +753,12 @@ def _collect_discursos_probe(
     path = f"api/v2/deputados/{deputado_id}/discursos"
     params = _discursos_params(start.isoformat(), end.isoformat(), itens=1, ordered=True)
     source_id = f"deputado:{deputado_id}:discursos:{probe_label}:{partition}"
-    already_recorded = run.has_record(source_id=source_id, record_type=record_type)
+    cached = _cached_result(run, source_id=source_id, record_type=record_type)
+    if cached is not None:
+        result, _request = cached
+        status = "positive" if _dados(result.data) else "zero"
+        run.log("record_resume_reused", source_id=source_id, record_type=record_type)
+        return status, False
     request_params = params
     strategy = "default"
     try:
@@ -774,9 +780,6 @@ def _collect_discursos_probe(
         result = _get_json_once(client, path, params=request_params)
     discursos = _dados(result.data)
     status = "positive" if discursos else "zero"
-    if already_recorded:
-        run.log("record_resume_skipped", source_id=source_id, record_type=record_type)
-        return status, False
     written = run.write_record(
         partition="metadata",
         source_id=source_id,
@@ -801,7 +804,10 @@ def _collect_discursos_deputado(
     try:
         pages = _fetch_discursos_pages_follow_next(
             client,
+            run,
             path,
+            partition=partition,
+            deputado_id=deputado_id,
             params=default_params,
             strategy="default",
             retries=True,
@@ -830,7 +836,10 @@ def _collect_discursos_deputado(
     try:
         pages = _fetch_discursos_pages_follow_next(
             client,
+            run,
             path,
+            partition=partition,
+            deputado_id=deputado_id,
             params=unordered_params,
             strategy="sem_ordenacao",
             retries=False,
@@ -865,10 +874,44 @@ def _collect_discursos_deputado(
     )
 
 
+def _cached_result(
+    run: CollectionRun,
+    *,
+    source_id: str,
+    record_type: str,
+) -> tuple[HttpResult, dict[str, Any]] | None:
+    """Reconstrói uma resposta raw válida para uma retomada sem rede."""
+    record = run.read_existing_record(source_id=source_id, record_type=record_type)
+    if not isinstance(record, dict):
+        return None
+    payload = record.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    response = record.get("response")
+    response = response if isinstance(response, dict) else {}
+    headers = response.get("headers")
+    headers = headers if isinstance(headers, dict) else {}
+    request = record.get("request")
+    request = request if isinstance(request, dict) else {"method": "GET", "path": "raw-cache", "params": {}}
+    status_code = response.get("status_code")
+    return (
+        HttpResult(
+            url=str(response.get("url") or f"raw-cache://{source_id}"),
+            status_code=int(status_code) if isinstance(status_code, int) else 200,
+            headers={str(key): str(value) for key, value in headers.items()},
+            data=payload,
+        ),
+        request,
+    )
+
+
 def _fetch_discursos_pages_follow_next(
     client: OpenDataClient,
+    run: CollectionRun,
     path: str,
     *,
+    partition: str,
+    deputado_id: int,
     params: dict[str, Any],
     strategy: str,
     retries: bool,
@@ -879,19 +922,36 @@ def _fetch_discursos_pages_follow_next(
     next_params: dict[str, Any] | None = params
     page_index = 1
     while next_url:
-        if fast_fallback:
-            result = _get_json_fast_fallback(client, next_url, params=next_params or {})
-        elif retries:
-            result = client.get_json(next_url, params=next_params)
-        else:
-            result = _get_json_once(client, next_url, params=next_params or {})
         request_path = next_url
         request_params = next_params or {}
+        source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
+        cached = _cached_result(run, source_id=source_id, record_type=RECORD_TYPE)
+        if cached is not None:
+            result, request = cached
+            reused = True
+            run.log("record_resume_reused", source_id=source_id, record_type=RECORD_TYPE)
+        else:
+            reused = False
+            request = _request_payload(request_path, request_params, strategy=strategy)
+            run.log(
+                "discursos_page_request_started",
+                partition=partition,
+                deputado_id=deputado_id,
+                page_index=page_index,
+                periodo={"data_inicio": params["dataInicio"], "data_fim": params["dataFim"]},
+            )
+            if fast_fallback:
+                result = _get_json_fast_fallback(client, next_url, params=request_params)
+            elif retries:
+                result = client.get_json(next_url, params=next_params)
+            else:
+                result = _get_json_once(client, next_url, params=request_params)
         pages.append(
             {
                 "page_index": page_index,
                 "result": result,
-                "request": _request_payload(request_path, request_params, strategy=strategy),
+                "request": request,
+                "reused": reused,
             }
         )
         next_url = _next_link(result.data)
@@ -911,20 +971,67 @@ def _collect_discursos_deputado_explicit_pages(
 ) -> dict[str, int]:
     path = f"api/v2/deputados/{deputado_id}/discursos"
     first_params = _discursos_params(periodo["data_inicio"], periodo["data_fim"], itens=itens, ordered=False)
-    first_request = _request_payload(path, first_params, strategy=f"itens_{itens}")
-    first_result = _get_json_once(client, path, params=first_params)
+    first_source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:1"
+    cached_first = _cached_result(run, source_id=first_source_id, record_type=RECORD_TYPE)
+    if cached_first is not None:
+        first_result, first_request = cached_first
+        first_reused = True
+        run.log("record_resume_reused", source_id=first_source_id, record_type=RECORD_TYPE)
+    else:
+        first_request = _request_payload(path, first_params, strategy=f"itens_{itens}")
+        first_reused = False
+        run.log(
+            "discursos_page_request_started",
+            partition=partition,
+            deputado_id=deputado_id,
+            page_index=1,
+            periodo=periodo,
+        )
+        first_result = _get_json_once(client, path, params=first_params)
     last_page = _last_page_from_links(first_result.data) or 1
     stats = _write_discursos_pages(
         run,
         partition=partition,
         periodo=periodo,
         deputado_id=deputado_id,
-        pages=[{"page_index": 1, "result": first_result, "request": first_request}],
+        pages=[
+            {
+                "page_index": 1,
+                "result": first_result,
+                "request": first_request,
+                "reused": first_reused,
+            }
+        ],
     )
 
     for page_index in range(2, last_page + 1):
         params = {**first_params, "pagina": page_index}
+        source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
+        cached = _cached_result(run, source_id=source_id, record_type=RECORD_TYPE)
+        if cached is not None:
+            result, request = cached
+            run.log("record_resume_reused", source_id=source_id, record_type=RECORD_TYPE)
+            page_stats = _write_discursos_pages(
+                run,
+                partition=partition,
+                periodo=periodo,
+                deputado_id=deputado_id,
+                pages=[{"page_index": page_index, "result": result, "request": request, "reused": True}],
+            )
+            stats["pages"] += page_stats["pages"]
+            stats["discursos"] += page_stats["discursos"]
+            stats["transcricoes"] += page_stats["transcricoes"]
+            stats["page_errors"] += page_stats["page_errors"]
+            continue
+
         request = _request_payload(path, params, strategy=f"itens_{itens}")
+        run.log(
+            "discursos_page_request_started",
+            partition=partition,
+            deputado_id=deputado_id,
+            page_index=page_index,
+            periodo=periodo,
+        )
         try:
             result = _get_json_once(client, path, params=params)
         except Exception as exc:
@@ -956,7 +1063,7 @@ def _collect_discursos_deputado_explicit_pages(
             partition=partition,
             periodo=periodo,
             deputado_id=deputado_id,
-            pages=[{"page_index": page_index, "result": result, "request": request}],
+            pages=[{"page_index": page_index, "result": result, "request": request, "reused": False}],
         )
         stats["pages"] += page_stats["pages"]
         stats["discursos"] += page_stats["discursos"]
@@ -981,7 +1088,8 @@ def _write_discursos_pages(
         source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
         discursos = _dados(result.data)
         if run.has_record(source_id=source_id, record_type=RECORD_TYPE):
-            run.log("record_resume_skipped", source_id=source_id, record_type=RECORD_TYPE)
+            if not page.get("reused", False):
+                run.log("record_resume_skipped", source_id=source_id, record_type=RECORD_TYPE)
             continue
         stats["pages"] += 1
         stats["discursos"] += len(discursos)
@@ -1045,6 +1153,7 @@ def _request_payload(path: str, params: dict[str, Any], *, strategy: str) -> dic
 
 
 def _get_json_once(client: OpenDataClient, path_or_url: str, *, params: dict[str, Any]) -> HttpResult:
+    client._wait_for_rate_limit()
     response = client.client.get(
         client._resolve_url(path_or_url),
         params=params,
@@ -1055,6 +1164,7 @@ def _get_json_once(client: OpenDataClient, path_or_url: str, *, params: dict[str
 
 
 def _get_json_fast_fallback(client: OpenDataClient, path_or_url: str, *, params: dict[str, Any]) -> HttpResult:
+    client._wait_for_rate_limit()
     response = client.client.get(
         client._resolve_url(path_or_url),
         params=params,

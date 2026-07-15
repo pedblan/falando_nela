@@ -201,6 +201,29 @@ def test_open_data_client_caps_server_retry_after() -> None:
     assert sleeps == [12]
 
 
+def test_collection_run_reads_existing_record_without_loading_payloads_in_memory(tmp_path: Path) -> None:
+    initial = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id="resume", resume=False)
+    initial.write_record(
+        partition="metadata",
+        source_id="deputado:10:discursos:ano:2010",
+        request={"method": "GET", "path": "api/v2/deputados/10/discursos", "params": {}},
+        response={"url": "https://example.test", "status_code": 200, "headers": {}},
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-12-31"},
+        payload={"dados": [{"id": 1}], "links": []},
+        record_type="discursos_year_probe",
+    )
+
+    resumed = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id="resume", resume=True)
+
+    record = resumed.read_existing_record(
+        source_id="deputado:10:discursos:ano:2010",
+        record_type="discursos_year_probe",
+    )
+    assert record is not None
+    assert record["source_id"] == "deputado:10:discursos:ano:2010"
+    assert record["payload"] == {"dados": [{"id": 1}], "links": []}
+
+
 def test_open_data_client_get_text() -> None:
     seen_accept_headers: list[str | None] = []
 

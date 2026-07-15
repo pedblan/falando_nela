@@ -95,8 +95,14 @@ runtime proprios e nao pode bloquear a incorporacao da nova janela.
 13. Limitar a espera indicada por `Retry-After` da API a 60 segundos por
     tentativa. Depois dos retries e fallbacks normais, registrar a falha
     recuperável em vez de deixar o Colab sem progresso indefinidamente.
-14. Preservar `transcricao` como texto oficial quando entregue pela API.
-15. Quando houver endpoint oficial mais granular para texto integral do discurso
+14. Em `--resume`, reconstruir probes e páginas mensais a partir do payload raw
+    já gravado antes de fazer qualquer nova requisição para o mesmo
+    `source_id`. Somente página/probe ausente ou raw inválido pode voltar à API.
+15. Espaçar chamadas à API da Câmara em pelo menos 0,2 segundo e registrar
+    `discursos_page_request_started` antes de cada página ainda ausente, para
+    distinguir espera remota de retomada local no Colab.
+16. Preservar `transcricao` como texto oficial quando entregue pela API.
+17. Quando houver endpoint oficial mais granular para texto integral do discurso
    ou sessao, esse texto deve ter prioridade sobre metadados, `sumario` e
    palavras-chave.
 

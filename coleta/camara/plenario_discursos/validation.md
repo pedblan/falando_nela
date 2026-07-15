@@ -85,6 +85,10 @@ Os testes devem cobrir:
   raw e o plano de mandatos comprovarem a mesma ordem e quantidade;
 - teto de 60 segundos para um `Retry-After` excessivo e `status=interrupted`
   após interrupção explícita, sem manifest falsamente `completed`;
+- reaproveitamento de probe e de página mensal raw numa retomada, sem qualquer
+  chamada HTTP para o `source_id` já gravado;
+- aplicação do intervalo mínimo também nas requisições de fallback rápido e
+  emissão de `discursos_page_request_started` antes de página sem cache;
 - uso de um `parlamentares_periodos` explicito fora do `data_root`;
 - progresso visivel da varredura de registros existentes e heartbeats por
   lote de deputados.
@@ -135,12 +139,18 @@ Os testes devem cobrir:
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular
   particoes, registros e deputados concluídos desse `run_id`, sem pular
   particoes concluidas por outro `run_id`.
+- Para um deputado parcialmente coletado, `--resume` deve reutilizar cada
+  `discursos_year_probe`, `discursos_quarter_probe` e `discursos_page` raw
+  válido antes de tentar a próxima resposta ausente; `record_resume_reused`
+  deve anteceder qualquer nova chamada desse item.
 - Em retomada parcial, o stdout deve mostrar `resume_record_scan_started`,
   `resume_record_scan_progress`, `resume_record_scan_completed` e depois
   `deputy_started`/`deputy_progress`; o autosave deve indicar `existing_record_scan=filtered`,
   `existing_record_scan_years` com os anos parciais e `active_partition`.
 - Se checkpoint e log nao permitirem provar o escopo parcial, o autosave deve
   indicar `existing_record_scan=loaded` e a retomada deve ler todo o run.
+- Cada chamada mensal não presente no raw deve ser precedida no stdout por
+  `discursos_page_request_started`, com deputado, página e período.
 - Em fronteira limpa validada, o manifest deve indicar
   `skip_existing_record_scan=true` e `existing_record_scan=skipped`.
 

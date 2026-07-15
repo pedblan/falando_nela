@@ -68,6 +68,8 @@
 - Um `Retry-After` enviado pela API pode atrasar no máximo 60 segundos cada
   tentativa. O coletor não pode permanecer sem evento por horas devido a uma
   espera controlada pelo servidor.
+- O coletor deve respeitar intervalo mínimo de 0,2 segundo entre requisições à
+  API da Câmara, inclusive nos caminhos de fallback rápido.
 - Ano vazio nao abre trimestre nem mes.
 - Ano positivo abre probes trimestrais com `itens=1`.
 - Trimestre vazio nao abre mes.
@@ -136,6 +138,10 @@
   cobertura parcial não pode parecer completa.
 - Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo
   `run_id` e registros ja presentes no JSONL do mesmo `run_id`.
+- Para probe ou página mensal já presentes no raw do mesmo `run_id`, a retomada
+  deve reconstruir a resposta a partir do payload gravado e não pode abrir nova
+  conexão HTTP para esse `source_id`. Raw ilegível ou payload incompatível pode
+  ser consultado novamente e deve ficar auditável no log.
 - Após concluir um deputado sem erro de página, o checkpoint deve persistir a
   unidade `deputado + intervalo de mandato`; a retomada deve pular essa unidade
   sem nova consulta. Itens com erro ficam fora da fronteira e são tentados de
@@ -156,6 +162,9 @@
 - Antes de cada deputado, registrar `deputy_started`; ao pular fronteira
   concluída, registrar `deputy_resume_skipped`. Isso identifica exatamente o
   item em curso quando um endpoint deixa de responder.
+- Antes de uma página mensal sem cache raw, registrar
+  `discursos_page_request_started`; uso de payload já gravado registra
+  `record_resume_reused`.
 - Se o log contiver `partition_started` sem conclusao posterior para uma
   particao da janela, `--skip-existing-record-scan` deve ser recusado. A
   retomada normal continua permitida e deve reconstruir o indice a partir do

@@ -54,6 +54,7 @@ class CollectionRun:
         self.checkpoint_path = output_dir / "checkpoints" / source / f"{dataset}.json"
         self._ensure_parent_dirs()
         self.checkpoint = self._load_checkpoint()
+        self.processed_record_paths: dict[str, Path] = {}
         self.processed_record_keys = (
             self._load_existing_record_keys(years=self.existing_record_years)
             if resume and load_existing_records
@@ -79,6 +80,34 @@ class CollectionRun:
 
     def has_record(self, *, source_id: str, record_type: str) -> bool:
         return self._record_key(source_id=source_id, record_type=record_type) in self.processed_record_keys
+
+    def read_existing_record(self, *, source_id: str, record_type: str) -> dict[str, Any] | None:
+        """Lê um registro raw já indexado, sem chamar novamente a fonte.
+
+        O índice de retomada guarda apenas chaves para permanecer leve mesmo em
+        coletas grandes. O payload é relido sob demanda no arquivo que contém
+        a chave, o que permite reutilizar respostas parciais sem mantê-las
+        todas na memória.
+        """
+        record_key = self._record_key(source_id=source_id, record_type=record_type)
+        path = self.processed_record_paths.get(record_key)
+        if path is None or not path.is_file():
+            return None
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if (
+                        record.get("source_id") == source_id
+                        and record.get("record_type") == record_type
+                    ):
+                        return record if isinstance(record, dict) else None
+        except OSError:
+            return None
+        return None
 
     def is_item_complete(self, item_id: str) -> bool:
         """Retorna se uma unidade de trabalho menor que uma partição foi concluída."""
@@ -154,6 +183,7 @@ class CollectionRun:
         self.record_counts[record_type] += 1
         self.partition_counts[partition] += 1
         self.processed_record_keys.add(record_key)
+        self.processed_record_paths[record_key] = raw_path
         return True
 
     def log(self, event: str, **fields: Any) -> None:
@@ -320,7 +350,9 @@ class CollectionRun:
                     source_id = record.get("source_id")
                     record_type = record.get("record_type")
                     if isinstance(source_id, str) and isinstance(record_type, str):
-                        keys.add(self._record_key(source_id=source_id, record_type=record_type))
+                        record_key = self._record_key(source_id=source_id, record_type=record_type)
+                        keys.add(record_key)
+                        self.processed_record_paths.setdefault(record_key, path)
             if file_index % 25 == 0 or file_index == len(paths):
                 self._print_progress(
                     "resume_record_scan_progress",

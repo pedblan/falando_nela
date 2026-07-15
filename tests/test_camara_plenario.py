@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import importlib
+import time
 from datetime import date
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from coleta.camara.plenario_discursos.collect import (
     _collect_discursos_deputado,
     _collect_discursos_deputado_adaptive,
     _collect_discursos_probe,
+    _get_json_fast_fallback,
     _partial_resume_scan_years,
     inspect_checkpoint_resume_state,
     validate_clean_checkpoint_boundary,
@@ -387,6 +389,85 @@ def test_collect_discursos_deputado_writes_monthly_pages_and_counts_transcricoes
         "A SRA. CONCEIÇÃO SAMPAIO — ação, saúde e Constituição."
     )
     assert records[0]["payload"]["dados"][0]["sumario"] == "resumo auxiliar"
+
+
+def test_collect_discursos_probe_reuses_cached_raw_without_calling_api(tmp_path: Path) -> None:
+    run_id = "resume-cached-probe"
+    initial = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=False)
+    initial.write_record(
+        partition="metadata",
+        source_id="deputado:10:discursos:ano:2010",
+        request={"method": "GET", "path": "api/v2/deputados/10/discursos", "params": {}},
+        response={"url": "https://example.test", "status_code": 200, "headers": {}},
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-12-31"},
+        payload={"dados": [], "links": []},
+        record_type="discursos_year_probe",
+    )
+    resumed = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=True)
+
+    class ForbiddenClient:
+        def __getattr__(self, _name: str) -> object:
+            raise AssertionError("a resposta raw deveria evitar qualquer chamada HTTP")
+
+    status, written = _collect_discursos_probe(
+        ForbiddenClient(),  # type: ignore[arg-type]
+        resumed,
+        deputado_id=10,
+        start=date(2010, 1, 1),
+        end=date(2010, 12, 31),
+        partition="2010",
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-12-31"},
+        record_type="discursos_year_probe",
+        probe_label="ano",
+    )
+
+    assert (status, written) == ("zero", False)
+    assert "record_resume_reused" in (tmp_path / "logs" / f"{run_id}.jsonl").read_text(encoding="utf-8")
+
+
+def test_collect_discursos_pages_reuse_cached_raw_without_calling_api(tmp_path: Path) -> None:
+    run_id = "resume-cached-page"
+    initial = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=False)
+    initial.write_record(
+        partition="2010-01",
+        source_id="deputado:10:discursos:2010-01:pagina:1",
+        request={"method": "GET", "path": "api/v2/deputados/10/discursos", "params": {}},
+        response={"url": "https://example.test", "status_code": 200, "headers": {}},
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-01-31"},
+        payload={"dados": [{"transcricao": "texto existente"}], "links": []},
+        record_type="discursos_page",
+    )
+    resumed = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=True)
+
+    class ForbiddenClient:
+        def __getattr__(self, _name: str) -> object:
+            raise AssertionError("a pagina raw deveria evitar qualquer chamada HTTP")
+
+    stats = _collect_discursos_deputado(
+        ForbiddenClient(),  # type: ignore[arg-type]
+        resumed,
+        partition="2010-01",
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-01-31"},
+        deputado_id=10,
+    )
+
+    assert stats == {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0}
+    assert "record_resume_reused" in (tmp_path / "logs" / f"{run_id}.jsonl").read_text(encoding="utf-8")
+
+
+def test_fast_fallback_respects_camara_request_interval() -> None:
+    sleeps: list[float] = []
+    client = OpenDataClient("https://example.test", min_interval_seconds=0.2, sleep=sleeps.append)
+    client.client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"dados": [], "links": []})),
+        follow_redirects=True,
+    )
+    client._last_request_at = time.monotonic()
+
+    _get_json_fast_fallback(client, "api/v2/deputados/10/discursos", params={})
+
+    assert len(sleeps) == 1
+    assert 0 < sleeps[0] <= 0.2
 
 
 def test_collect_discursos_adaptive_stops_after_empty_year_probe(tmp_path: Path) -> None:
