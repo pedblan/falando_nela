@@ -26,6 +26,13 @@ Arquivos atuais:
   reauditoria completa antes de derivados. Depois do gate aprovado, usar o
   caderno de processamento 07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb.
 
+- 09_recuperacao_discursos_plenario_2010_colab.ipynb: fecha a recuperação de
+  2010 antes dos derivados. Para CN, transforma códigos que existam no raw mas
+  não tenham texto em população fixa e extrai o trecho correspondente do Diário
+  do Congresso Nacional oficial; para Câmara, coleta por `id` oficial do
+  deputado. O caderno só libera o processamento quando os dois inventários
+  tiverem texto/transcrições e manifests aprovados.
+
 - `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
   histórico dedicado que audita a lacuna, executa as duas coletas com
   `historical-official`, regenera os derivados cumulativos e fecha a

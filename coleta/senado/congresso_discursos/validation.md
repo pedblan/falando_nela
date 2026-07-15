@@ -10,6 +10,25 @@ Os IDs ausentes devem ser recuperados pelo caderno
 08_backfill_discursos_senadores_por_codigo_2010_colab.ipynb e só podem seguir
 para derivados após reauditoria strict require-complete.
 
+Para CN/2010, validar também que cada código encontrado no raw tem
+`texto`/`TextoIntegral` não vazio. Se houver somente metadados, o caderno 09
+deve congelar `congresso_2010_text_missing_population.jsonl` e executar:
+
+```bash
+python -m coleta.senado.recuperar_textos_diario \
+  --mode prod --no-sample --resume \
+  --output-dir "$FALANDO_NELA_DATA_ROOT" \
+  --data-inicio 2010-01-01 --data-fim 2010-12-31 \
+  --run-id backfill-discursos-plenario-2010-congresso-diario \
+  --population-path "$POPULATION_PATH"
+```
+
+O manifest precisa ter `status=completed`, `errors=0` e um
+`pronunciamento_texto` com texto não vazio para cada código da população. A
+proveniência deve indicar `diario-congresso-oficial-por-codigo-v1`, `DCN`, o
+código do diário e as páginas baixadas. Falta de texto, publicação DCN ambígua,
+PDF sem texto ou delimitação de orador ambígua é falha retomável, não cobertura.
+
 ## Smoke test
 
 ```bash

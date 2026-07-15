@@ -34,6 +34,29 @@
 - A recuperação de IDs CN da auditoria deve usar
   coleta.senado.backfill_discursos_por_codigo, com CodigoPronunciamento como
   chave e a origem CodigoParlamentar preservada no payload.
+- A presença do código no raw não satisfaz a cobertura analítica: a auditoria
+  deve verificar `texto`/`TextoIntegral` não vazio antes de liberar derivados.
+
+## Recuperação no Diário do Congresso
+
+- `coleta.senado.recuperar_textos_diario` recebe `--population-path` com uma
+  população CN fechada, gerada antes da coleta, e aceita apenas itens de
+  `congresso_discursos` dentro da janela solicitada.
+- Cada item deve ter `CodigoPronunciamento`, data, nome oficial do orador e
+  exatamente uma publicação `DCN` com `DataPublicacao` e `PaginaInicial`.
+- A busca do diário deve usar `tipDiario=2`, independentemente de uma
+  `UrlDiario` legada que indique outro veículo, e deve recusar resposta cujo
+  caderno não seja `DCN`.
+- O PDF deve ser obtido no acervo oficial, preservar URL, código do diário e
+  intervalo de páginas como proveniência, e conter camada textual extraível.
+- `CodigoPronunciamento` é a chave exclusiva de identidade. O nome do orador
+  pode ser usado apenas para delimitar seu trecho no PDF já selecionado por
+  publicação/página; não pode descobrir nem substituir o código.
+- Um trecho só é aceito se começa no cabeçalho do orador esperado e termina no
+  cabeçalho do próximo orador; falha de delimitação deve falhar o item.
+- O resultado aprovado usa o contrato canônico de `pronunciamento_texto`, com
+  `texto_status=disponivel` e
+  `metodo_obtencao=diario-congresso-oficial-por-codigo-v1`.
 
 ## Separacao de dados
 
@@ -67,7 +90,9 @@
   `CodigoPronunciamento`, `TextoIntegral`, `TextoIntegralUrl`, `texto`,
   `forma`, `metodo_obtencao`, `texto_status`, `metadata` e `fontes`.
 - Tentar, nesta ordem, o endpoint oficial de texto integral e as notas da
-  sessao. Preservar as tentativas no payload quando houver fallback.
+  sessao. Preservar as tentativas no payload quando houver fallback. Para uma
+  população histórica CN sem texto, o recuperador de diário é um fluxo
+  explícito posterior, não uma conversão silenciosa de metadados em texto.
 - Quando nao houver texto e existir video, texto binario ou endpoint de videos
   da sessao, gravar tambem em `transcription_queue`.
 - Uma excecao inesperada ao baixar um pronunciamento deve marcar a particao

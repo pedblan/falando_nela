@@ -23,5 +23,8 @@ def test_2010_recovery_notebook_is_generated_and_uses_official_ids() -> None:
     assert "CodigoPronunciamento" in source
     assert "deputado:(\\d+):discursos" in source
     assert "congresso_2010_text_inventory.json" in source
+    assert "congresso_2010_text_missing_population.jsonl" in source
+    assert "coleta.senado.recuperar_textos_diario" in source
+    assert "RODAR_RECUPERACAO_CONGRESSO = False" in source
     assert "RODAR_CAMARA_2010 = False" in source
     assert "VALIDAR_RECUPERACAO = False" in source

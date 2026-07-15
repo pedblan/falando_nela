@@ -51,12 +51,34 @@ CN e a população fechada senator_endpoint_missing_ids.jsonl. A chave é
 CodigoPronunciamento; CodigoParlamentar é somente proveniência. Isso completa
 senadores sem substituir a descoberta de deputados e autoridades.
 
+## Recuperação de texto no Diário do Congresso (CN/2010)
+
+O raw pode conter um `CodigoPronunciamento` sem corpo textual: presença do ID
+não é cobertura analítica. Para os códigos CN de 2010 que continuarem sem
+`texto`/`TextoIntegral`, o caderno 09 deve produzir uma população fechada que
+preserve `CodigoPronunciamento`, data e o objeto oficial `pronunciamento`.
+
+`coleta.senado.recuperar_textos_diario` recupera somente essa população. Para
+cada código, ele seleciona a publicação declarada `DCN`, consulta o acervo de
+diários do Senado explicitamente com `tipDiario=2` (Congresso Nacional) e baixa
+o intervalo de páginas que começa em `PaginaInicial`. Alguns metadados legados
+trazem `UrlDiario` com `tipDiario=1`; essa URL não é a seleção autoritativa do
+veículo quando a publicação declara `DCN`.
+
+O código, e não o nome, é a identidade do registro. O nome oficial do orador
+só delimita o início e o fim de seu trecho dentro do PDF DCN já vinculado ao
+código, data e página. Se não houver uma publicação DCN, o PDF não tiver texto
+extraível ou o trecho não puder ser delimitado, o item falha e a partição fica
+retomável; nunca se grava texto de outro orador como recuperação bem-sucedida.
+
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.
 - `data/raw/senado/congresso_discursos/ano=YYYY/mes=MM/{run_id}.jsonl`: registros textuais consolidados.
 - `data/raw/senado/congresso_discursos/transcription_queue/{run_id}.jsonl`:
   pronunciamentos sem texto oficial e com fonte audiovisual candidata.
+- `data/operations/backfills/discursos_plenario_2010/{recovery_id}/congresso_2010_text_missing_population.jsonl`:
+  população fixa de códigos CN sem texto antes da recuperação no diário.
 - `data/checkpoints/senado/congresso_discursos.json`.
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
