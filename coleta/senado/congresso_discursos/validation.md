@@ -31,6 +31,14 @@ PDF sem texto ou delimitação de orador ambígua é falha retomável, não cobe
 Quando a população não trouxer nome, a proveniência deve registrar
 `speaker_source=portal_oficial` e o portal deve ter sido consultado pelo mesmo
 `CodigoPronunciamento` da população.
+Falas breves com cabeçalho oficial, delimitadas do próximo orador e com corpo
+não vazio devem entrar no corpus; tamanho curto não é motivo de exclusão.
+Cobrir em teste título institucional, nome com quebra hifenizada e o caso em
+que a mesma pessoa atua como Presidência e faz discurso ordinário. Neste último,
+o texto aprovado deve respeitar o tipo oficial de uso da palavra. Para edição
+conjunta indexada em data diferente, validar que `lookup_date` e
+`lookup_date_fallback_days` apontam para o caderno DCN que contém a página
+histórica; uma edição próxima sem a página não pode ser aceita.
 
 ## Smoke test
 

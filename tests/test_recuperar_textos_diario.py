@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from coleta.common.http import HttpResult
 from coleta.senado import recuperar_textos_diario as recovery
 
@@ -54,6 +56,8 @@ def test_load_population_requires_dcn_publication_and_keeps_code_identity(tmp_pa
             },
             "speaker": "Antônio Carlos Valadares",
             "speaker_source": "pronunciamento",
+            "speech_type": None,
+            "speech_type_source": "pendente_portal_oficial",
         }
     ]
 
@@ -88,6 +92,25 @@ def test_fetch_speaker_from_portal_uses_the_exact_pronunciamento_code() -> None:
     assert recovery.fetch_speaker_from_portal(FakeClient(), "384499") == "José Sarney"  # type: ignore[arg-type]
 
 
+def test_fetch_portal_metadata_keeps_the_official_speech_type() -> None:
+    class FakeClient:
+        def get_text(self, endpoint: str) -> HttpResult:
+            assert endpoint.endswith("/384499")
+            return HttpResult(
+                endpoint,
+                200,
+                {},
+                """
+                <dl><dt>Autor</dt><dd><span>José Sarney</span></dd></dl>
+                <h2><em><span>Fala da Presidência</span></em></h2>
+                """,
+            )
+
+    assert recovery.fetch_pronunciamento_metadata_from_portal(
+        FakeClient(), "384499"  # type: ignore[arg-type]
+    ) == {"speaker": "José Sarney", "speech_type": "Fala da Presidência"}
+
+
 def test_extract_speaker_text_is_accent_insensitive_and_stops_at_next_speaker() -> None:
     document = """
 O SR. ANTONIO CARLOS VALADARES (PSB – SE) – Primeiro parágrafo com conteúdo suficiente
@@ -116,6 +139,46 @@ O SR. MÁRCIO REINALDO MOREIRA (PP – MG) – Próximo orador.
     assert "Próximo orador" not in text
 
 
+def test_extract_speaker_text_keeps_a_short_official_speech() -> None:
+    document = """
+O SR. INÁCIO ARRUDA (PCdoB – CE) – Muito obrigado, Sr. Presidente.
+O SR. PRESIDENTE (José Sarney) – Próximo orador.
+"""
+
+    text = recovery.extract_speaker_text(document, "Inácio Arruda")
+
+    assert text == "O SR. INÁCIO ARRUDA (PCdoB – CE) – Muito obrigado, Sr. Presidente."
+
+
+def test_extract_speaker_text_accepts_authority_titles_and_source_name_variants() -> None:
+    minister = """
+O SR. MINISTRO GILMAR MENDES – Bom dia, Congresso Nacional.
+O SR. PRESIDENTE (José Sarney) – Próximo orador.
+"""
+    guest = """
+A SRA. ODETE ANGELA ORTIGARA SOC -
+COL – Buongiorno a tutti.
+O SR. PRESIDENTE (Marco Maia) – Próximo orador.
+"""
+
+    assert recovery.extract_speaker_text(minister, "Gilmar Mendes") is not None
+    assert recovery.extract_speaker_text(guest, "Odete Angela Ortigara Soccol") is not None
+
+
+def test_extract_speaker_text_uses_type_to_distinguish_presidency_from_speech() -> None:
+    document = """
+A SRA. PRESIDENTA (Serys Slhessarenko. PT – MT) – Passo a Presidência.
+O SR. PRESIDENTE (Inácio Arruda) – Com a palavra a Senadora Serys.
+A SRA. SERYS SLHESSARENKO (PT – MT) – Este é o discurso registrado.
+O SR. PRESIDENTE (Inácio Arruda) – Próximo orador.
+"""
+
+    text = recovery.extract_speaker_text(document, "Serys Slhessarenko", speech_type="Discurso")
+
+    assert text is not None
+    assert text.startswith("A SRA. SERYS SLHESSARENKO")
+
+
 def test_lookup_congress_diary_forces_dcn_even_when_legacy_url_points_to_senado() -> None:
     class FakeClient:
         def get_text(self, path: str, *, params: dict[str, Any]) -> HttpResult:
@@ -126,7 +189,7 @@ def test_lookup_congress_diary_forces_dcn_even_when_legacy_url_points_to_senado(
                 "https://legis.senado.leg.br/diarios/ver/2088?pagina=769",
                 200,
                 {},
-                'var diario = {"tituloCurto":"DCN 5/2010","caderno":{"codigo":2088,"sglVeiculo":"DCN","paginaFinal":799}};',
+                'var diario = {"tituloCurto":"DCN 5/2010","caderno":{"codigo":2088,"sglVeiculo":"DCN","paginaInicial":735,"paginaFinal":799}};',
             )
 
     diary = recovery.lookup_congress_diary(
@@ -138,12 +201,37 @@ def test_lookup_congress_diary_forces_dcn_even_when_legacy_url_points_to_senado(
     assert diary["titulo"] == "DCN 5/2010"
 
 
+def test_lookup_congress_diary_finds_a_combined_issue_on_adjacent_official_date() -> None:
+    class FakeClient:
+        def get_text(self, _path: str, *, params: dict[str, Any]) -> HttpResult:
+            if params["datDiario"] != "16/12/2010":
+                request = httpx.Request("GET", "https://example.test/diarios")
+                response = httpx.Response(404, request=request)
+                raise httpx.HTTPStatusError("not found", request=request, response=response)
+            return HttpResult(
+                "https://legis.senado.leg.br/diarios/ver/3701?pagina=4006",
+                200,
+                {},
+                'var diario = {"tituloCurto":"DCN 24/2010","caderno":{"codigo":3701,"sglVeiculo":"DCN","paginaInicial":3953,"paginaFinal":4499}};',
+            )
+
+    diary = recovery.lookup_congress_diary(
+        FakeClient(),  # type: ignore[arg-type]
+        {"data_publicacao": "2010-12-23", "pagina_inicial": 4006},
+    )
+
+    assert diary["codigo_diario"] == "3701"
+    assert diary["lookup_date"] == "2010-12-16"
+    assert diary["lookup_date_fallback_days"] == -7
+
+
 def test_recover_pronunciamento_writes_a_code_bound_text_payload(monkeypatch: Any) -> None:
     record = _population_record()
     prepared = {
         **record,
         "publication": recovery.select_congress_publication(record["pronunciamento"]),
         "speaker": "Antônio Carlos Valadares",
+        "speech_type": "Discurso",
     }
     monkeypatch.setattr(
         recovery,

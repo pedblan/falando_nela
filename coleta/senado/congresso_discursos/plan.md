@@ -71,11 +71,27 @@ código, data e página. Se não houver uma publicação DCN, o PDF não tiver t
 extraível ou o trecho não puder ser delimitado, o item falha e a partição fica
 retomável; nunca se grava texto de outro orador como recuperação bem-sucedida.
 
+O cabeçalho pode conter título institucional (por exemplo, `MINISTRO` ou
+`VICE-PRESIDENTE`), grafia abreviada ou quebra de linha no nome. A delimitação
+aceita essas variações apenas depois de confirmar os tokens do orador. Para
+separar fala comum de `Fala da Presidência` do mesmo autor, usa
+`TipoUsoPalavra`/tipo do pronunciamento: cabeçalho `PRESIDENTE` só é preferido
+para a fala da Presidência. Não há tamanho mínimo: fala breve com cabeçalho
+confirmado e corpo não vazio é uma recuperação válida.
+
+O índice atual do Diário pode catalogar uma edição conjunta em data próxima da
+`DataPublicacao` histórica. Se a consulta exata não localizar um caderno DCN
+que contenha a página declarada, a recuperação pesquisa deterministicamente
+até 21 dias antes/depois, aceita somente caderno DCN cujo intervalo contenha
+a página e registra no payload a data efetivamente usada e o deslocamento.
+
 Quando o payload histórico por senador não trouxer nome do orador, o
 recuperador consulta a página oficial de pronunciamento pelo próprio
 `CodigoPronunciamento` para obtê-lo. Essa consulta não descobre nem troca a
 identidade do item; apenas fornece o marcador necessário para recortar a página
-DCN já escolhida pelo código.
+DCN já escolhida pelo código. Quando necessário, a mesma página fornece o tipo
+de uso da palavra para escolher corretamente entre cabeçalho de Presidência e
+fala ordinária.
 
 ## Saidas
 

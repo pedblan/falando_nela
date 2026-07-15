@@ -47,6 +47,10 @@
 - A busca do diário deve usar `tipDiario=2`, independentemente de uma
   `UrlDiario` legada que indique outro veículo, e deve recusar resposta cujo
   caderno não seja `DCN`.
+- Se a data histórica não resolver um caderno DCN cujo intervalo contenha
+  `PaginaInicial`, a busca pode percorrer deterministicamente a janela de 21
+  dias antes/depois. O caderno aceito deve conter a página declarada, e a
+  proveniência deve registrar `lookup_date` e `lookup_date_fallback_days`.
 - O PDF deve ser obtido no acervo oficial, preservar URL, código do diário e
   intervalo de páginas como proveniência, e conter camada textual extraível.
 - `CodigoPronunciamento` é a chave exclusiva de identidade. O nome do orador
@@ -57,10 +61,20 @@
   registrar `speaker_source=portal_oficial`. Ausência do autor também nessa
   página é falha retomável; o coletor não pode inferir o nome por texto ou por
   outro código.
+- Se o tipo de uso da palavra estiver ausente, o recuperador deve consultar a
+  mesma página oficial e registrar `speech_type` e `speech_type_source`; a
+  consulta serve somente à delimitação do item já identificado pelo código.
 - Um trecho só é aceito se começa no cabeçalho do orador esperado e termina no
   cabeçalho do próximo orador; para `Fala da Presidência`, o cabeçalho
   `O SR./A SRA. PRESIDENTE (Nome...)` é o marcador oficial equivalente. Falha
   de delimitação deve falhar o item.
+- A validação de cabeçalho deve tolerar título institucional, grafia abreviada
+  ou quebra hifenizada de linha, sem dispensar a confirmação dos tokens do
+  orador. Quando o mesmo orador aparece como Presidente e como orador comum,
+  `TipoUsoPalavra`/tipo do pronunciamento decide qual cabeçalho é elegível.
+- Não há mínimo arbitrário de caracteres: uma fala breve, desde que tenha o
+  cabeçalho oficial e conteúdo não vazio, é texto analítico válido e deve ser
+  preservada.
 - O resultado aprovado usa o contrato canônico de `pronunciamento_texto`, com
   `texto_status=disponivel` e
   `metodo_obtencao=diario-congresso-oficial-por-codigo-v1`.
