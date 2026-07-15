@@ -80,6 +80,37 @@ class CollectionRun:
     def has_record(self, *, source_id: str, record_type: str) -> bool:
         return self._record_key(source_id=source_id, record_type=record_type) in self.processed_record_keys
 
+    def is_item_complete(self, item_id: str) -> bool:
+        """Retorna se uma unidade de trabalho menor que uma partição foi concluída."""
+        runs = self.checkpoint.get("runs", {})
+        current = runs.get(self.run_id, {}) if isinstance(runs, dict) else {}
+        completed = current.get("completed_items", {}) if isinstance(current, dict) else {}
+        return item_id in completed if isinstance(completed, dict) else False
+
+    def completed_item_ids(self) -> set[str]:
+        runs = self.checkpoint.get("runs", {})
+        current = runs.get(self.run_id, {}) if isinstance(runs, dict) else {}
+        completed = current.get("completed_items", {}) if isinstance(current, dict) else {}
+        return set(completed) if isinstance(completed, dict) else set()
+
+    def mark_items_complete(self, items: dict[str, dict[str, Any]]) -> int:
+        """Persiste uma fronteira retomável sem transformar itens em registros raw."""
+        if not items:
+            return 0
+        completed = self._run_checkpoint().setdefault("completed_items", {})
+        if not isinstance(completed, dict):
+            completed = {}
+            self._run_checkpoint()["completed_items"] = completed
+        written = 0
+        for item_id, metadata in items.items():
+            if item_id in completed:
+                continue
+            completed[item_id] = {**metadata, "completed_at": utc_now_iso()}
+            written += 1
+        if written:
+            self._write_checkpoint()
+        return written
+
     def write_record(
         self,
         *,

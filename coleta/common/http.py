@@ -9,6 +9,7 @@ import httpx
 
 
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
+DEFAULT_MAX_RETRY_AFTER_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
@@ -35,12 +36,14 @@ class OpenDataClient:
         timeout: float = 30.0,
         retries: int = 4,
         backoff_seconds: float = 1.0,
+        max_retry_after_seconds: float = DEFAULT_MAX_RETRY_AFTER_SECONDS,
         min_interval_seconds: float = 0.0,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.base_url = base_url.rstrip("/") + "/"
         self.retries = retries
         self.backoff_seconds = backoff_seconds
+        self.max_retry_after_seconds = max_retry_after_seconds
         self.min_interval_seconds = min_interval_seconds
         self.sleep = sleep
         self._last_request_at: float | None = None
@@ -126,7 +129,7 @@ class OpenDataClient:
         retry_after = response.headers.get("Retry-After")
         if retry_after:
             try:
-                self.sleep(float(retry_after))
+                self.sleep(min(float(retry_after), self.max_retry_after_seconds))
                 return
             except ValueError:
                 pass

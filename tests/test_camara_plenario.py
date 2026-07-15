@@ -179,6 +179,119 @@ def test_collect_marks_a_year_failed_and_retries_it_after_deputy_error(
     assert "2010" in second_checkpoint["completed_partitions"]
 
 
+def test_collect_resume_restores_a_verified_prefix_from_interrupted_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = importlib.import_module("coleta.camara.plenario_discursos.collect")
+    run_id = "camara-2010-prefix"
+    initial = CollectionRun(
+        tmp_path,
+        source="camara",
+        dataset="plenario_discursos",
+        run_id=run_id,
+        resume=False,
+    )
+    initial.write_record(
+        partition="metadata",
+        source_id="deputado:10:discursos:ano:2010",
+        request={"method": "GET", "path": "api/v2/deputados/10/discursos", "params": {}},
+        response={"status_code": 200, "url": "https://example.test", "headers": {}},
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-12-31"},
+        payload={"dados": []},
+        record_type="discursos_year_probe",
+    )
+    initial.write_manifest(
+        status="completed",
+        errors=0,
+        deputados_processados=1,
+        deputados_periodos_carregados=2,
+    )
+
+    class FakeClient:
+        def __enter__(self) -> "FakeClient":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(module, "OpenDataClient", lambda *_args, **_kwargs: FakeClient())
+    monkeypatch.setattr(
+        module,
+        "load_parlamentares_periodos",
+        lambda *_args, **_kwargs: {
+            "10": [
+                ParlamentarPeriodo("10", "Deputada A", date(2010, 1, 1), date(2010, 12, 31), "camara")
+            ],
+            "11": [
+                ParlamentarPeriodo("11", "Deputado B", date(2010, 1, 1), date(2010, 12, 31), "camara")
+            ],
+        },
+    )
+    called: list[int] = []
+
+    def collect_only_missing(*_args: object, **kwargs: object) -> dict[str, object]:
+        called.append(int(kwargs["deputado_id"]))
+        return {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0, "preflight": {}}
+
+    monkeypatch.setattr(module, "_collect_discursos_deputado_adaptive", collect_only_missing)
+    module.collect(
+        [
+            "--mode", "prod", "--output-dir", str(tmp_path), "--run-id", run_id,
+            "--data-inicio", "2010-01-01", "--data-fim", "2010-12-31", "--no-sample", "--resume",
+        ]
+    )
+
+    manifest = json.loads((tmp_path / "manifests" / f"{run_id}.json").read_text(encoding="utf-8"))
+    assert called == [11]
+    assert manifest["status"] == "completed"
+    assert manifest["deputados_processados"] == 2
+    assert manifest["deputados_resume_skipped"] == 1
+    assert manifest["deputados_prefix_restaurados"] == 1
+
+
+def test_collect_marks_manifest_interrupted_on_keyboard_interrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = importlib.import_module("coleta.camara.plenario_discursos.collect")
+    run_id = "camara-2010-interrupted"
+
+    class FakeClient:
+        def __enter__(self) -> "FakeClient":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(module, "OpenDataClient", lambda *_args, **_kwargs: FakeClient())
+    monkeypatch.setattr(
+        module,
+        "load_parlamentares_periodos",
+        lambda *_args, **_kwargs: {
+            "10": [
+                ParlamentarPeriodo("10", "Deputada", date(2010, 1, 1), date(2010, 12, 31), "camara")
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "_collect_discursos_deputado_adaptive",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        module.collect(
+            [
+                "--mode", "prod", "--output-dir", str(tmp_path), "--run-id", run_id,
+                "--data-inicio", "2010-01-01", "--data-fim", "2010-12-31", "--no-sample",
+            ]
+        )
+
+    manifest = json.loads((tmp_path / "manifests" / f"{run_id}.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "interrupted"
+
+
 def test_collect_deputados_paginates_metadata_with_stable_page_ids(tmp_path: Path) -> None:
     responses = {
         "https://example.test/api/v2/deputados?dataInicio=2026-05-01&dataFim=2026-05-18&itens=100&ordem=ASC&ordenarPor=nome": {

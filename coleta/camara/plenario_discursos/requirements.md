@@ -10,7 +10,9 @@
 - `--sample` / `--no-sample`: sobrescreve o default do modo.
 - `--sample-limit N`: limita deputados em validacoes/amostras.
 - `--resume`: pula particoes concluidas no checkpoint para o mesmo `run_id` e
-  registros ja existentes desse `run_id`.
+  registros ja existentes desse `run_id`. Dentro de partição aberta, pula
+  deputados já confirmados no checkpoint pelo mesmo ID e intervalo oficial de
+  mandato.
 - `--skip-existing-record-scan`: evita a varredura integral do raw somente em
   uma retomada situada entre particoes; exige `--resume`, checkpoint/log
   coerentes, nenhuma particao aberta na janela e zero falhas nao resolvidas.
@@ -63,6 +65,9 @@
   evita gastar a politica completa de retry em erros historicos persistentes.
   `429`, `502`, `503` e `504` continuam podendo usar retries normais quando
   nao houver fallback imediato seguro.
+- Um `Retry-After` enviado pela API pode atrasar no máximo 60 segundos cada
+  tentativa. O coletor não pode permanecer sem evento por horas devido a uma
+  espera controlada pelo servidor.
 - Ano vazio nao abre trimestre nem mes.
 - Ano positivo abre probes trimestrais com `itens=1`.
 - Trimestre vazio nao abre mes.
@@ -97,6 +102,8 @@
   mandato for usado.
 - O manifest deve terminar como `completed_with_errors` quando houver paginas
   mensais persistentes registradas como `discursos_page_error`.
+- Interrupção explícita do runtime deve terminar o manifest com
+  `status=interrupted`, nunca como `completed`.
 
 ## Limites
 
@@ -129,6 +136,14 @@
   cobertura parcial não pode parecer completa.
 - Com `--resume`, o coletor deve pular particoes concluidas pelo mesmo
   `run_id` e registros ja presentes no JSONL do mesmo `run_id`.
+- Após concluir um deputado sem erro de página, o checkpoint deve persistir a
+  unidade `deputado + intervalo de mandato`; a retomada deve pular essa unidade
+  sem nova consulta. Itens com erro ficam fora da fronteira e são tentados de
+  novo.
+- Para compatibilidade com interrupções de versões anteriores, um prefixo só
+  pode ser migrado do manifest se o plano por mandato tiver o mesmo tamanho e
+  houver probe raw para cada deputado do prefixo. A ordem é a dos IDs oficiais,
+  não nomes.
 - A varredura de registros existentes deve emitir progresso no stdout no
   inicio, a cada 50 mil linhas ou 25 arquivos e no fim.
 - Quando checkpoint e log forem coerentes e houver particao anual parcial, o
@@ -138,6 +153,9 @@
 - O processamento anual deve emitir `deputy_progress` no primeiro deputado, a
   cada 25 deputados e no ultimo; cada evento deve atualizar o autosave com
   `active_partition`, visitados, total, paginas, discursos e erros.
+- Antes de cada deputado, registrar `deputy_started`; ao pular fronteira
+  concluída, registrar `deputy_resume_skipped`. Isso identifica exatamente o
+  item em curso quando um endpoint deixa de responder.
 - Se o log contiver `partition_started` sem conclusao posterior para uma
   particao da janela, `--skip-existing-record-scan` deve ser recusado. A
   retomada normal continua permitida e deve reconstruir o indice a partir do

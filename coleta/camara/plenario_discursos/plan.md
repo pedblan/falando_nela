@@ -83,8 +83,20 @@ runtime proprios e nao pode bloquear a incorporacao da nova janela.
     mensal e paginas persistentes quebradas como erro auditavel em `metadata/`.
     O erro `500` aciona esse fallback rapidamente, porque nos anos historicos
     ele costuma ser persistente e ligado a registros/paginas especificos.
-11. Preservar `transcricao` como texto oficial quando entregue pela API.
-12. Quando houver endpoint oficial mais granular para texto integral do discurso
+11. Depois de concluir um deputado sem erro de página, gravar no checkpoint do
+    mesmo `run_id` uma fronteira por deputado e intervalo de mandato. Uma
+    retomada deve pular essa fronteira sem reconsultar a API; itens com erro de
+    página permanecem pendentes.
+12. Para recuperar uma interrupção produzida por versões anteriores que ainda
+    não gravavam essa fronteira, aceitar apenas o prefixo determinístico do
+    plano de mandatos declarado no manifest, se cada deputado do prefixo tiver
+    evidência raw de probe. A inferência registra sua proveniência no
+    checkpoint; nunca é feita por nome.
+13. Limitar a espera indicada por `Retry-After` da API a 60 segundos por
+    tentativa. Depois dos retries e fallbacks normais, registrar a falha
+    recuperável em vez de deixar o Colab sem progresso indefinidamente.
+14. Preservar `transcricao` como texto oficial quando entregue pela API.
+15. Quando houver endpoint oficial mais granular para texto integral do discurso
    ou sessao, esse texto deve ter prioridade sobre metadados, `sumario` e
    palavras-chave.
 
@@ -106,7 +118,7 @@ runtime proprios e nao pode bloquear a incorporacao da nova janela.
 - `data/raw/camara/plenario_discursos/metadata/{run_id}.jsonl`.
 - `data/raw/camara/plenario_discursos/ano=YYYY/mes=MM/{run_id}.jsonl`.
 - `data/checkpoints/camara/plenario_discursos.json`, com retomada por
-  `run_id`.
+  `run_id`, partição e fronteiras concluídas por deputado.
 - `data/logs/{run_id}.jsonl`.
 - `data/manifests/{run_id}.json`.
 

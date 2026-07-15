@@ -30,6 +30,7 @@ RECORD_TYPE = "discursos_page"
 YEAR_PROBE_RECORD_TYPE = "discursos_year_probe"
 QUARTER_PROBE_RECORD_TYPE = "discursos_quarter_probe"
 PAGE_ERROR_RECORD_TYPE = "discursos_page_error"
+DEPUTY_COMPLETE_CHECKPOINT_KIND = "discursos_deputado_complete"
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 FAST_FALLBACK_STATUS_CODES = {500}
 
@@ -189,6 +190,15 @@ def collect(argv: Sequence[str] | None = None) -> None:
                         planejamento="parlamentares_periodos" if periodos_by_deputado else "api_deputados_periodo",
                     )
 
+                    restored_prefix = _restore_interrupted_deputy_prefix(
+                        run,
+                        deputados=deputados,
+                        partition=partition,
+                    )
+                    preflight_stats["resume_deputados_prefix_restored"] += restored_prefix
+                    resumed_deputados = 0
+                    completed_deputy_items: dict[str, dict[str, Any]] = {}
+
                     for deputado_index, deputado in enumerate(deputados, start=1):
                         try:
                             if (
@@ -211,6 +221,29 @@ def collect(argv: Sequence[str] | None = None) -> None:
                                 "data_inicio": request_start.isoformat(),
                                 "data_fim": request_end.isoformat(),
                             }
+                            checkpoint_item_id = _deputy_checkpoint_item_id(
+                                deputado_id=int(deputado_id),
+                                start=request_start,
+                                end=request_end,
+                            )
+                            if run.is_item_complete(checkpoint_item_id):
+                                processed_deputados += 1
+                                resumed_deputados += 1
+                                preflight_stats["resume_deputados_skipped"] += 1
+                                run.log(
+                                    "deputy_resume_skipped",
+                                    partition=partition,
+                                    deputado_id=deputado_id,
+                                    periodo=request_periodo,
+                                    checkpoint_item_id=checkpoint_item_id,
+                                )
+                                continue
+                            run.log(
+                                "deputy_started",
+                                partition=partition,
+                                deputado_id=deputado_id,
+                                periodo=request_periodo,
+                            )
                             try:
                                 stats = _collect_discursos_deputado_adaptive(
                                     client,
@@ -241,12 +274,21 @@ def collect(argv: Sequence[str] | None = None) -> None:
                             processed_discourse_pages += stats["pages"]
                             processed_discourses += stats["discursos"]
                             processed_transcricoes += stats["transcricoes"]
+                            if not stats.get("page_errors", 0):
+                                completed_deputy_items[checkpoint_item_id] = {
+                                    "kind": DEPUTY_COMPLETE_CHECKPOINT_KIND,
+                                    "partition": partition,
+                                    "deputado_id": int(deputado_id),
+                                    "periodo": request_periodo,
+                                }
                         finally:
                             if (
                                 deputado_index == 1
                                 or deputado_index % 25 == 0
                                 or deputado_index == len(deputados)
                             ):
+                                run.mark_items_complete(completed_deputy_items)
+                                completed_deputy_items = {}
                                 progress = {
                                     "partition": partition,
                                     "deputados_visitados": deputado_index,
@@ -255,6 +297,8 @@ def collect(argv: Sequence[str] | None = None) -> None:
                                     "paginas_discursos": processed_discourse_pages,
                                     "discursos": processed_discourses,
                                     "discursos_com_transcricao": processed_transcricoes,
+                                    "deputados_resume_skipped": resumed_deputados,
+                                    "deputados_prefix_restaurados": restored_prefix,
                                     "errors": errors,
                                 }
                                 run.log("deputy_progress", **progress)
@@ -267,6 +311,8 @@ def collect(argv: Sequence[str] | None = None) -> None:
                         "paginas_discursos": processed_discourse_pages,
                         "discursos": processed_discourses,
                         "discursos_com_transcricao": processed_transcricoes,
+                        "deputados_resume_skipped": resumed_deputados,
+                        "deputados_prefix_restaurados": restored_prefix,
                         "preflight": dict(preflight_stats),
                     }
                     if partition_errors:
@@ -290,6 +336,10 @@ def collect(argv: Sequence[str] | None = None) -> None:
                     run.mark_partition_failed(partition, periodo=periodo, error=error_summary(exc, include_traceback=True))
                     run.log("partition_failed", partition=partition, error=error_summary(exc))
                     continue
+    except KeyboardInterrupt:
+        status = "interrupted"
+        run.log("run_interrupted", reason="keyboard_interrupt")
+        raise
     except Exception as exc:
         errors += 1
         status = "failed"
@@ -302,6 +352,8 @@ def collect(argv: Sequence[str] | None = None) -> None:
             sample=runtime.sample,
             sample_limit=runtime.sample_limit,
             deputados_processados=processed_deputados,
+            deputados_resume_skipped=preflight_stats.get("resume_deputados_skipped", 0),
+            deputados_prefix_restaurados=preflight_stats.get("resume_deputados_prefix_restored", 0),
             deputados_periodos_carregados=len(periodos_by_deputado),
             paginas_discursos=processed_discourse_pages,
             discursos=processed_discourses,
@@ -313,6 +365,88 @@ def collect(argv: Sequence[str] | None = None) -> None:
             errors=errors,
         )
         print(run.manifest_path)
+
+
+def _deputy_checkpoint_item_id(*, deputado_id: int, start: date, end: date) -> str:
+    return f"deputado:{deputado_id}:discursos:{start.isoformat()}:{end.isoformat()}"
+
+
+def _restore_interrupted_deputy_prefix(
+    run: CollectionRun,
+    *,
+    deputados: list[dict[str, Any]],
+    partition: str,
+) -> int:
+    """Migra uma fronteira segura gravada por versões anteriores do coletor.
+
+    A versão antiga só persistia o total concluído no manifest quando o Colab
+    era interrompido. A ordem do plano por mandato é determinística; portanto,
+    a fronteira pode ser retomada sem reconsultar esse prefixo, desde que cada
+    deputado tenha evidência raw e o manifest descreva o mesmo plano.
+    """
+    if not run.resume or run.completed_item_ids() or not run.manifest_path.is_file():
+        return 0
+    try:
+        manifest = json.loads(run.manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    if (
+        manifest.get("run_id") != run.run_id
+        or manifest.get("status") != "completed"
+        or manifest.get("errors") != 0
+        or manifest.get("deputados_periodos_carregados") != len(deputados)
+    ):
+        return 0
+    try:
+        completed_count = int(manifest.get("deputados_processados", 0))
+    except (TypeError, ValueError):
+        return 0
+    if not 0 < completed_count < len(deputados):
+        return 0
+
+    prefix = deputados[:completed_count]
+    for deputado in prefix:
+        deputado_id = deputado.get("id")
+        if deputado_id is None:
+            return 0
+        has_probe = run.has_record(
+            source_id=f"deputado:{int(deputado_id)}:discursos:ano:{partition}",
+            record_type=YEAR_PROBE_RECORD_TYPE,
+        ) or any(
+            run.has_record(
+                source_id=f"deputado:{int(deputado_id)}:discursos:trimestre:{partition}-Q{quarter}",
+                record_type=QUARTER_PROBE_RECORD_TYPE,
+            )
+            for quarter in range(1, 5)
+        )
+        if not has_probe:
+            return 0
+
+    items: dict[str, dict[str, Any]] = {}
+    for deputado in prefix:
+        deputado_id = int(deputado["id"])
+        start, end = parlamentar_active_period(
+            deputado,
+            date.fromisoformat(partition + "-01-01"),
+            date.fromisoformat(partition + "-12-31"),
+        )
+        item_id = _deputy_checkpoint_item_id(deputado_id=deputado_id, start=start, end=end)
+        items[item_id] = {
+            "kind": DEPUTY_COMPLETE_CHECKPOINT_KIND,
+            "partition": partition,
+            "deputado_id": deputado_id,
+            "periodo": {"data_inicio": start.isoformat(), "data_fim": end.isoformat()},
+            "inferred_from": "interrupted_manifest_prefix_v1",
+        }
+    restored = run.mark_items_complete(items)
+    if restored:
+        run.log(
+            "resume_deputy_prefix_restored",
+            partition=partition,
+            deputados_restaurados=restored,
+            manifest=str(run.manifest_path),
+        )
+    return restored
 
 
 def validate_clean_checkpoint_boundary(

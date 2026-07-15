@@ -179,6 +179,28 @@ def test_open_data_client_retries_transient_status() -> None:
     assert result.data == {"ok": True}
 
 
+def test_open_data_client_caps_server_retry_after() -> None:
+    calls = {"count": 0}
+    sleeps: list[float] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return httpx.Response(429, headers={"Retry-After": "3600"})
+        return httpx.Response(200, json={"ok": True})
+
+    client = OpenDataClient(
+        "https://example.test",
+        max_retry_after_seconds=12,
+        sleep=sleeps.append,
+    )
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+
+    assert client.get_json("/dados").data == {"ok": True}
+    assert calls["count"] == 2
+    assert sleeps == [12]
+
+
 def test_open_data_client_get_text() -> None:
     seen_accept_headers: list[str | None] = []
 
@@ -326,6 +348,31 @@ def test_collection_run_writes_record_checkpoint_and_manifest(tmp_path) -> None:
     assert manifest["record_counts"]["response"] == 1
     assert autosave["run_id"] == "run-test"
     assert run.should_skip_partition("2026-05")
+
+
+def test_collection_run_persists_completed_items_for_resume(tmp_path) -> None:
+    run = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-test",
+        resume=False,
+    )
+
+    assert run.mark_items_complete({"item:1": {"kind": "unit"}}) == 1
+    assert run.is_item_complete("item:1")
+    assert run.completed_item_ids() == {"item:1"}
+
+    resumed = CollectionRun(
+        tmp_path,
+        source="fonte",
+        dataset="dataset",
+        run_id="run-test",
+        resume=True,
+    )
+
+    assert resumed.is_item_complete("item:1")
+    assert resumed.mark_items_complete({"item:1": {"kind": "unit"}}) == 0
 
 
 def test_collection_run_does_not_skip_partition_completed_by_other_run_id(tmp_path) -> None:

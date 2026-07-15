@@ -79,6 +79,12 @@ Os testes devem cobrir:
 - aceite da retomada rapida quando o ultimo `partition_started` possui
   `partition_completed`, e recusa quando uma particao da janela permanece
   aberta ou falha;
+- persistência e reaproveitamento de fronteira por deputado na retomada de uma
+  partição aberta, sem nova consulta para o deputado já confirmado;
+- migração segura do prefixo de manifest interrompido somente quando os probes
+  raw e o plano de mandatos comprovarem a mesma ordem e quantidade;
+- teto de 60 segundos para um `Retry-After` excessivo e `status=interrupted`
+  após interrupção explícita, sem manifest falsamente `completed`;
 - uso de um `parlamentares_periodos` explicito fora do `data_root`;
 - progresso visivel da varredura de registros existentes e heartbeats por
   lote de deputados.
@@ -127,11 +133,11 @@ Os testes devem cobrir:
   bem-sucedida, a conclusão posterior do mesmo ano é a única autorização para
   pulá-lo.
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular
-  particoes/registros ja gravados desse `run_id`, sem pular particoes
-  concluidas por outro `run_id`.
+  particoes, registros e deputados concluídos desse `run_id`, sem pular
+  particoes concluidas por outro `run_id`.
 - Em retomada parcial, o stdout deve mostrar `resume_record_scan_started`,
   `resume_record_scan_progress`, `resume_record_scan_completed` e depois
-  `deputy_progress`; o autosave deve indicar `existing_record_scan=filtered`,
+  `deputy_started`/`deputy_progress`; o autosave deve indicar `existing_record_scan=filtered`,
   `existing_record_scan_years` com os anos parciais e `active_partition`.
 - Se checkpoint e log nao permitirem provar o escopo parcial, o autosave deve
   indicar `existing_record_scan=loaded` e a retomada deve ler todo o run.
