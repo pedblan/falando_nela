@@ -71,6 +71,12 @@ código, data e página. Se não houver uma publicação DCN, o PDF não tiver t
 extraível ou o trecho não puder ser delimitado, o item falha e a partição fica
 retomável; nunca se grava texto de outro orador como recuperação bem-sucedida.
 
+Quando o payload histórico por senador não trouxer nome do orador, o
+recuperador consulta a página oficial de pronunciamento pelo próprio
+`CodigoPronunciamento` para obtê-lo. Essa consulta não descobre nem troca a
+identidade do item; apenas fornece o marcador necessário para recortar a página
+DCN já escolhida pelo código.
+
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.

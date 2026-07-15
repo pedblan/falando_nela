@@ -28,6 +28,9 @@ O manifest precisa ter `status=completed`, `errors=0` e um
 proveniência deve indicar `diario-congresso-oficial-por-codigo-v1`, `DCN`, o
 código do diário e as páginas baixadas. Falta de texto, publicação DCN ambígua,
 PDF sem texto ou delimitação de orador ambígua é falha retomável, não cobertura.
+Quando a população não trouxer nome, a proveniência deve registrar
+`speaker_source=portal_oficial` e o portal deve ter sido consultado pelo mesmo
+`CodigoPronunciamento` da população.
 
 ## Smoke test
 

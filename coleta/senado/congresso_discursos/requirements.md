@@ -52,8 +52,15 @@
 - `CodigoPronunciamento` é a chave exclusiva de identidade. O nome do orador
   pode ser usado apenas para delimitar seu trecho no PDF já selecionado por
   publicação/página; não pode descobrir nem substituir o código.
+- Se o payload de origem não tiver nome do orador, o recuperador deve consultar
+  a página oficial de pronunciamento pelo mesmo `CodigoPronunciamento` e
+  registrar `speaker_source=portal_oficial`. Ausência do autor também nessa
+  página é falha retomável; o coletor não pode inferir o nome por texto ou por
+  outro código.
 - Um trecho só é aceito se começa no cabeçalho do orador esperado e termina no
-  cabeçalho do próximo orador; falha de delimitação deve falhar o item.
+  cabeçalho do próximo orador; para `Fala da Presidência`, o cabeçalho
+  `O SR./A SRA. PRESIDENTE (Nome...)` é o marcador oficial equivalente. Falha
+  de delimitação deve falhar o item.
 - O resultado aprovado usa o contrato canônico de `pronunciamento_texto`, com
   `texto_status=disponivel` e
   `metodo_obtencao=diario-congresso-oficial-por-codigo-v1`.

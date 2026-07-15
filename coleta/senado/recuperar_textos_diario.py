@@ -7,6 +7,7 @@ import re
 import unicodedata
 from collections import Counter, defaultdict
 from datetime import date
+from html import unescape
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
@@ -21,6 +22,7 @@ SOURCE = "senado"
 DATASET = "congresso_discursos"
 HOUSE = "CN"
 DIARIOS_BASE_URL = "https://legis.senado.leg.br/"
+PORTAL_PRONUNCIAMENTO_URL = "https://www25.senado.leg.br/web/atividade/pronunciamentos/-/p/pronunciamento/{codigo}"
 DIARY_LOOKUP_PATH = "diarios/BuscaDiario"
 DIARY_PAGES_PATH = "diarios/BuscaPaginasDiario"
 DIARY_TYPE_CONGRESSO = 2
@@ -195,9 +197,7 @@ def load_population(path: Path, *, start: date, end: date) -> list[dict[str, Any
         if not start <= value_date <= end:
             continue
         publication = select_congress_publication(pronunciamento)
-        speaker = _string(_first(pronunciamento, "NomeAutor", "NomeParlamentar", "Autor"))
-        if not speaker:
-            raise ValueError(f"Nome do orador ausente para CodigoPronunciamento={code}")
+        speaker = speaker_from_pronunciamento(pronunciamento)
         normalized = {
             "codigo_pronunciamento": code,
             "data": value_date.isoformat(),
@@ -206,6 +206,7 @@ def load_population(path: Path, *, start: date, end: date) -> list[dict[str, Any
             "pronunciamento": pronunciamento,
             "publication": publication,
             "speaker": speaker,
+            "speaker_source": "pronunciamento" if speaker else "pendente_portal_oficial",
         }
         previous = by_code.get(code)
         if previous and previous != normalized:
@@ -249,6 +250,17 @@ def recover_pronunciamento_texto(
     client: OpenDataClient,
     record: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    resolved_from_portal = not record.get("speaker")
+    speaker = record.get("speaker") or fetch_speaker_from_portal(client, record["codigo_pronunciamento"])
+    record = {
+        **record,
+        "speaker": speaker,
+        "speaker_source": (
+            "portal_oficial"
+            if resolved_from_portal
+            else record.get("speaker_source", "pronunciamento")
+        ),
+    }
     publication = record["publication"]
     diary = lookup_congress_diary(client, publication)
     page_start = int(publication["pagina_inicial"])
@@ -287,6 +299,51 @@ def recover_pronunciamento_texto(
         f"Não foi possível delimitar o texto de {record['speaker']!r} para "
         f"CodigoPronunciamento={record['codigo_pronunciamento']} no DCN {diary['codigo_diario']}"
     )
+
+
+def speaker_from_pronunciamento(pronunciamento: dict[str, Any]) -> str | None:
+    direct = _string(_first(pronunciamento, "NomeAutor", "NomeParlamentar", "NomeOrador"))
+    if direct:
+        return direct
+    for path in [
+        ("Autor", "Nome"),
+        ("Autor", "NomeParlamentar"),
+        ("Parlamentar", "Nome"),
+        ("Parlamentar", "NomeParlamentar"),
+        ("IdentificacaoParlamentar", "NomeParlamentar"),
+    ]:
+        value: Any = pronunciamento
+        for key in path:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(key)
+        name = _string(value)
+        if name:
+            return name
+    return None
+
+
+def fetch_speaker_from_portal(client: OpenDataClient, codigo_pronunciamento: str) -> str:
+    endpoint = PORTAL_PRONUNCIAMENTO_URL.format(codigo=codigo_pronunciamento)
+    result = client.get_text(endpoint)
+    match = re.search(
+        r"<dt>\s*Autor\s*</dt>\s*<dd>\s*<span>\s*(.*?)\s*</span>",
+        str(result.data),
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        raise ValueError(
+            "Autor ausente no portal oficial para "
+            f"CodigoPronunciamento={codigo_pronunciamento}: {result.url}"
+        )
+    speaker = _string(re.sub(r"<[^>]+>", "", unescape(match.group(1))))
+    if not speaker:
+        raise ValueError(
+            "Autor vazio no portal oficial para "
+            f"CodigoPronunciamento={codigo_pronunciamento}: {result.url}"
+        )
+    return speaker
 
 
 def lookup_congress_diary(client: OpenDataClient, publication: dict[str, Any]) -> dict[str, Any]:
@@ -347,8 +404,9 @@ def download_diary_pages(
 def extract_speaker_text(document_text: str, speaker: str) -> str | None:
     normalized_document = _normalize(document_text)
     normalized_speaker = _normalize(speaker)
+    speaker_heading = re.escape(normalized_speaker)
     start_pattern = re.compile(
-        rf"(?:^|\n)\s*(?:O|A)\s+S(?:R|RA)\.\s+{re.escape(normalized_speaker)}\s*(?=\(|[-–])",
+        rf"(?:^|\n)\s*(?:O|A)\s+S(?:R|RA)\.\s+(?:{speaker_heading}\s*(?=\(|[-–])|PRESIDENTE\s*\(\s*{speaker_heading}\b)",
         flags=re.MULTILINE,
     )
     start = start_pattern.search(normalized_document)
@@ -392,6 +450,7 @@ def build_payload(
                 "strategy": RECOVERY_STRATEGY,
                 "codigo_pronunciamento": code,
                 "speaker_for_segment_boundary": record["speaker"],
+                "speaker_source": record["speaker_source"],
                 "publication": publication,
                 "diary": diary,
                 "pages_downloaded": pages_downloaded,

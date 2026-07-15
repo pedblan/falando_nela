@@ -53,8 +53,39 @@ def test_load_population_requires_dcn_publication_and_keeps_code_identity(tmp_pa
                 "url_diario_original": "http://legis.senado.leg.br/diarios/BuscaDiario?tipDiario=1",
             },
             "speaker": "Antônio Carlos Valadares",
+            "speaker_source": "pronunciamento",
         }
     ]
+
+
+def test_missing_speaker_is_kept_for_code_bound_portal_lookup(tmp_path: Path) -> None:
+    record = _population_record()
+    record["pronunciamento"].pop("NomeAutor")
+    path = tmp_path / "population.jsonl"
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    rows = recovery.load_population(
+        path,
+        start=recovery.date(2010, 1, 1),
+        end=recovery.date(2010, 12, 31),
+    )
+
+    assert rows[0]["speaker"] is None
+    assert rows[0]["speaker_source"] == "pendente_portal_oficial"
+
+
+def test_fetch_speaker_from_portal_uses_the_exact_pronunciamento_code() -> None:
+    class FakeClient:
+        def get_text(self, endpoint: str) -> HttpResult:
+            assert endpoint.endswith("/384499")
+            return HttpResult(
+                endpoint,
+                200,
+                {},
+                "<dl><dt>Autor</dt><dd><span>José Sarney</span></dd></dl>",
+            )
+
+    assert recovery.fetch_speaker_from_portal(FakeClient(), "384499") == "José Sarney"  # type: ignore[arg-type]
 
 
 def test_extract_speaker_text_is_accent_insensitive_and_stops_at_next_speaker() -> None:
@@ -68,6 +99,20 @@ O SR. PRESIDENTE (Mão Santa) – Próximo orador.
 
     assert text is not None
     assert text.startswith("O SR. ANTONIO CARLOS VALADARES")
+    assert "Próximo orador" not in text
+
+
+def test_extract_speaker_text_accepts_the_presidency_heading() -> None:
+    document = """
+O SR. PRESIDENTE (José Sarney. PMDB – AP) – Sob a proteção de Deus, iniciamos
+os trabalhos desta reunião e registramos conteúdo suficiente para o recorte oficial.
+O SR. MÁRCIO REINALDO MOREIRA (PP – MG) – Próximo orador.
+"""
+
+    text = recovery.extract_speaker_text(document, "José Sarney")
+
+    assert text is not None
+    assert text.startswith("O SR. PRESIDENTE (José Sarney")
     assert "Próximo orador" not in text
 
 
