@@ -10,6 +10,15 @@
    `--strict` e o caminho desse snapshot.
 5. Fechar o ciclo somente com todos os gates verdadeiros em `summary.json`.
 
+## Backfill auditado de senadores
+
+Depois de uma auditoria por CodigoParlamentar desde 2010 concluir sem IDs
+ausentes, a reconstrução também deve ler todo o raw cumulativo e substituir
+somente processed current e Parquets current. O caderno
+07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb valida a
+auditoria, cria um snapshot separado e confirma cobertura em 2015 e 2016 sem
+reutilizar o ciclo histórico de coleta.
+
 ## Ciclo operacional 20260713
 
 - Regerar a fotografia canonica `current` depois que todas as faixas de coleta

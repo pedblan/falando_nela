@@ -17,6 +17,17 @@ Cada linha Parquet deve estar no snapshot ou em
 estar presentes; `normalization_loss`, `parquet_loss` e perda de snapshot sem
 justificativa reprovam o ciclo.
 
+## Gate do backfill auditado de senadores
+
+- Exigir reauditoria por CodigoParlamentar com zero IDs ausentes, erros,
+  conflitos e JSONL inválido antes de qualquer derivado.
+- Reconstruir processed current e Parquets current sem limitar o raw aos runs
+  de backfill.
+- Criar um snapshot com run id específico e exigir cobertura positiva de
+  Senado e Congresso nos anos 2015 e 2016.
+- Persistir o checksum do snapshot e a tabela de cobertura no summary do
+  backfill.
+
 ## Gate do ciclo 20260713
 
 - Nao iniciar processamento enquanto algum run requerido estiver sem manifest

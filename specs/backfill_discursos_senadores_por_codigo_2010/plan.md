@@ -40,3 +40,11 @@ SF e CN rodam em sequência, com locks independentes. Um manifest só é aceito
 com status completed e errors igual a zero. Depois dos dois manifests, a mesma
 auditoria é executada com resume, strict e require-complete. Não gerar
 derivados ou snapshot enquanto houver qualquer lacuna de senador.
+
+## Derivados pós-auditoria
+
+Depois da reauditoria aprovada, reconstruir processed-textos-v1-current e
+parquet-textos-v1-current a partir de todo o raw cumulativo, sem filtrar pelos
+dois runs de backfill. Criar um snapshot novo e validar que os Parquets e o
+snapshot contêm linhas de Senado e Congresso em 2015 e 2016. Essa etapa usa o
+caderno de processamento 07 e não reutiliza os gates do caderno 06.

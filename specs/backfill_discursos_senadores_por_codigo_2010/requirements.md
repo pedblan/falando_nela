@@ -47,3 +47,15 @@
   com o mesmo run-id e resume.
 - CN é cobertura de senadores em sessões conjuntas, não uma substituição da
   descoberta de deputados ou outras autoridades. IDs extras no raw permanecem.
+
+## Reconstrução dos derivados
+
+- A execução depende de senator_endpoint_summary.json com missing_ids,
+  errors, invalid_probe_lines, invalid_raw_lines e source_conflicts iguais a
+  zero, e somente estado complete na cobertura.
+- A normalização usa mode prod, data-root explícito, run-id
+  processed-textos-v1-current e overwrite, sem raw-run-id.
+- A conversão Parquet usa o perfil colab, o mesmo data-root, run-id
+  parquet-textos-v1-current e overwrite.
+- O snapshot usa um analysis run id exclusivo do backfill e pode ser refeito
+  com overwrite sem alterar raw ou a fotografia current.

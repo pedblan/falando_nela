@@ -19,6 +19,12 @@ Convencoes:
 
 Arquivos atuais:
 
+- 07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb: depois da
+  reauditoria completa do caderno 08 de coleta, reconstrói os derivados
+  current a partir de todo o raw, gera Parquets, cria o snapshot pós-backfill
+  e valida cobertura de Senado e Congresso em 2015 e 2016. Não depende dos
+  manifests da recuperação histórica anterior.
+
 - `06_processamento_validacao_atualizacao_colab.ipynb`: bloqueia derivados ate
   todas as faixas obrigatorias do ciclo `20260713` estarem completas ou
   possuirem adiamento exato e auditado. Registra separadamente o run historico
