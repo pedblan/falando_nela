@@ -94,6 +94,11 @@
   `discursos_page_error` em `metadata/`.
 - A primeira tentativa mensal ordenada que receber `500` deve acionar fallback
   rapido sem aguardar todos os retries do cliente HTTP padrao.
+- A paginação mensal deve persistir cada resposta antes de solicitar a próxima;
+  não pode acumular uma lista ilimitada de páginas em memória.
+- Um `rel=next` posterior ao `rel=last` deve ser ignorado e registrado como
+  anomalia. URL de página repetida, `rel=last` contraditório ou mais de 1.000
+  páginas no mesmo deputado/mês deve falhar a janela de modo auditável.
 - `transcricao` deve ser preservada como texto prioritario quando estiver
   disponivel.
 - Nomes e transcrições devem preservar Unicode/UTF-8, inclusive diacríticos
@@ -165,6 +170,8 @@
 - Antes de uma página mensal sem cache raw, registrar
   `discursos_page_request_started`; uso de payload já gravado registra
   `record_resume_reused`.
+- Quando a API entregar `next` além da última página declarada, registrar
+  `discursos_pagination_next_ignored` com a URL descartada.
 - Se o log contiver `partition_started` sem conclusao posterior para uma
   particao da janela, `--skip-existing-record-scan` deve ser recusado. A
   retomada normal continua permitida e deve reconstruir o indice a partir do

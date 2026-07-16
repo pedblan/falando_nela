@@ -89,6 +89,9 @@ Os testes devem cobrir:
   chamada HTTP para o `source_id` já gravado;
 - aplicação do intervalo mínimo também nas requisições de fallback rápido e
   emissão de `discursos_page_request_started` antes de página sem cache;
+- paginação contraditória (`next` após `last`) encerrada na última página
+  declarada, com páginas anteriores já persistidas; URL repetida deve falhar
+  antes de nova chamada HTTP;
 - uso de um `parlamentares_periodos` explicito fora do `data_root`;
 - progresso visivel da varredura de registros existentes e heartbeats por
   lote de deputados.
@@ -151,6 +154,9 @@ Os testes devem cobrir:
   indicar `existing_record_scan=loaded` e a retomada deve ler todo o run.
 - Cada chamada mensal não presente no raw deve ser precedida no stdout por
   `discursos_page_request_started`, com deputado, página e período.
+- Uma sequência de `rel=next` não pode gerar milhares de páginas em memória:
+  o JSONL mensal deve receber cada página imediatamente e o log deve registrar
+  `discursos_pagination_next_ignored` quando `next` contradisser `last`.
 - Em fronteira limpa validada, o manifest deve indicar
   `skip_existing_record_scan=true` e `existing_record_scan=skipped`.
 

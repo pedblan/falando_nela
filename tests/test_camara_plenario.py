@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from coleta.camara.plenario_discursos.collect import (
+    DiscursosPaginationError,
     _collect_deputados,
     _collect_discursos_deputado,
     _collect_discursos_deputado_adaptive,
@@ -439,12 +440,14 @@ def test_collect_discursos_pages_reuse_cached_raw_without_calling_api(tmp_path: 
     )
     resumed = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=True)
 
-    class ForbiddenClient:
-        def __getattr__(self, _name: str) -> object:
-            raise AssertionError("a pagina raw deveria evitar qualquer chamada HTTP")
+    def fail_request(_request: httpx.Request) -> httpx.Response:
+        raise AssertionError("a pagina raw deveria evitar qualquer chamada HTTP")
+
+    client = OpenDataClient("https://example.test")
+    client.client = httpx.Client(transport=httpx.MockTransport(fail_request), follow_redirects=True)
 
     stats = _collect_discursos_deputado(
-        ForbiddenClient(),  # type: ignore[arg-type]
+        client,
         resumed,
         partition="2010-01",
         periodo={"data_inicio": "2010-01-01", "data_fim": "2010-01-31"},
@@ -453,6 +456,89 @@ def test_collect_discursos_pages_reuse_cached_raw_without_calling_api(tmp_path: 
 
     assert stats == {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0}
     assert "record_resume_reused" in (tmp_path / "logs" / f"{run_id}.jsonl").read_text(encoding="utf-8")
+
+
+def test_collect_discursos_honors_declared_last_page_and_persists_pages(tmp_path: Path) -> None:
+    seen_pages: list[str | None] = []
+    base_url = "https://example.test/api/v2/deputados/10/discursos"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = request.url.params.get("pagina")
+        seen_pages.append(page)
+        if page in {None, "1"}:
+            return httpx.Response(
+                200,
+                json={
+                    "dados": [{"transcricao": "primeira"}],
+                    "links": [
+                        {"rel": "next", "href": f"{base_url}?pagina=2"},
+                        {"rel": "last", "href": f"{base_url}?pagina=2"},
+                    ],
+                },
+            )
+        if page == "2":
+            return httpx.Response(
+                200,
+                json={
+                    "dados": [{"transcricao": "segunda"}],
+                    "links": [
+                        {"rel": "next", "href": f"{base_url}?pagina=3"},
+                        {"rel": "last", "href": f"{base_url}?pagina=2"},
+                    ],
+                },
+            )
+        raise AssertionError(f"a pagina circular não deveria ser requisitada: {page}")
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id="cycle", resume=False)
+
+    stats = _collect_discursos_deputado(
+        client,
+        run,
+        partition="2010-02",
+        periodo={"data_inicio": "2010-02-01", "data_fim": "2010-02-28"},
+        deputado_id=10,
+    )
+
+    raw_path = tmp_path / "raw" / "camara" / "plenario_discursos" / "ano=2010" / "mes=02" / "cycle.jsonl"
+    records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines()]
+    assert stats == {"pages": 2, "discursos": 2, "transcricoes": 2, "page_errors": 0}
+    assert seen_pages == [None, "2"]
+    assert [record["source_id"] for record in records] == [
+        "deputado:10:discursos:2010-02:pagina:1",
+        "deputado:10:discursos:2010-02:pagina:2",
+    ]
+    assert "discursos_pagination_next_ignored" in (tmp_path / "logs" / "cycle.jsonl").read_text(encoding="utf-8")
+
+
+def test_collect_discursos_rejects_repeated_page_link(tmp_path: Path) -> None:
+    seen_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_urls.append(str(request.url))
+        return httpx.Response(
+            200,
+            json={
+                "dados": [{"transcricao": "repetida"}],
+                "links": [{"rel": "next", "href": str(request.url)}],
+            },
+        )
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    run = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id="repeat", resume=False)
+
+    with pytest.raises(DiscursosPaginationError, match="Link de página repetido"):
+        _collect_discursos_deputado(
+            client,
+            run,
+            partition="2010-02",
+            periodo={"data_inicio": "2010-02-01", "data_fim": "2010-02-28"},
+            deputado_id=10,
+        )
+
+    assert len(seen_urls) == 1
 
 
 def test_fast_fallback_respects_camara_request_interval() -> None:

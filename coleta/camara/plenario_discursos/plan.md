@@ -101,8 +101,12 @@ runtime proprios e nao pode bloquear a incorporacao da nova janela.
 15. Espaçar chamadas à API da Câmara em pelo menos 0,2 segundo e registrar
     `discursos_page_request_started` antes de cada página ainda ausente, para
     distinguir espera remota de retomada local no Colab.
-16. Preservar `transcricao` como texto oficial quando entregue pela API.
-17. Quando houver endpoint oficial mais granular para texto integral do discurso
+16. Persistir cada página mensal assim que ela chegar, em vez de acumular a
+    paginação em memória. O paginador deve memorizar URLs já visitadas, respeitar
+    `rel=last`, ignorar um `rel=next` posterior à última página declarada e
+    falhar de forma auditável em ciclos ou acima de mil páginas mensais.
+17. Preservar `transcricao` como texto oficial quando entregue pela API.
+18. Quando houver endpoint oficial mais granular para texto integral do discurso
    ou sessao, esse texto deve ter prioridade sobre metadados, `sumario` e
    palavras-chave.
 

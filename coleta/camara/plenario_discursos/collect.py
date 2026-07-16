@@ -34,6 +34,11 @@ DEPUTY_COMPLETE_CHECKPOINT_KIND = "discursos_deputado_complete"
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 FAST_FALLBACK_STATUS_CODES = {500}
 CAMARA_MIN_INTERVAL_SECONDS = 0.2
+MAX_DISCURSOS_PAGES_PER_MONTH = 1_000
+
+
+class DiscursosPaginationError(RuntimeError):
+    """A API retornou uma sequência de páginas impossível de concluir."""
 
 
 def collect(argv: Sequence[str] | None = None) -> None:
@@ -802,7 +807,7 @@ def _collect_discursos_deputado(
     path = f"api/v2/deputados/{deputado_id}/discursos"
     default_params = _discursos_params(periodo["data_inicio"], periodo["data_fim"], itens=100, ordered=True)
     try:
-        pages = _fetch_discursos_pages_follow_next(
+        return _fetch_discursos_pages_follow_next(
             client,
             run,
             path,
@@ -812,13 +817,6 @@ def _collect_discursos_deputado(
             strategy="default",
             retries=True,
             fast_fallback=True,
-        )
-        return _write_discursos_pages(
-            run,
-            partition=partition,
-            periodo=periodo,
-            deputado_id=deputado_id,
-            pages=pages,
         )
     except httpx.HTTPStatusError as exc:
         if not _is_retryable_http_error(exc):
@@ -834,7 +832,7 @@ def _collect_discursos_deputado(
 
     unordered_params = _discursos_params(periodo["data_inicio"], periodo["data_fim"], itens=100, ordered=False)
     try:
-        pages = _fetch_discursos_pages_follow_next(
+        return _fetch_discursos_pages_follow_next(
             client,
             run,
             path,
@@ -844,13 +842,6 @@ def _collect_discursos_deputado(
             strategy="sem_ordenacao",
             retries=False,
             fast_fallback=False,
-        )
-        return _write_discursos_pages(
-            run,
-            partition=partition,
-            periodo=periodo,
-            deputado_id=deputado_id,
-            pages=pages,
         )
     except httpx.HTTPStatusError as exc:
         if not _is_retryable_http_error(exc):
@@ -916,14 +907,39 @@ def _fetch_discursos_pages_follow_next(
     strategy: str,
     retries: bool,
     fast_fallback: bool,
-) -> list[dict[str, Any]]:
-    pages: list[dict[str, Any]] = []
+) -> dict[str, int]:
+    """Busca e persiste páginas uma a uma, recusando links circulares.
+
+    Alguns retornos históricos da API podem expor um `rel=next` incompatível
+    com o próprio `rel=last`. Não se pode manter uma lista ilimitada dessas
+    respostas em RAM nem seguir o link além do limite anunciado pela fonte.
+    """
+    stats = {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0}
     next_url: str | None = path
     next_params: dict[str, Any] | None = params
     page_index = 1
+    seen_request_urls: set[str] = set()
+    last_page: int | None = None
     while next_url:
+        if page_index > MAX_DISCURSOS_PAGES_PER_MONTH:
+            raise DiscursosPaginationError(
+                f"Limite de {MAX_DISCURSOS_PAGES_PER_MONTH} páginas excedido para "
+                f"deputado={deputado_id}, período={partition}"
+            )
         request_path = next_url
         request_params = next_params or {}
+        request_url = str(
+            client.client.build_request(
+                "GET",
+                client._resolve_url(request_path),
+                params=next_params,
+            ).url
+        )
+        if request_url in seen_request_urls:
+            raise DiscursosPaginationError(
+                f"Link de página repetido para deputado={deputado_id}, período={partition}: {request_url}"
+            )
+        seen_request_urls.add(request_url)
         source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
         cached = _cached_result(run, source_id=source_id, record_type=RECORD_TYPE)
         if cached is not None:
@@ -946,18 +962,52 @@ def _fetch_discursos_pages_follow_next(
                 result = client.get_json(next_url, params=next_params)
             else:
                 result = _get_json_once(client, next_url, params=request_params)
-        pages.append(
-            {
-                "page_index": page_index,
-                "result": result,
-                "request": request,
-                "reused": reused,
-            }
+        page_stats = _write_discursos_pages(
+            run,
+            partition=partition,
+            periodo={"data_inicio": params["dataInicio"], "data_fim": params["dataFim"]},
+            deputado_id=deputado_id,
+            pages=[
+                {
+                    "page_index": page_index,
+                    "result": result,
+                    "request": request,
+                    "reused": reused,
+                }
+            ],
         )
+        stats["pages"] += page_stats["pages"]
+        stats["discursos"] += page_stats["discursos"]
+        stats["transcricoes"] += page_stats["transcricoes"]
+        stats["page_errors"] += page_stats["page_errors"]
+
+        declared_last_page = _last_page_from_links(result.data)
+        if declared_last_page is not None:
+            if declared_last_page < page_index:
+                raise DiscursosPaginationError(
+                    f"Página atual {page_index} excede rel=last={declared_last_page} para "
+                    f"deputado={deputado_id}, período={partition}"
+                )
+            if last_page is not None and declared_last_page != last_page:
+                raise DiscursosPaginationError(
+                    f"rel=last mudou de {last_page} para {declared_last_page} para "
+                    f"deputado={deputado_id}, período={partition}"
+                )
+            last_page = declared_last_page
         next_url = _next_link(result.data)
+        if next_url and last_page is not None and page_index >= last_page:
+            run.log(
+                "discursos_pagination_next_ignored",
+                partition=partition,
+                deputado_id=deputado_id,
+                page_index=page_index,
+                declared_last_page=last_page,
+                ignored_next_url=next_url,
+            )
+            break
         next_params = None
         page_index += 1
-    return pages
+    return stats
 
 
 def _collect_discursos_deputado_explicit_pages(
