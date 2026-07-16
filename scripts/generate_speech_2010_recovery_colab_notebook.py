@@ -148,6 +148,7 @@ def build_notebook() -> nbformat.NotebookNode:
             import subprocess
             from collections import Counter
             from datetime import datetime, timezone
+            from urllib.parse import parse_qs, urlparse
 
             from IPython.display import display
 
@@ -338,6 +339,29 @@ def build_notebook() -> nbformat.NotebookNode:
                     command.extend(["--parlamentares-periodos-path", str(periodos_path)])
                 return command
 
+            def camara_record_matches_period(record):
+                periodo = record.get("periodo") if isinstance(record.get("periodo"), dict) else {}
+                request = record.get("request") if isinstance(record.get("request"), dict) else {}
+                path = request.get("path") if isinstance(request.get("path"), str) else ""
+                params = request.get("params") if isinstance(request.get("params"), dict) else {}
+                query = parse_qs(urlparse(path).query)
+                observed = {key: str(values[-1]) for key, values in query.items() if values}
+                observed.update({str(key): str(value) for key, value in params.items() if value is not None})
+                evidence = {"dataInicio", "dataFim", "pagina", "itens"}
+                data_inicio = str(periodo.get("data_inicio") or "")
+                data_fim = str(periodo.get("data_fim") or "")
+                if any(key in observed for key in evidence):
+                    if observed.get("dataInicio") != data_inicio or observed.get("dataFim") != data_fim:
+                        return False
+                payload = record.get("payload") if isinstance(record.get("payload"), dict) else {}
+                for item in payload.get("dados", []):
+                    if not isinstance(item, dict):
+                        continue
+                    data_hora = str(item.get("dataHoraInicio") or "")
+                    if data_hora and not data_inicio <= data_hora[:10] <= data_fim:
+                        return False
+                return True
+
             def assert_camara_complete():
                 manifest_path = DATA_ROOT / "manifests" / f"{CAMARA_RUN_ID}.json"
                 checkpoint_path = DATA_ROOT / "checkpoints" / "camara" / "plenario_discursos.json"
@@ -355,9 +379,13 @@ def build_notebook() -> nbformat.NotebookNode:
                 transcriptions = 0
                 deputy_ids = set()
                 dates_outside_2010 = []
+                pages_rejected_by_request_scope = 0
                 for path in sorted(root.rglob(f"{CAMARA_RUN_ID}.jsonl")):
                     for record in iter_jsonl(path):
                         assert record.get("record_type") == "discursos_page", record
+                        if not camara_record_matches_period(record):
+                            pages_rejected_by_request_scope += 1
+                            continue
                         source_id = str(record.get("source_id") or "")
                         match = re.match(r"^deputado:(\\d+):discursos:", source_id)
                         assert match, source_id
@@ -381,6 +409,7 @@ def build_notebook() -> nbformat.NotebookNode:
                     "discursos": speeches,
                     "discursos_com_transcricao": transcriptions,
                     "deputados_por_id": len(deputy_ids),
+                    "paginas_rejeitadas_por_escopo_da_requisicao": pages_rejected_by_request_scope,
                     "datas_fora_de_2010": dates_outside_2010[:100],
                     "manifest": str(manifest_path),
                 }

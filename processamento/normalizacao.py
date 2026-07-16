@@ -569,20 +569,27 @@ def _normalize_camara_discursos_page(
 
 
 def _camara_discursos_request_has_wrong_scope(record: dict[str, Any]) -> bool:
-    """Exclui somente páginas comprovadamente gravadas fora do período raw."""
+    """Exclui páginas cuja requisição ou payload não respeita o período raw."""
     request = _dict(record.get("request"))
     path = _string(request.get("path"))
     params = _dict(request.get("params"))
     query = parse_qs(urlparse(path).query) if path else {}
     observed = {key: _string(values[-1]) for key, values in query.items() if values}
     observed.update({str(key): _string(value) for key, value in params.items() if value is not None})
-    if not any(key in observed for key in ("dataInicio", "dataFim", "pagina", "itens")):
-        return False
     periodo = _dict(record.get("periodo"))
-    return (
-        observed.get("dataInicio") != _string(periodo.get("data_inicio"))
-        or observed.get("dataFim") != _string(periodo.get("data_fim"))
-    )
+    data_inicio = _string(periodo.get("data_inicio"))
+    data_fim = _string(periodo.get("data_fim"))
+    if any(key in observed for key in ("dataInicio", "dataFim", "pagina", "itens")):
+        if observed.get("dataInicio") != data_inicio or observed.get("dataFim") != data_fim:
+            return True
+
+    for item in _list(_dict(record.get("payload")).get("dados")):
+        if not isinstance(item, dict):
+            continue
+        data_item = _string(item.get("dataHoraInicio"))
+        if data_item and data_inicio and data_fim and not data_inicio <= data_item[:10] <= data_fim:
+            return True
+    return False
 
 
 def _normalize_camara_ccjc_notas(record: dict[str, Any], *, raw_path: Path, data_root: Path) -> dict[str, Any]:

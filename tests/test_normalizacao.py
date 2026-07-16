@@ -136,7 +136,7 @@ def test_normalize_camara_discursos_page_uses_deputado_index(tmp_path: Path) -> 
     assert record["texto_status"] == "disponivel"
 
 
-def test_normalize_camara_discursos_page_ignores_raw_with_missing_request_dates(tmp_path: Path) -> None:
+def test_normalize_camara_discursos_page_ignores_payload_outside_record_period(tmp_path: Path) -> None:
     raw_path = tmp_path / "raw" / "camara" / "plenario_discursos" / "ano=2010" / "mes=03" / "run.jsonl"
     raw_path.parent.mkdir(parents=True)
     raw_record = {
@@ -149,8 +149,13 @@ def test_normalize_camara_discursos_page_ignores_raw_with_missing_request_dates(
         "periodo": {"data_inicio": "2010-03-01", "data_fim": "2010-03-31"},
         "request": {
             "method": "GET",
-            "path": "https://dadosabertos.camara.leg.br/api/v2/deputados/10/discursos?pagina=2&itens=15",
-            "params": {},
+            "path": "https://dadosabertos.camara.leg.br/api/v2/deputados/10/discursos",
+            "params": {
+                "dataInicio": "2010-03-01",
+                "dataFim": "2010-03-31",
+                "pagina": 2,
+                "itens": 100,
+            },
         },
         "payload": {"dados": [{"dataHoraInicio": "2009-01-01T10:00", "transcricao": "fora do mês"}]},
     }
