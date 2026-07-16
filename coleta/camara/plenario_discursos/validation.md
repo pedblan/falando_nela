@@ -203,6 +203,10 @@ PY
 - No progresso, `com_texto` conta ocorrências raw com transcrição; não significa
   recuperação feita pelo caderno. `pendentes_unicos` é a fila provisória após
   deduplicar unidades já observadas com texto.
+- A auditoria posterior mede por ano ocorrências e unidades únicas com texto e
+  mídia. Uma unidade repetida primeiro sem texto e depois com transcrição não
+  entra em `unique_pending_media_transcription`; `metadata/` continua fora da
+  varredura.
 - Nenhum candidato da Câmara entra em `recovered_legacy_texts.parquet` ou nos
   matches do banco legado, mesmo se houver colisão artificial de id.
 - `camara_media_download_queue.parquet` contém apenas Câmara, URL não vazia e

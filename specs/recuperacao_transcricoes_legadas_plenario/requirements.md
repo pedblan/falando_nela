@@ -44,6 +44,29 @@ inspecionada.
   `transcription_status=pending_after_download`.
 - A fila não contém texto legado e não autoriza download ou ASR nesta etapa.
 
+## Auditoria segura posterior
+
+- O caderno 11 deve ler a recuperação operacional pelo `recovery_id` explícito
+  e reconciliar suas contagens com `summary.json` antes de analisar conteúdo.
+- Hash e comprimento de todo texto aceito devem ser recalculados; a amostra de
+  aceitos é estratificada por método/ano e exibida integralmente.
+- Conflitos devem ser reduzidos também ao nível de candidato e classificados
+  como múltiplas variantes textuais, linha legada compartilhada, ambas ou não
+  classificado, sem decisão automática.
+- Vínculos com escore inferior a 90 permanecem em revisão manual e recebem
+  somente uma amostra reproduzível para inspeção.
+- Não encontrados devem ser contados por casa/ano.
+- A Câmara deve ser auditada somente no corpus mensal. A métrica distingue
+  ocorrências raw de unidades únicas e considera uma unidade audiovisual
+  resolvida quando qualquer ocorrência contém `transcricao`.
+- Os Parquets `camara__plenario_discursos.parquet`,
+  `senado__plenario_discursos.parquet` e
+  `senado__congresso_discursos.parquet` são lidos para 2010, 2015 e 2016. O
+  caderno sorteia poucos textos integrais por arena/ano com semente fixa e uma
+  amostra adicional cuja proveniência contenha `diario`.
+- A exibição integral não trunca cabeçalhos ou marcas editoriais; cartões HTML
+  recolhíveis podem ser usados para manter a saída navegável.
+
 ## Segurança operacional
 
 - Flags de download do Parquet e de escrita começam em `False`.
@@ -52,6 +75,9 @@ inspecionada.
 - Downloads usam arquivo `.part` e promoção atômica após validação.
 - Saídas ficam exclusivamente em `operations/`.
 - O caderno não instala nem chama ferramentas de ASR ou download de mídia.
+- A auditoria começa com `GRAVAR_AUDITORIA=False`, exige confirmação literal do
+  `audit_id`, recusa sobrescrever uma auditoria existente e escreve somente em
+  `operations/auditorias/transcricoes_legadas/{audit_id}/`.
 
 ## Artefato executável
 
@@ -59,3 +85,7 @@ O fluxo é implementado por
 `notebooks/coleta/10_sondagem_transcricoes_audiovisuais_plenario_colab.ipynb`,
 gerado de forma reproduzível por
 `scripts/generate_video_transcription_probe_colab_notebook.py`.
+A revisão posterior é implementada por
+`notebooks/coleta/11_auditoria_transcricoes_e_amostras_plenario_colab.ipynb`,
+gerado por
+`scripts/generate_video_transcription_audit_colab_notebook.py`.

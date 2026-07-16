@@ -40,6 +40,13 @@ Arquivos atuais:
   posterior da Câmara. Não baixa mídia nem executa ASR; grava somente em
   `operations/` sob confirmação explícita.
 
+- 11_auditoria_transcricoes_e_amostras_plenario_colab.ipynb: revisa, sem
+  promover, as saídas operacionais do caderno 10. Recalcula hashes dos aceitos,
+  separa causas de conflito, amostra vínculos manuais, distribui os não
+  encontrados por ano e mede a cobertura texto/mídia da Câmara por unidade
+  única. Também exibe amostras integrais reproduzíveis de 2010, 2015 e 2016 em
+  Câmara, Senado e Congresso, com amostra extra de proveniência do Diário.
+
 - `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
   histórico dedicado que audita a lacuna, executa as duas coletas com
   `historical-official`, regenera os derivados cumulativos e fecha a
@@ -151,4 +158,11 @@ O caderno de recuperação das transcrições legadas também tem gerador própr
 ```bash
 python scripts/generate_video_transcription_probe_colab_notebook.py
 python scripts/generate_video_transcription_probe_colab_notebook.py --check
+```
+
+A auditoria segura dessas saídas e das amostras históricas é gerada por:
+
+```bash
+python scripts/generate_video_transcription_audit_colab_notebook.py
+python scripts/generate_video_transcription_audit_colab_notebook.py --check
 ```

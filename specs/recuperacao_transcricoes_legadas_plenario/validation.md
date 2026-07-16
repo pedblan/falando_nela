@@ -18,6 +18,15 @@
   runtime Colab já usado não mantenha a implementação anterior em memória;
 - testar inferência de aliases do schema legado;
 - testar recusa de arquivo sem `PAR1` ou tamanho esperado.
+- validar o caderno 11 com `nbformat`, AST e sincronização com seu gerador;
+- testar a auditoria de cobertura da Câmara com ocorrência vazia posteriormente
+  resolvida, unidade audiovisual ainda pendente e texto sem mídia;
+- comprovar no caderno 11 a classificação explícita das causas de conflito, a
+  distribuição anual dos não encontrados e a revisão manual sem aceite;
+- comprovar anos fixos `2010, 2015, 2016`, semente fixa, as três arenas, texto
+  integral sem truncamento e priorização de proveniência contendo `diario`;
+- comprovar escrita desligada, confirmação literal, recusa de sobrescrita e
+  `provenance.json` somente em `operations/auditorias/`.
 
 ## Gates no Colab
 
@@ -35,6 +44,20 @@
   e estados pendentes de download/transcrição;
 - `summary.json` registra contagens por casa e estado;
 - nenhum caminho canônico é escrito pelo caderno.
+
+No caderno 11:
+
+- hashes e comprimentos recalculados coincidem com os 471 aceitos lidos;
+- números de candidatos únicos em revisão, conflito e não encontrado coincidem
+  com `candidate_status.csv`, distinguindo-os das linhas de correspondência;
+- a auditoria anual da Câmara é não vazia e informa cobertura entre unidades
+  únicas com mídia, sem transformar ausência em aceite ou falha estrutural;
+- existem linhas e amostras não vazias para cada combinação de Câmara, Senado e
+  Congresso com 2010, 2015 e 2016;
+- a quantidade de linhas do Diário e sua amostra ficam registradas como achado
+  substantivo; ausência não autoriza promoção nem é ocultada;
+- `canonical_outputs_untouched=True` e nenhuma escrita ocorre fora da pasta
+  imutável da auditoria.
 
 ## Revisão antes da promoção
 

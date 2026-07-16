@@ -38,6 +38,13 @@ uma área operacional até revisão e etapas posteriores próprias por casa.
 8. Impedir que qualquer candidato da Câmara entre no cruzamento legado.
 9. Exportar textos senatoriais de chave forte, revisões, conflitos, auditoria
    sem texto, fila de download da Câmara e resumo somente sob confirmação.
+10. Em caderno separado, auditar hashes/comprimentos dos aceitos, classificar
+    conflitos por causa, amostrar vínculos manuais, distribuir ausências por
+    ano e medir por ano a cobertura texto/mídia da Câmara em unidades únicas.
+11. Ler os Parquets canônicos sem modificá-los e sortear, com semente fixa,
+    poucos textos integrais de 2010, 2015 e 2016 para Câmara, Senado e
+    Congresso, incluindo amostra adicional dos registros cuja proveniência
+    mencione o Diário.
 
 ## Saídas
 
@@ -52,9 +59,23 @@ Sob
 - `candidate_status.csv`;
 - `summary.json`.
 
+Sob
+`operations/auditorias/transcricoes_legadas/{audit_id}/`, somente após
+confirmação no caderno 11:
+
+- amostras dos aceitos e dos vínculos manuais;
+- diagnóstico e amostra das variantes conflitantes;
+- distribuição anual dos não encontrados;
+- cobertura texto/mídia da Câmara;
+- inventário e amostras integrais dos anos históricos;
+- relatório HTML e `provenance.json` com commit, parâmetros, semente e
+  checksums das entradas e saídas.
+
 ## Limite desta etapa
 
 O caderno não baixa mídia, não executa Whisper ou outro ASR e não escreve em
 `raw/`, `processed/`, Parquets canônicos ou snapshots. A promoção dos textos
 senatoriais exige revisão humana e contrato raw versionado. A fila da Câmara
 serve para dimensionar uma aquisição retomável posterior, não como texto.
+O caderno de auditoria tampouco decide conflitos ou promove recuperações: seus
+achados substantivos permanecem diagnósticos para decisão humana.

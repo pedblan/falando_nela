@@ -7,6 +7,7 @@ import pytest
 
 from coleta.transcricoes_audiovisuais import (
     INVENTORY_CODE_VERSION,
+    audit_camara_transcription_coverage,
     infer_old_parquet_columns,
     scan_camara_media_candidates,
     scan_senado_transcription_queue,
@@ -16,7 +17,7 @@ from coleta.transcricoes_audiovisuais import (
 
 
 def test_inventory_code_version_requires_monthly_only_scan() -> None:
-    assert INVENTORY_CODE_VERSION >= 2
+    assert INVENTORY_CODE_VERSION >= 3
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
@@ -179,6 +180,91 @@ def test_camara_inventory_uses_audio_and_stable_candidate_id(tmp_path: Path) -> 
     assert rows[0]["raw_occurrences"] == 2
 
 
+def test_camara_coverage_distinguishes_occurrences_and_unique_pending_units(
+    tmp_path: Path,
+) -> None:
+    path = (
+        tmp_path
+        / "raw"
+        / "camara"
+        / "plenario_discursos"
+        / "ano=2015"
+        / "mes=03"
+        / "run.jsonl"
+    )
+    resolved_item = {
+        "dataHoraInicio": "2015-03-02T10:00:00",
+        "uriEvento": "https://dadosabertos.camara.leg.br/api/v2/eventos/10",
+        "tipoDiscurso": "Ordem do Dia",
+        "sumario": "Tema resolvido",
+        "urlVideo": "https://example.test/10.mp4",
+        "transcricao": None,
+    }
+    pending_item = {
+        "dataHoraInicio": "2015-03-03T10:00:00",
+        "uriEvento": "https://dadosabertos.camara.leg.br/api/v2/eventos/11",
+        "tipoDiscurso": "Ordem do Dia",
+        "sumario": "Tema pendente",
+        "urlAudio": "https://example.test/11.mp3",
+        "transcricao": " ",
+    }
+    text_without_media = {
+        "dataHoraInicio": "2015-03-04T10:00:00",
+        "uriEvento": "https://dadosabertos.camara.leg.br/api/v2/eventos/12",
+        "tipoDiscurso": "Ordem do Dia",
+        "sumario": "Tema textual",
+        "transcricao": "Texto oficial",
+    }
+    _write_jsonl(
+        path,
+        [
+            {
+                "record_type": "discursos_page",
+                "source_id": "deputado:123:discursos:2015-03:pagina:1",
+                "payload": {
+                    "dados": [
+                        resolved_item,
+                        pending_item,
+                        text_without_media,
+                    ]
+                },
+            },
+            {
+                "record_type": "discursos_page",
+                "source_id": "deputado:123:discursos:2015-03:pagina:2",
+                "payload": {
+                    "dados": [
+                        {**resolved_item, "transcricao": "Texto oficial do vídeo"}
+                    ]
+                },
+            },
+        ],
+    )
+
+    progress: list[str] = []
+    rows = audit_camara_transcription_coverage(tmp_path, progress=progress.append)
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["year"] == 2015
+    assert row["item_occurrences"] == 4
+    assert row["text_occurrences"] == 2
+    assert row["empty_text_occurrences"] == 2
+    assert row["media_occurrences"] == 3
+    assert row["media_with_text_occurrences"] == 1
+    assert row["media_without_text_occurrences"] == 2
+    assert row["unique_units"] == 3
+    assert row["unique_units_with_text"] == 2
+    assert row["unique_units_with_media"] == 2
+    assert row["unique_units_with_media_and_text"] == 1
+    assert row["unique_pending_media_transcription"] == 1
+    assert row["text_coverage_rate"] == pytest.approx(2 / 3)
+    assert row["media_text_coverage_rate"] == pytest.approx(1 / 2)
+    assert progress == [
+        "Cobertura Câmara: 1/1 arquivos; itens=4; com_texto=2; com_midia=3"
+    ]
+
+
 def test_camara_inventory_ignores_invalid_metadata_jsonl(tmp_path: Path) -> None:
     metadata = (
         tmp_path
@@ -222,9 +308,11 @@ def test_camara_inventory_ignores_invalid_metadata_jsonl(tmp_path: Path) -> None
 
     progress: list[str] = []
     rows = scan_camara_media_candidates(tmp_path, progress=progress.append)
+    coverage = audit_camara_transcription_coverage(tmp_path)
 
     assert len(rows) == 1
     assert rows[0]["raw_path"].startswith("raw/camara/plenario_discursos/ano=2024/")
+    assert coverage[0]["unique_pending_media_transcription"] == 1
     assert progress == [
         "Câmara: 1/1 arquivos; itens=1; com_texto=0; sem_texto=1; "
         "sem_texto_com_midia=1; pendentes_unicos=1"

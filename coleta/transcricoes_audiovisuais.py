@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-INVENTORY_CODE_VERSION = 2
+INVENTORY_CODE_VERSION = 3
 
 
 OLD_PARQUET_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
@@ -326,6 +326,116 @@ def scan_camara_media_candidates(
     return sorted(rows, key=_candidate_sort_key)
 
 
+def audit_camara_transcription_coverage(
+    data_root: Path,
+    *,
+    progress: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """Mede, por ano, a cobertura textual das unidades audiovisuais da Câmara.
+
+    A auditoria distingue ocorrências raw de unidades únicas. Uma unidade com
+    mídia só permanece pendente quando nenhuma de suas ocorrências contém
+    ``transcricao``. Arquivos de ``metadata/`` não fazem parte do corpus e não
+    são lidos.
+    """
+
+    corpus_root = Path(data_root) / "raw" / "camara" / "plenario_discursos"
+    if not corpus_root.is_dir():
+        return []
+
+    paths = sorted(
+        path
+        for path in corpus_root.glob("ano=*/mes=*/*.jsonl")
+        if path.is_file()
+    )
+    buckets: dict[int | None, dict[str, Any]] = {}
+    items_seen = 0
+    text_occurrences = 0
+    media_occurrences = 0
+
+    for file_index, path in enumerate(paths, start=1):
+        partition_year = _partition_year(path)
+        for record in iter_jsonl(path):
+            if record.get("record_type") != "discursos_page":
+                continue
+            payload = _mapping(record.get("payload"))
+            data = payload.get("dados")
+            if not isinstance(data, list):
+                continue
+            deputy_id = _deputy_id_from_source_id(record.get("source_id"))
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                items_seen += 1
+                year = _year(_string(item.get("dataHoraInicio"))) or partition_year
+                bucket = buckets.setdefault(year, _new_camara_coverage_bucket())
+                unit_key = _camara_unit_key(item, deputy_id=deputy_id)
+                has_text = _has_text(item.get("transcricao"))
+                media_url, _ = _camara_preferred_media(item)
+                has_media = bool(media_url)
+
+                bucket["item_occurrences"] += 1
+                bucket["unique_units"].add(unit_key)
+                if has_text:
+                    text_occurrences += 1
+                    bucket["text_occurrences"] += 1
+                    bucket["unique_units_with_text"].add(unit_key)
+                else:
+                    bucket["empty_text_occurrences"] += 1
+
+                if has_media:
+                    media_occurrences += 1
+                    bucket["media_occurrences"] += 1
+                    bucket["unique_units_with_media"].add(unit_key)
+                    if has_text:
+                        bucket["media_with_text_occurrences"] += 1
+                    else:
+                        bucket["media_without_text_occurrences"] += 1
+                        bucket["unique_blank_units_with_media"].add(unit_key)
+
+        if progress and (file_index == 1 or file_index % 25 == 0 or file_index == len(paths)):
+            progress(
+                f"Cobertura Câmara: {file_index}/{len(paths)} arquivos; "
+                f"itens={items_seen}; com_texto={text_occurrences}; "
+                f"com_midia={media_occurrences}"
+            )
+
+    rows: list[dict[str, Any]] = []
+    for year in sorted(buckets, key=lambda value: (value is None, value or 0)):
+        bucket = buckets[year]
+        unique_units = bucket["unique_units"]
+        unique_with_text = bucket["unique_units_with_text"]
+        unique_with_media = bucket["unique_units_with_media"]
+        unique_media_and_text = unique_with_media & unique_with_text
+        unique_pending = bucket["unique_blank_units_with_media"] - unique_with_text
+        rows.append(
+            {
+                "year": year,
+                "files_total": len(paths),
+                "item_occurrences": bucket["item_occurrences"],
+                "text_occurrences": bucket["text_occurrences"],
+                "empty_text_occurrences": bucket["empty_text_occurrences"],
+                "media_occurrences": bucket["media_occurrences"],
+                "media_with_text_occurrences": bucket["media_with_text_occurrences"],
+                "media_without_text_occurrences": bucket["media_without_text_occurrences"],
+                "unique_units": len(unique_units),
+                "unique_units_with_text": len(unique_with_text),
+                "unique_units_with_media": len(unique_with_media),
+                "unique_units_with_media_and_text": len(unique_media_and_text),
+                "unique_pending_media_transcription": len(unique_pending),
+                "text_coverage_rate": (
+                    len(unique_with_text) / len(unique_units) if unique_units else None
+                ),
+                "media_text_coverage_rate": (
+                    len(unique_media_and_text) / len(unique_with_media)
+                    if unique_with_media
+                    else None
+                ),
+            }
+        )
+    return rows
+
+
 def select_probe_sample(
     candidates: Sequence[dict[str, Any]],
     *,
@@ -428,6 +538,29 @@ def _camara_unit_key(item: dict[str, Any], *, deputy_id: str | None) -> str:
     ]
     material = "\x1f".join(value or "" for value in stable_values)
     return sha256(material.encode("utf-8")).hexdigest()[:24]
+
+
+def _new_camara_coverage_bucket() -> dict[str, Any]:
+    return {
+        "item_occurrences": 0,
+        "text_occurrences": 0,
+        "empty_text_occurrences": 0,
+        "media_occurrences": 0,
+        "media_with_text_occurrences": 0,
+        "media_without_text_occurrences": 0,
+        "unique_units": set(),
+        "unique_units_with_text": set(),
+        "unique_units_with_media": set(),
+        "unique_blank_units_with_media": set(),
+    }
+
+
+def _partition_year(path: Path) -> int | None:
+    for part in path.parts:
+        match = re.fullmatch(r"ano=(\d{4})", part)
+        if match:
+            return int(match.group(1))
+    return None
 
 
 def _media_priority(row: dict[str, Any]) -> tuple[int, int]:
