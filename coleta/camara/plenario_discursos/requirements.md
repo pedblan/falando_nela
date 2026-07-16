@@ -122,6 +122,16 @@
   Plenario ficam para normalizacao posterior.
 - `sumario` e `keywords` nao substituem a transcricao/texto integral.
 
+## Recuperação De Texto Legado
+
+- Itens sem `transcricao` e com mídia oficial podem ser inventariados fora do
+  coletor; se outra ocorrência raw da mesma unidade já tiver texto, ela deve
+  sair da fila.
+- O Parquet legado contém somente Senado e não pode fornecer texto da Câmara.
+- A saída da Câmara preserva id do deputado, data, evento, tipo, URL, origem raw,
+  prioridade e estados pendentes de download/transcrição.
+- A fila fica em `operations/` e não autoriza mutação do raw ou dos derivados.
+
 ## Concorrencia Operacional
 
 - Pode rodar em paralelo com `senado/ccj_notas` e `camara/ccjc_eventos`, pois

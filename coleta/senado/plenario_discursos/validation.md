@@ -157,3 +157,11 @@ PY
 - O arquivo `manifests/{run_id}.autosave.json` deve existir durante/depois da execucao.
 - Falhas isoladas devem aparecer em `logs/{run_id}.jsonl` e, quando forem de particao, em `failed_partitions` no checkpoint.
 - Reexecutar com o mesmo `--run-id --resume` deve ler JSONLs existentes e pular pronunciamentos ja gravados, sem baixar novamente textos integrais salvos.
+
+## Validação Da Recuperação Legada
+
+- `CodigoPronunciamento` é a chave preferencial e nunca é substituída por nome.
+- Texto legado vazio, casa conflitante ou múltiplos hashes para o mesmo
+  candidato não entram nos recuperados.
+- Vídeo de sessão sem alinhamento continua fora da promoção automática.
+- A execução do caderno 10 não modifica raw, checkpoint ou manifest do coletor.

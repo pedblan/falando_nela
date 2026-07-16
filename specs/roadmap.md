@@ -74,6 +74,11 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 ## Fase 3: normalizacao e armazenamento
 
 - Consolidar dados brutos em camada `raw`.
+- Recuperar, antes de qualquer novo ASR, as transcrições audiovisuais já
+  existentes para o Senado em `DiscursosTodos.parquet`. Para a Câmara, que não
+  está no legado, produzir primeiro uma fila auditável de mídia e dimensionar
+  download/transcrição em etapa própria. Manter tudo em `operations/` até
+  revisão e promoção raw versionada.
 - Criar camada `processed` com campos normalizados entre Senado, Congresso e Camara.
 - Criar `apartes_parlamentares/v1` como tabela relacional independente de
   `textos_parlamentares/v1`, voltada a contagens anuais de relacoes

@@ -189,3 +189,13 @@ for path in root.glob(f"ano=*/mes=*/{run_id}.jsonl"):
         assert record["record_type"] == "discursos_page", path
 PY
 ```
+
+## Validação Da Recuperação Legada
+
+- O inventário seleciona somente páginas mensais `discursos_page` com mídia e
+  texto vazio e elimina a unidade quando uma ocorrência posterior tem texto.
+- Nenhum candidato da Câmara entra em `recovered_legacy_texts.parquet` ou nos
+  matches do banco legado, mesmo se houver colisão artificial de id.
+- `camara_media_download_queue.parquet` contém apenas Câmara, URL não vazia e
+  estados pendentes de download e transcrição.
+- A execução do caderno 10 não modifica raw, checkpoint ou manifest do coletor.

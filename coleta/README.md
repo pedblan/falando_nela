@@ -138,6 +138,13 @@ Os metadados brutos da fonte podem conter campos como `metadata.pronunciamento.T
 
 Registros em `transcription_queue` nao devem ser usados como texto analitico ate passarem por uma etapa futura de transcricao documentada.
 
+Quando uma transcrição já existir no banco da pesquisa anterior, use o caderno
+`notebooks/coleta/10_sondagem_transcricoes_audiovisuais_plenario_colab.ipynb`.
+O Parquet legado contém somente Senado: o caderno cruza apenas essa fila por
+identificador ou URL auditável. Para a Câmara, ele gera uma fila separada com
+as mídias que ainda exigem download e transcrição. Nenhuma das duas saídas é
+promovida automaticamente ao raw ou aos derivados.
+
 Para pareceres em PDF/HTML, `forma=documento` pode aparecer quando o arquivo oficial foi localizado, mas a extracao textual ainda nao produziu texto. Esses casos devem ser tratados em etapa futura de OCR ou revisao documental, sem substituir silenciosamente documentos ja extraidos.
 
 ## Metadados relacionais

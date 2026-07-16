@@ -114,6 +114,16 @@ Cada `pronunciamento_texto` deve conter:
 - Notas de sessao tem prioridade sobre fila de video.
 - Whisper/ffmpeg nao entram nesta etapa.
 
+## Recuperação De Texto Legado
+
+- A fila pode ser cruzada separadamente com `DiscursosTodos.parquet` por
+  `CodigoPronunciamento` ou URL oficial idêntica.
+- O banco legado é fonte de recuperação, não substituto silencioso da fonte
+  oficial nem entrada direta da normalização canônica.
+- Resultado aceito fica em `operations/` com hash do texto, método do vínculo e
+  estado de revisão; conflito de textos deve ser bloqueado.
+- O caderno de recuperação não executa ASR nem altera este coletor.
+
 ## Limites e Retomada
 
 - Respeitar retries para `429`, `500`, `502`, `503` e `504`.

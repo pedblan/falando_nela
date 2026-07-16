@@ -170,6 +170,14 @@ runtime proprios e nao pode bloquear a incorporacao da nova janela.
 - Durante a varredura dos JSONLs existentes, imprimir inicio, progresso por
   arquivo/50 mil registros e conclusao, para que a indexacao do Drive nao
   pareca uma execucao travada.
+
+## Recuperação Legada Separada
+
+Páginas mensais que possuam `urlAudio` ou `urlVideo`, mas não `transcricao`,
+entram no inventário do caderno 10. O banco da pesquisa anterior contém apenas
+Senado e não é usado para preencher Câmara. O caderno gera uma fila com id do
+deputado, data, evento, tipo e URL oficial para dimensionar download e
+transcrição posteriores, sem alterar este coletor.
 - Se checkpoint e log concordarem sobre as particoes concluidas e identificarem
   anos abertos ou com falha, reconstruir o indice somente para esses anos,
   incluindo o arquivo compartilhado de `metadata`; diante de divergencia,

@@ -33,6 +33,13 @@ Arquivos atuais:
   deputado. O caderno só libera o processamento quando os dois inventários
   tiverem texto/transcrições e manifests aprovados.
 
+- 10_sondagem_transcricoes_audiovisuais_plenario_colab.ipynb: inventaria
+  discursos atuais sem texto na Câmara e no Senado. Como
+  `DiscursosTodos.parquet` contém apenas Senado, recupera somente os textos
+  senatoriais e produz `camara_media_download_queue.parquet` para a aquisição
+  posterior da Câmara. Não baixa mídia nem executa ASR; grava somente em
+  `operations/` sob confirmação explícita.
+
 - `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
   histórico dedicado que audita a lacuna, executa as duas coletas com
   `historical-official`, regenera os derivados cumulativos e fecha a
@@ -137,4 +144,11 @@ O caderno isolado da recuperação 2015–2016 tem gerador próprio:
 ```bash
 python scripts/generate_backfill_2015_2016_colab_notebook.py
 python scripts/generate_backfill_2015_2016_colab_notebook.py --check
+```
+
+O caderno de recuperação das transcrições legadas também tem gerador próprio:
+
+```bash
+python scripts/generate_video_transcription_probe_colab_notebook.py
+python scripts/generate_video_transcription_probe_colab_notebook.py --check
 ```

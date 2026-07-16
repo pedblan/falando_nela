@@ -136,3 +136,11 @@ Em notebooks de orquestracao, use `check=False` para que uma falha registrada pe
 - Nao executar Whisper, ffmpeg ou transcricao de video nesta etapa.
 - Nao raspar HTML se o endpoint oficial de texto integral entregar conteudo valido.
 - Nao tratar `Resumo`, `Indexacao`, publicacoes ou URLs como substitutos do texto integral.
+
+## Recuperação Legada Separada
+
+Casos da `transcription_queue` podem ser comparados ao banco da pesquisa
+anterior no caderno 10. Essa recuperação usa `CodigoPronunciamento` como chave
+forte, não baixa o vídeo e grava somente artefatos operacionais. O coletor e seu
+raw permanecem inalterados; qualquer promoção posterior deve registrar
+explicitamente a proveniência legada.
