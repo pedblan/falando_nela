@@ -144,3 +144,9 @@ anterior no caderno 10. Essa recuperação usa `CodigoPronunciamento` como chave
 forte, não baixa o vídeo e grava somente artefatos operacionais. O coletor e seu
 raw permanecem inalterados; qualquer promoção posterior deve registrar
 explicitamente a proveniência legada.
+
+Depois da auditoria humana, o caderno 12 pode publicar exclusivamente os casos
+aceitos por chave forte em novos JSONLs mensais. Essa publicação usa
+`legacy_parquet_transcricao_audiovisual_v1`, não altera checkpoints de coleta e
+é recusada se já existir texto raw não vazio para o código. Os derivados só são
+regenerados em uma segunda operação confirmada.

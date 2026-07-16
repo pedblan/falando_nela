@@ -78,6 +78,10 @@
 - O resultado aprovado usa o contrato canônico de `pronunciamento_texto`, com
   `texto_status=disponivel` e
   `metodo_obtencao=diario-congresso-oficial-por-codigo-v1`.
+- Cabeçalhos e rodapés que permaneçam no trecho extraído não são apagados do
+  raw. A normalização pode removê-los apenas nas fronteiras de página, com
+  regra versionada, idempotente e proveniência de hashes/linhas removidas em
+  `fontes.normalizacao_texto_diario`.
 
 ## Separacao de dados
 

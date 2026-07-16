@@ -123,6 +123,12 @@ Cada `pronunciamento_texto` deve conter:
 - Resultado aceito fica em `operations/` com hash do texto, método do vínculo e
   estado de revisão; conflito de textos deve ser bloqueado.
 - O caderno de recuperação não executa ASR nem altera este coletor.
+- Uma promoção posterior pode entrar no raw apenas com
+  `metodo_obtencao=legacy_parquet_transcricao_audiovisual_v1`, chave forte,
+  hash validado, aprovação visual registrada e proveniência em
+  `metadata.legacy_recovery`.
+- A promoção cria run/manifest próprios, não altera o checkpoint do coletor e
+  bloqueia códigos que já tenham texto raw oficial não vazio.
 
 ## Limites e Retomada
 

@@ -165,3 +165,6 @@ PY
   candidato não entram nos recuperados.
 - Vídeo de sessão sem alinhamento continua fora da promoção automática.
 - A execução do caderno 10 não modifica raw, checkpoint ou manifest do coletor.
+- O caderno 12 admite somente os 471 aceitos por chave forte, preserva método e
+  hash, prova ausência de texto raw anterior e exige fingerprint idêntico para
+  todos os registros senatoriais fora dos alvos após o rebuild.

@@ -47,6 +47,13 @@ Arquivos atuais:
   única. Também exibe amostras integrais reproduzíveis de 2010, 2015 e 2016 em
   Câmara, Senado e Congresso, com amostra extra de proveniência do Diário.
 
+- 12_promocao_transcricoes_legadas_plenario_colab.ipynb: promove somente os
+  471 textos do Senado aceitos por chave forte e aprovados na revisão visual de
+  30%. Em uma segunda operação, regenera `processed`/Parquets e remove
+  conservadoramente cabeçalhos e rodapés dos 83 textos recuperados do Diário,
+  sem alterar o raw. As mutações começam desligadas e o caderno valida drift
+  por fingerprints antes/depois.
+
 - `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
   histórico dedicado que audita a lacuna, executa as duas coletas com
   `historical-official`, regenera os derivados cumulativos e fecha a
@@ -165,4 +172,11 @@ A auditoria segura dessas saídas e das amostras históricas é gerada por:
 ```bash
 python scripts/generate_video_transcription_audit_colab_notebook.py
 python scripts/generate_video_transcription_audit_colab_notebook.py --check
+```
+
+A promoção revisada e o rebuild controlado são gerados por:
+
+```bash
+python scripts/generate_legacy_transcription_promotion_colab_notebook.py
+python scripts/generate_legacy_transcription_promotion_colab_notebook.py --check
 ```

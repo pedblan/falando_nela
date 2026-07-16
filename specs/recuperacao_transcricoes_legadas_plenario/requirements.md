@@ -79,6 +79,40 @@ inspecionada.
   `audit_id`, recusa sobrescrever uma auditoria existente e escreve somente em
   `operations/auditorias/transcricoes_legadas/{audit_id}/`.
 
+## Promoção revisada
+
+- A população promovível tem exatamente 471 registros, todos do Senado, com
+  estado de revisão aceito, `publication_status=operations_only`, escore
+  `>=90` e vínculo `exact_speech_id`, `exact_audio_url` ou `exact_video_url`.
+- A decisão humana registra aprovação de uma amostra aleatória de 30%, nota,
+  `audit_id` e `recovery_id`.
+- Texto raw não vazio já associado ao código bloqueia a primeira promoção.
+  Câmara, revisão manual, conflitos e não encontrados são excluídos.
+- Cada registro usa `record_type=pronunciamento_texto`, método
+  `legacy_parquet_transcricao_audiovisual_v1`, partição mensal e proveniência
+  completa em `metadata.legacy_recovery`.
+- Arquivos raw e manifest são novos, escritos por `.partial` e publicados sem
+  overwrite. Falha anterior ao manifest remove os arquivos publicados pela
+  tentativa.
+- `PROMOVER_TRANSCRICOES` e `REGERAR_DERIVADOS` começam em `False` e exigem
+  confirmações literais independentes.
+- A fotografia anterior dos sete Parquets é persistida antes da escrita raw e
+  reutilizada em uma retomada.
+
+## Limpeza derivada do Diário
+
+- O raw e os PDFs oficiais permanecem imutáveis.
+- A regra só incide sobre método
+  `diario-congresso-oficial-por-codigo-v1` e examina as cinco primeiras e cinco
+  últimas linhas não vazias de cada página delimitada por `\f`.
+- Apenas números de página e linhas editoriais reconhecidas podem ser
+  removidos; uma menção ao Diário no corpo não é alvo.
+- A transformação é idempotente, preserva texto não vazio e registra versão,
+  hashes, comprimentos, quebras de página e linhas removidas em
+  `fontes.normalizacao_texto_diario`.
+- O rebuild só é liberado após confirmação literal de
+  `diario-congresso-limpeza-editorial-v1`.
+
 ## Artefato executável
 
 O fluxo é implementado por
@@ -89,3 +123,7 @@ A revisão posterior é implementada por
 `notebooks/coleta/11_auditoria_transcricoes_e_amostras_plenario_colab.ipynb`,
 gerado por
 `scripts/generate_video_transcription_audit_colab_notebook.py`.
+A promoção e o rebuild controlado são implementados por
+`notebooks/coleta/12_promocao_transcricoes_legadas_plenario_colab.ipynb`,
+gerado por
+`scripts/generate_legacy_transcription_promotion_colab_notebook.py`.

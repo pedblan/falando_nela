@@ -93,6 +93,12 @@ DCN já escolhida pelo código. Quando necessário, a mesma página fornece o ti
 de uso da palavra para escolher corretamente entre cabeçalho de Presidência e
 fala ordinária.
 
+Cabeçalhos e rodapés de página preservados nessa extração continuam no raw
+auditável. No rebuild controlado do caderno 12, a normalização pode retirar
+somente linhas editoriais reconhecidas nas fronteiras `\f`, registrando versão,
+hashes e linhas removidas. Textos obtidos por outros métodos não participam da
+transformação.
+
 ## Saidas
 
 - `data/raw/senado/congresso_discursos/metadata/{run_id}.jsonl`: listas mensais brutas.

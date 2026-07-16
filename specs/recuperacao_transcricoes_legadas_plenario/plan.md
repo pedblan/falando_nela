@@ -45,6 +45,16 @@ uma área operacional até revisão e etapas posteriores próprias por casa.
     poucos textos integrais de 2010, 2015 e 2016 para Câmara, Senado e
     Congresso, incluindo amostra adicional dos registros cuja proveniência
     mencione o Diário.
+12. Depois da aprovação humana, promover em caderno próprio somente os 471
+    aceitos por chave forte. Recusar códigos com texto raw anterior e registrar
+    fingerprints integrais dos sete Parquets antes da escrita.
+13. Publicar registros mensais novos do Senado com método
+    `legacy_parquet_transcricao_audiovisual_v1` e proveniência da recuperação,
+    auditoria e decisão visual.
+14. Reconstruir a fotografia `current`, aplicando somente na normalização a
+    limpeza editorial versionada dos 83 textos recuperados do Diário.
+15. Validar o acréscimo exato de 471 linhas e provar por fingerprints que o
+    drift ficou restrito aos promovidos e ao subconjunto do Diário.
 
 ## Saídas
 
@@ -71,11 +81,18 @@ confirmação no caderno 11:
 - relatório HTML e `provenance.json` com commit, parâmetros, semente e
   checksums das entradas e saídas.
 
+Sob `operations/promocoes/transcricoes_legadas/{promotion_run_id}/`:
+
+- fotografia e fingerprints anteriores ao rebuild;
+- decisão da revisão visual e cópia do manifest raw;
+- estado retomável da operação;
+- validação final com gates e fingerprints posteriores.
+
 ## Limite desta etapa
 
-O caderno não baixa mídia, não executa Whisper ou outro ASR e não escreve em
-`raw/`, `processed/`, Parquets canônicos ou snapshots. A promoção dos textos
-senatoriais exige revisão humana e contrato raw versionado. A fila da Câmara
-serve para dimensionar uma aquisição retomável posterior, não como texto.
-O caderno de auditoria tampouco decide conflitos ou promove recuperações: seus
-achados substantivos permanecem diagnósticos para decisão humana.
+Os cadernos 10 e 11 não baixam mídia, não executam Whisper ou outro ASR e não
+escrevem em `raw/`, `processed/`, Parquets canônicos ou snapshots. A promoção
+posterior é isolada no caderno 12 e exige revisão humana, contrato raw
+versionado e confirmações distintas para raw e derivados. A fila da Câmara
+serve para dimensionar uma aquisição posterior, não como texto. Conflitos,
+vínculos manuais e não encontrados permanecem diagnósticos.

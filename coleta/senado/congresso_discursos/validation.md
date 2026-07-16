@@ -40,6 +40,12 @@ conjunta indexada em data diferente, validar que `lookup_date` e
 `lookup_date_fallback_days` apontam para o caderno DCN que contém a página
 histórica; uma edição próxima sem a página não pode ser aceita.
 
+No rebuild posterior, exigir exatamente 83 registros com método
+`diario-congresso-oficial-por-codigo-v1`. A limpeza derivada mantém os mesmos
+ids e a mesma contagem, preserva texto não vazio, é idempotente e não altera o
+fingerprint de qualquer linha do Congresso obtida por outro método. Raw e PDFs
+continuam inalterados.
+
 ## Smoke test
 
 ```bash

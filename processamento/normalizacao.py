@@ -12,6 +12,7 @@ from typing import Any, Iterable, Iterator, Sequence
 from urllib.parse import parse_qs, urlparse
 
 from coleta.common.config import DEFAULT_DEV_DATA_DIR, PROD_DATA_ROOT_ENV, utc_now_iso
+from processamento.limpeza_diario import DIARY_RECOVERY_METHOD, clean_diary_editorial_noise
 
 DATASET_NAME = "textos_parlamentares"
 DATASET_VERSION = "v1"
@@ -404,8 +405,20 @@ def _normalize_senado_pronunciamento(record: dict[str, Any], *, raw_path: Path, 
     metadata = _dict(payload.get("metadata"))
     pronunciamento = _dict(metadata.get("pronunciamento"))
     sessao = _dict(metadata.get("sessao"))
-    fontes = _dict(payload.get("fontes"))
     dataset = str(record.get("dataset"))
+    fontes = dict(_dict(payload.get("fontes")))
+    texto = _clean_text(payload.get("texto") or payload.get("TextoIntegral"))
+    metodo_obtencao = _string(payload.get("metodo_obtencao"))
+    if (
+        dataset == "congresso_discursos"
+        and texto
+        and metodo_obtencao == DIARY_RECOVERY_METHOD
+    ):
+        cleaning = clean_diary_editorial_noise(texto)
+        texto = cleaning["text"]
+        fontes["normalizacao_texto_diario"] = {
+            key: value for key, value in cleaning.items() if key != "text"
+        }
     codigo = _string(payload.get("codigo_pronunciamento") or payload.get("CodigoPronunciamento") or record.get("source_id"))
     data = _date_part(
         _first(
@@ -444,10 +457,10 @@ def _normalize_senado_pronunciamento(record: dict[str, Any], *, raw_path: Path, 
         parlamentar_cargo=_string(_first(pronunciamento, "FuncaoAutor", "TipoAutor", "tipoAutor")),
         pronunciamento_id=codigo,
         sessao_id=_string(_first(sessao, "CodigoSessao", "codigoSessao")),
-        texto=_clean_text(payload.get("texto") or payload.get("TextoIntegral")),
+        texto=texto,
         texto_status=_string(payload.get("texto_status")),
         forma=_string(payload.get("forma")),
-        metodo_obtencao=_string(payload.get("metodo_obtencao")),
+        metodo_obtencao=metodo_obtencao,
         url_texto=_string(payload.get("TextoIntegralUrl") or fontes.get("texto_integral_txt") or fontes.get("texto_integral_html")),
         url_video=_string(fontes.get("video") or fontes.get("videos_sessao_api")),
         url_origem=_string(fontes.get("texto_integral_html") or fontes.get("texto_integral_txt")),

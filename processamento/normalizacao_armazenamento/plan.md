@@ -19,6 +19,16 @@ somente processed current e Parquets current. O caderno
 auditoria, cria um snapshot separado e confirma cobertura em 2015 e 2016 sem
 reutilizar o ciclo histórico de coleta.
 
+## Promoção revisada de transcrições legadas
+
+O caderno 12 publica em raw somente os 471 textos senatoriais aceitos por chave
+forte e, em etapa confirmada separadamente, reconstrói
+`processed-textos-v1-current` e `parquet-textos-v1-current`. A normalização
+remove ruído editorial somente dos 83 registros cujo método é
+`diario-congresso-oficial-por-codigo-v1`, preservando o raw e anexando a
+auditoria da transformação a `fontes`. Fingerprints anteriores e posteriores
+devem limitar o drift a essas duas populações.
+
 ## Ciclo operacional 20260713
 
 - Regerar a fotografia canonica `current` depois que todas as faixas de coleta

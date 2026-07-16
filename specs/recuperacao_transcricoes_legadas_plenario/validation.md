@@ -27,6 +27,11 @@
   integral sem truncamento e priorização de proveniência contendo `diario`;
 - comprovar escrita desligada, confirmação literal, recusa de sobrescrita e
   `provenance.json` somente em `operations/auditorias/`.
+- validar o caderno 12 com `nbformat`, AST e sincronização com seu gerador;
+- testar construção, rejeições, escrita atômica e normalização dos registros de
+  promoção com fixtures sintéticas;
+- testar limpeza do Diário limitada a fronteiras, preservação de menção no
+  corpo, no-op fora do método exato e idempotência.
 
 ## Gates no Colab
 
@@ -59,9 +64,27 @@ No caderno 11:
 - `canonical_outputs_untouched=True` e nenhuma escrita ocorre fora da pasta
   imutável da auditoria.
 
+No caderno 12:
+
+- há exatamente 471 aceitos, códigos únicos, hashes/comprimentos válidos e
+  somente métodos de chave forte do Senado;
+- os conjuntos manual, conflito e não encontrado são disjuntos dos promovidos;
+- nenhuma promoção inicial ocorre se o código já tiver texto raw ou Parquet;
+- a prévia encontra exatamente 83 textos do Diário, produz texto não vazio e é
+  idempotente;
+- o Senado cresce exatamente 471 linhas e cada promovido mantém método,
+  `raw_run_id` e hash esperados;
+- o fingerprint do Senado sem os alvos e os cinco Parquets não relacionados
+  permanece idêntico;
+- no Congresso, ids, contagem e linhas fora do método do Diário não mudam; a
+  mudança textual fica restrita aos mesmos 83 ids;
+- a operação só termina com `promotion_state.status=validated` e
+  `validation.json` persistido.
+
 ## Revisão antes da promoção
 
 No Senado, inspecionar por método de vínculo uma amostra contendo texto,
 autor/id, data, sessão e URL. Na Câmara, revisar a quantidade, os anos e a
 acessibilidade das URLs antes de autorizar qualquer download. Promoção e
-aquisição são tarefas posteriores distintas.
+aquisição são tarefas posteriores distintas. A aprovação humana de 30% fica
+registrada no caderno 12 e não autoriza resolver os demais estados.

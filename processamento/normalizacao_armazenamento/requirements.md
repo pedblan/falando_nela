@@ -99,6 +99,12 @@ versionada, rastreavel e pronta para cadernos analiticos.
 Para pronunciamentos do Senado, aceitar a data oficial tanto em Data quanto em
 DataPronunciamento antes de recorrer à partição mensal.
 
+Para pronunciamentos do Congresso obtidos exatamente por
+`diario-congresso-oficial-por-codigo-v1`, aplicar a limpeza editorial
+`diario-congresso-limpeza-editorial-v1` somente nas fronteiras de página. O
+registro processed guarda hashes, comprimentos, contagem e linhas removidas em
+`fontes.normalizacao_texto_diario`; nenhum outro método passa por essa regra.
+
 Cada registro processado deve expor campos comuns para:
 
 - fonte, casa, dataset, ambito e orgao;
