@@ -9,6 +9,8 @@
 - comprovar flags desligadas e confirmação explícita;
 - comprovar ausência de `faster-whisper`, `yt-dlp` e `ffmpeg`;
 - testar inventário e deduplicação das duas casas com fixtures JSONL;
+- comprovar que JSONL inválido em `camara/.../metadata/` é ignorado e que a
+  mesma corrupção em `ano=YYYY/mes=MM/` continua bloqueante;
 - testar que vídeo de sessão do Senado permanece marcado para alinhamento;
 - comprovar em teste sintético que um id da Câmara presente no Parquet de teste
   continua excluído do cruzamento legado;

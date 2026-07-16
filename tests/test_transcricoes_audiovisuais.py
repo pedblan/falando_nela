@@ -174,6 +174,70 @@ def test_camara_inventory_uses_audio_and_stable_candidate_id(tmp_path: Path) -> 
     assert rows[0]["raw_occurrences"] == 2
 
 
+def test_camara_inventory_ignores_invalid_metadata_jsonl(tmp_path: Path) -> None:
+    metadata = (
+        tmp_path
+        / "raw"
+        / "camara"
+        / "plenario_discursos"
+        / "metadata"
+        / "interrupted.jsonl"
+    )
+    metadata.parent.mkdir(parents=True, exist_ok=True)
+    metadata.write_text('{"record_type":"discursos_page"}\n\x00partial', encoding="utf-8")
+    corpus = (
+        tmp_path
+        / "raw"
+        / "camara"
+        / "plenario_discursos"
+        / "ano=2024"
+        / "mes=05"
+        / "run.jsonl"
+    )
+    _write_jsonl(
+        corpus,
+        [
+            {
+                "record_type": "discursos_page",
+                "source_id": "deputado:123:discursos:2024-05:pagina:1",
+                "payload": {
+                    "dados": [
+                        {
+                            "dataHoraInicio": "2024-05-02T10:00:00",
+                            "uriEvento": "https://dadosabertos.camara.leg.br/api/v2/eventos/99",
+                            "tipoDiscurso": "Pequeno Expediente",
+                            "urlAudio": "https://example.test/99.mp3",
+                            "transcricao": None,
+                        }
+                    ]
+                },
+            }
+        ],
+    )
+
+    rows = scan_camara_media_candidates(tmp_path)
+
+    assert len(rows) == 1
+    assert rows[0]["raw_path"].startswith("raw/camara/plenario_discursos/ano=2024/")
+
+
+def test_camara_inventory_still_rejects_invalid_monthly_corpus(tmp_path: Path) -> None:
+    corpus = (
+        tmp_path
+        / "raw"
+        / "camara"
+        / "plenario_discursos"
+        / "ano=2024"
+        / "mes=05"
+        / "broken.jsonl"
+    )
+    corpus.parent.mkdir(parents=True, exist_ok=True)
+    corpus.write_text("not-json\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="JSONL inválido"):
+        scan_camara_media_candidates(tmp_path)
+
+
 def test_probe_sample_is_reproducible_and_prioritizes_asr_eligible() -> None:
     candidates = [
         {

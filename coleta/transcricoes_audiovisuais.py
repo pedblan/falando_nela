@@ -226,7 +226,11 @@ def scan_camara_media_candidates(
 
     candidates: dict[str, dict[str, Any]] = {}
     resolved_keys: set[str] = set()
-    paths = sorted(corpus_root.rglob("*.jsonl"))
+    paths = sorted(
+        path
+        for path in corpus_root.glob("ano=*/mes=*/*.jsonl")
+        if path.is_file()
+    )
     for file_index, path in enumerate(paths, start=1):
         for record in iter_jsonl(path):
             if record.get("record_type") != "discursos_page":

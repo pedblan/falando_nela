@@ -194,6 +194,9 @@ PY
 
 - O inventário seleciona somente páginas mensais `discursos_page` com mídia e
   texto vazio e elimina a unidade quando uma ocorrência posterior tem texto.
+- A varredura lê apenas `ano=YYYY/mes=MM/*.jsonl`: JSONL parcial em
+  `metadata/` não interrompe a sondagem, mas JSON inválido no corpus mensal
+  continua sendo erro bloqueante.
 - Nenhum candidato da Câmara entra em `recovered_legacy_texts.parquet` ou nos
   matches do banco legado, mesmo se houver colisão artificial de id.
 - `camara_media_download_queue.parquet` contém apenas Câmara, URL não vazia e
