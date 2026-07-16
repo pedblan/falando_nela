@@ -97,8 +97,10 @@
 - A paginação mensal deve persistir cada resposta antes de solicitar a próxima;
   não pode acumular uma lista ilimitada de páginas em memória.
 - Um `rel=next` posterior ao `rel=last` deve ser ignorado e registrado como
-  anomalia. URL de página repetida, `rel=last` contraditório ou mais de 1.000
-  páginas no mesmo deputado/mês deve falhar a janela de modo auditável.
+  anomalia. A URL de `rel=next` não pode alterar `dataInicio`, `dataFim`,
+  ordenação ou tamanho de página da consulta mensal original; apenas seu número
+  de página pode ser usado. Mais de 1.000 páginas no mesmo deputado/mês deve
+  falhar a janela de modo auditável.
 - `transcricao` deve ser preservada como texto prioritario quando estiver
   disponivel.
 - Nomes e transcrições devem preservar Unicode/UTF-8, inclusive diacríticos

@@ -112,7 +112,8 @@ Os testes devem cobrir:
 - `discursos_page` e gravado apenas para requisicoes mensais.
 - `discursos_page_error` aparece somente em `metadata/` e nao bloqueia a
   gravacao de outras paginas recuperaveis do mesmo mes.
-- Paginacao mensal segue links `rel=next`.
+- Paginação mensal reconstrói cada URL com os filtros mensais originais; um
+  `rel=next` sem as datas não pode ampliar o escopo da coleta.
 - Quando o fallback `itens=1` for acionado, paginas recuperadas podem aparecer
   com indices nao contiguos se uma pagina intermediaria persistir com 500; a
   lacuna deve estar registrada no erro correspondente em `metadata/`.

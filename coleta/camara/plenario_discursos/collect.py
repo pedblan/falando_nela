@@ -870,6 +870,7 @@ def _cached_result(
     *,
     source_id: str,
     record_type: str,
+    expected_params: dict[str, Any] | None = None,
 ) -> tuple[HttpResult, dict[str, Any]] | None:
     """Reconstrói uma resposta raw válida para uma retomada sem rede."""
     record = run.read_existing_record(source_id=source_id, record_type=record_type)
@@ -884,6 +885,17 @@ def _cached_result(
     headers = headers if isinstance(headers, dict) else {}
     request = record.get("request")
     request = request if isinstance(request, dict) else {"method": "GET", "path": "raw-cache", "params": {}}
+    if expected_params is not None and _request_has_wrong_discursos_scope(request, expected_params):
+        run.log(
+            "discursos_cached_page_scope_rejected",
+            source_id=source_id,
+            record_type=record_type,
+            expected_periodo={
+                "data_inicio": expected_params.get("dataInicio"),
+                "data_fim": expected_params.get("dataFim"),
+            },
+        )
+        return None
     status_code = response.get("status_code")
     return (
         HttpResult(
@@ -908,31 +920,29 @@ def _fetch_discursos_pages_follow_next(
     retries: bool,
     fast_fallback: bool,
 ) -> dict[str, int]:
-    """Busca e persiste páginas uma a uma, recusando links circulares.
-
-    Alguns retornos históricos da API podem expor um `rel=next` incompatível
-    com o próprio `rel=last`. Não se pode manter uma lista ilimitada dessas
-    respostas em RAM nem seguir o link além do limite anunciado pela fonte.
-    """
+    """Busca páginas mensais sem aceitar que ``rel=next`` altere o período."""
     stats = {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0}
-    next_url: str | None = path
-    next_params: dict[str, Any] | None = params
     page_index = 1
     seen_request_urls: set[str] = set()
     last_page: int | None = None
-    while next_url:
+    while True:
         if page_index > MAX_DISCURSOS_PAGES_PER_MONTH:
             raise DiscursosPaginationError(
                 f"Limite de {MAX_DISCURSOS_PAGES_PER_MONTH} páginas excedido para "
                 f"deputado={deputado_id}, período={partition}"
             )
-        request_path = next_url
-        request_params = next_params or {}
+        # A Câmara por vezes devolve ``rel=next`` sem dataInicio/dataFim. O
+        # href serve apenas como sinal de paginação; cada requisição é sempre
+        # reconstruída sobre o endpoint e os filtros originais deste mês.
+        request_path = path
+        request_params = {**params}
+        if page_index > 1:
+            request_params["pagina"] = page_index
         request_url = str(
             client.client.build_request(
                 "GET",
                 client._resolve_url(request_path),
-                params=next_params,
+                params=request_params,
             ).url
         )
         if request_url in seen_request_urls:
@@ -940,8 +950,24 @@ def _fetch_discursos_pages_follow_next(
                 f"Link de página repetido para deputado={deputado_id}, período={partition}: {request_url}"
             )
         seen_request_urls.add(request_url)
-        source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
-        cached = _cached_result(run, source_id=source_id, record_type=RECORD_TYPE)
+        base_source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
+        source_id = base_source_id
+        cached = _cached_result(
+            run,
+            source_id=base_source_id,
+            record_type=RECORD_TYPE,
+            expected_params=request_params,
+        )
+        if cached is None and run.has_record(source_id=base_source_id, record_type=RECORD_TYPE):
+            # O raw antigo é imutável. Uma página registrada pela URL defeituosa
+            # ganha uma chave nova, deixando a versão corrigida auditável.
+            source_id = f"{base_source_id}:escopo-corrigido"
+            cached = _cached_result(
+                run,
+                source_id=source_id,
+                record_type=RECORD_TYPE,
+                expected_params=request_params,
+            )
         if cached is not None:
             result, request = cached
             reused = True
@@ -957,11 +983,11 @@ def _fetch_discursos_pages_follow_next(
                 periodo={"data_inicio": params["dataInicio"], "data_fim": params["dataFim"]},
             )
             if fast_fallback:
-                result = _get_json_fast_fallback(client, next_url, params=request_params)
+                result = _get_json_fast_fallback(client, request_path, params=request_params)
             elif retries:
-                result = client.get_json(next_url, params=next_params)
+                result = client.get_json(request_path, params=request_params)
             else:
-                result = _get_json_once(client, next_url, params=request_params)
+                result = _get_json_once(client, request_path, params=request_params)
         page_stats = _write_discursos_pages(
             run,
             partition=partition,
@@ -973,6 +999,7 @@ def _fetch_discursos_pages_follow_next(
                     "result": result,
                     "request": request,
                     "reused": reused,
+                    "source_id": source_id,
                 }
             ],
         )
@@ -989,24 +1016,42 @@ def _fetch_discursos_pages_follow_next(
                     f"deputado={deputado_id}, período={partition}"
                 )
             if last_page is not None and declared_last_page != last_page:
-                raise DiscursosPaginationError(
-                    f"rel=last mudou de {last_page} para {declared_last_page} para "
-                    f"deputado={deputado_id}, período={partition}"
+                run.log(
+                    "discursos_pagination_last_normalized",
+                    partition=partition,
+                    deputado_id=deputado_id,
+                    page_index=page_index,
+                    declared_last_page=declared_last_page,
+                    retained_last_page=max(last_page, declared_last_page),
                 )
-            last_page = declared_last_page
-        next_url = _next_link(result.data)
-        if next_url and last_page is not None and page_index >= last_page:
-            run.log(
-                "discursos_pagination_next_ignored",
-                partition=partition,
-                deputado_id=deputado_id,
-                page_index=page_index,
-                declared_last_page=last_page,
-                ignored_next_url=next_url,
-            )
+            last_page = max(last_page or 1, declared_last_page)
+        next_link = _next_link(result.data)
+        if last_page is not None and page_index >= last_page:
+            if next_link:
+                run.log(
+                    "discursos_pagination_next_ignored",
+                    partition=partition,
+                    deputado_id=deputado_id,
+                    page_index=page_index,
+                    declared_last_page=last_page,
+                    ignored_next_url=next_link,
+                )
             break
-        next_params = None
-        page_index += 1
+        if last_page is not None:
+            page_index += 1
+            continue
+        next_page = _page_number_from_link(next_link)
+        if next_page is None:
+            if next_link:
+                raise DiscursosPaginationError(
+                    f"rel=next sem número de página para deputado={deputado_id}, período={partition}"
+                )
+            break
+        if next_page <= page_index:
+            raise DiscursosPaginationError(
+                f"Próxima página inválida ({next_page}) para deputado={deputado_id}, período={partition}"
+            )
+        page_index = next_page
     return stats
 
 
@@ -1135,7 +1180,9 @@ def _write_discursos_pages(
         page_index = int(page["page_index"])
         result = page["result"]
         request = page["request"]
-        source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
+        source_id = page.get("source_id")
+        if not isinstance(source_id, str) or not source_id:
+            source_id = f"deputado:{deputado_id}:discursos:{partition}:pagina:{page_index}"
         discursos = _dados(result.data)
         if run.has_record(source_id=source_id, record_type=RECORD_TYPE):
             if not page.get("reused", False):
@@ -1266,6 +1313,18 @@ def _next_link(payload: Any) -> str | None:
     return None
 
 
+def _page_number_from_link(link: str | None) -> int | None:
+    if not link:
+        return None
+    page_values = parse_qs(urlparse(link).query).get("pagina", [])
+    if not page_values:
+        return None
+    try:
+        return int(page_values[0])
+    except ValueError:
+        return None
+
+
 def _last_page_from_links(payload: Any) -> int | None:
     if not isinstance(payload, dict):
         return None
@@ -1275,14 +1334,31 @@ def _last_page_from_links(payload: Any) -> int | None:
         href = link.get("href")
         if not isinstance(href, str):
             continue
-        page_values = parse_qs(urlparse(href).query).get("pagina", [])
-        if not page_values:
-            continue
-        try:
-            return int(page_values[0])
-        except ValueError:
-            return None
+        return _page_number_from_link(href)
     return None
+
+
+def _request_has_wrong_discursos_scope(request: dict[str, Any], expected_params: dict[str, Any]) -> bool:
+    """Detecta somente respostas antigas que carregam uma URL de página fora do mês.
+
+    Registros antigos sem parâmetros continuam reutilizáveis; a rejeição é
+    reservada para o caso comprovado do ``rel=next`` que trazia pagina/itens,
+    mas omitia as datas.
+    """
+    path = request.get("path")
+    query = parse_qs(urlparse(path).query) if isinstance(path, str) else {}
+    supplied = request.get("params")
+    supplied = supplied if isinstance(supplied, dict) else {}
+    observed = {key: str(values[-1]) for key, values in query.items() if values}
+    observed.update({str(key): str(value) for key, value in supplied.items() if value is not None})
+    has_query_evidence = any(key in observed for key in ("dataInicio", "dataFim", "pagina", "itens"))
+    if not has_query_evidence:
+        return False
+    for key in ("dataInicio", "dataFim"):
+        if observed.get(key) != str(expected_params[key]):
+            return True
+    expected_page = str(expected_params.get("pagina", 1))
+    return observed.get("pagina", "1") != expected_page
 
 
 def _dados(payload: Any) -> list[dict[str, Any]]:

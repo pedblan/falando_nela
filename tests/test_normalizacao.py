@@ -136,6 +136,28 @@ def test_normalize_camara_discursos_page_uses_deputado_index(tmp_path: Path) -> 
     assert record["texto_status"] == "disponivel"
 
 
+def test_normalize_camara_discursos_page_ignores_raw_with_missing_request_dates(tmp_path: Path) -> None:
+    raw_path = tmp_path / "raw" / "camara" / "plenario_discursos" / "ano=2010" / "mes=03" / "run.jsonl"
+    raw_path.parent.mkdir(parents=True)
+    raw_record = {
+        "run_id": "run",
+        "source": "camara",
+        "dataset": "plenario_discursos",
+        "record_type": "discursos_page",
+        "source_id": "deputado:10:discursos:2010-03:pagina:2",
+        "partition": "2010-03",
+        "periodo": {"data_inicio": "2010-03-01", "data_fim": "2010-03-31"},
+        "request": {
+            "method": "GET",
+            "path": "https://dadosabertos.camara.leg.br/api/v2/deputados/10/discursos?pagina=2&itens=15",
+            "params": {},
+        },
+        "payload": {"dados": [{"dataHoraInicio": "2009-01-01T10:00", "transcricao": "fora do mês"}]},
+    }
+
+    assert normalize_raw_record(raw_record, raw_path=raw_path, data_root=tmp_path) == []
+
+
 def test_normalize_data_root_writes_partitioned_jsonl_and_deduplicates_newer_first(tmp_path: Path) -> None:
     metadata_path = tmp_path / "raw" / "camara" / "plenario_discursos" / "metadata" / "deputados.jsonl"
     metadata_path.parent.mkdir(parents=True)

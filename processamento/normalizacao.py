@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from hashlib import sha1
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
+from urllib.parse import parse_qs, urlparse
 
 from coleta.common.config import DEFAULT_DEV_DATA_DIR, PROD_DATA_ROOT_ENV, utc_now_iso
 
@@ -498,6 +499,8 @@ def _normalize_camara_discursos_page(
     data_root: Path,
     deputados_index: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    if _camara_discursos_request_has_wrong_scope(record):
+        return []
     payload = _dict(record.get("payload"))
     source_id = _string(record.get("source_id")) or ""
     deputado_id = _extract_deputado_id(source_id)
@@ -563,6 +566,23 @@ def _normalize_camara_discursos_page(
             )
         )
     return records
+
+
+def _camara_discursos_request_has_wrong_scope(record: dict[str, Any]) -> bool:
+    """Exclui somente páginas comprovadamente gravadas fora do período raw."""
+    request = _dict(record.get("request"))
+    path = _string(request.get("path"))
+    params = _dict(request.get("params"))
+    query = parse_qs(urlparse(path).query) if path else {}
+    observed = {key: _string(values[-1]) for key, values in query.items() if values}
+    observed.update({str(key): _string(value) for key, value in params.items() if value is not None})
+    if not any(key in observed for key in ("dataInicio", "dataFim", "pagina", "itens")):
+        return False
+    periodo = _dict(record.get("periodo"))
+    return (
+        observed.get("dataInicio") != _string(periodo.get("data_inicio"))
+        or observed.get("dataFim") != _string(periodo.get("data_fim"))
+    )
 
 
 def _normalize_camara_ccjc_notas(record: dict[str, Any], *, raw_path: Path, data_root: Path) -> dict[str, Any]:

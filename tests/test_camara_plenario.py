@@ -335,8 +335,15 @@ def test_collect_deputados_paginates_metadata_with_stable_page_ids(tmp_path: Pat
 
 
 def test_collect_discursos_deputado_writes_monthly_pages_and_counts_transcricoes(tmp_path: Path) -> None:
-    responses = {
-        "https://example.test/api/v2/deputados/10/discursos?dataInicio=2026-05-01&dataFim=2026-05-18&itens=100&ordem=ASC&ordenarPor=dataHoraInicio": {
+    seen_request_params: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        params = dict(request.url.params)
+        seen_request_params.append(params)
+        if params.get("pagina", "1") == "1":
+            return httpx.Response(
+                200,
+                json={
             "dados": [
                 {
                     "dataHoraInicio": "2026-05-02T10:00",
@@ -346,15 +353,16 @@ def test_collect_discursos_deputado_writes_monthly_pages_and_counts_transcricoes
                 }
             ],
             "links": [{"rel": "next", "href": "https://example.test/api/v2/deputados/10/discursos?pagina=2"}],
-        },
-        "https://example.test/api/v2/deputados/10/discursos?pagina=2": {
-            "dados": [{"dataHoraInicio": "2026-05-03T10:00", "sumario": "sem transcricao"}],
-            "links": [],
-        },
-    }
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=responses[str(request.url)])
+                },
+            )
+        assert params["pagina"] == "2"
+        return httpx.Response(
+            200,
+            json={
+                "dados": [{"dataHoraInicio": "2026-05-03T10:00", "sumario": "sem transcricao"}],
+                "links": [],
+            },
+        )
 
     client = OpenDataClient("https://example.test", sleep=lambda _: None)
     client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
@@ -390,6 +398,14 @@ def test_collect_discursos_deputado_writes_monthly_pages_and_counts_transcricoes
         "A SRA. CONCEIÇÃO SAMPAIO — ação, saúde e Constituição."
     )
     assert records[0]["payload"]["dados"][0]["sumario"] == "resumo auxiliar"
+    assert seen_request_params[1] == {
+        "dataInicio": "2026-05-01",
+        "dataFim": "2026-05-18",
+        "itens": "100",
+        "ordem": "ASC",
+        "ordenarPor": "dataHoraInicio",
+        "pagina": "2",
+    }
 
 
 def test_collect_discursos_probe_reuses_cached_raw_without_calling_api(tmp_path: Path) -> None:
@@ -456,6 +472,51 @@ def test_collect_discursos_pages_reuse_cached_raw_without_calling_api(tmp_path: 
 
     assert stats == {"pages": 0, "discursos": 0, "transcricoes": 0, "page_errors": 0}
     assert "record_resume_reused" in (tmp_path / "logs" / f"{run_id}.jsonl").read_text(encoding="utf-8")
+
+
+def test_collect_discursos_replaces_cached_page_with_missing_period_filters(tmp_path: Path) -> None:
+    run_id = "resume-wrong-scope"
+    initial = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=False)
+    initial.write_record(
+        partition="2010-01",
+        source_id="deputado:10:discursos:2010-01:pagina:1",
+        request={
+            "method": "GET",
+            "path": "api/v2/deputados/10/discursos?pagina=1&itens=15",
+            "params": {},
+        },
+        response={"url": "https://example.test", "status_code": 200, "headers": {}},
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-01-31"},
+        payload={"dados": [{"transcricao": "fora do escopo"}], "links": []},
+        record_type="discursos_page",
+    )
+    resumed = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id=run_id, resume=True)
+    seen_params: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_params.append(dict(request.url.params))
+        return httpx.Response(200, json={"dados": [{"transcricao": "no mês"}], "links": []})
+
+    client = OpenDataClient("https://example.test", sleep=lambda _: None)
+    client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+
+    stats = _collect_discursos_deputado(
+        client,
+        resumed,
+        partition="2010-01",
+        periodo={"data_inicio": "2010-01-01", "data_fim": "2010-01-31"},
+        deputado_id=10,
+    )
+
+    raw_path = tmp_path / "raw" / "camara" / "plenario_discursos" / "ano=2010" / "mes=01" / f"{run_id}.jsonl"
+    records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines()]
+    assert stats == {"pages": 1, "discursos": 1, "transcricoes": 1, "page_errors": 0}
+    assert seen_params[0]["dataInicio"] == "2010-01-01"
+    assert seen_params[0]["dataFim"] == "2010-01-31"
+    assert records[-1]["source_id"] == "deputado:10:discursos:2010-01:pagina:1:escopo-corrigido"
+    assert "discursos_cached_page_scope_rejected" in (
+        tmp_path / "logs" / f"{run_id}.jsonl"
+    ).read_text(encoding="utf-8")
 
 
 def test_collect_discursos_honors_declared_last_page_and_persists_pages(tmp_path: Path) -> None:
@@ -529,7 +590,7 @@ def test_collect_discursos_rejects_repeated_page_link(tmp_path: Path) -> None:
     client.client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
     run = CollectionRun(tmp_path, source="camara", dataset="plenario_discursos", run_id="repeat", resume=False)
 
-    with pytest.raises(DiscursosPaginationError, match="Link de página repetido"):
+    with pytest.raises(DiscursosPaginationError, match="rel=next sem número de página"):
         _collect_discursos_deputado(
             client,
             run,
