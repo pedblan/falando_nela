@@ -197,6 +197,12 @@ PY
 - A varredura lê apenas `ano=YYYY/mes=MM/*.jsonl`: JSONL parcial em
   `metadata/` não interrompe a sondagem, mas JSON inválido no corpus mensal
   continua sendo erro bloqueante.
+- O caderno recarrega explicitamente o módulo após `git pull`, exige
+  `INVENTORY_CODE_VERSION >= 2` e imprime o caminho/versão executados, evitando
+  que o cache de imports do Colab reutilize a implementação antiga.
+- No progresso, `com_texto` conta ocorrências raw com transcrição; não significa
+  recuperação feita pelo caderno. `pendentes_unicos` é a fila provisória após
+  deduplicar unidades já observadas com texto.
 - Nenhum candidato da Câmara entra em `recovered_legacy_texts.parquet` ou nos
   matches do banco legado, mesmo se houver colisão artificial de id.
 - `camara_media_download_queue.parquet` contém apenas Câmara, URL não vazia e

@@ -14,6 +14,8 @@
 - testar que vídeo de sessão do Senado permanece marcado para alinhamento;
 - comprovar em teste sintético que um id da Câmara presente no Parquet de teste
   continua excluído do cruzamento legado;
+- comprovar recarga explícita do módulo no caderno e gate de versão, para que um
+  runtime Colab já usado não mantenha a implementação anterior em memória;
 - testar inferência de aliases do schema legado;
 - testar recusa de arquivo sem `PAR1` ou tamanho esperado.
 

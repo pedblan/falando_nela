@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 
+INVENTORY_CODE_VERSION = 2
+
+
 OLD_PARQUET_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "house": (
         "casa",
@@ -225,7 +228,11 @@ def scan_camara_media_candidates(
         return []
 
     candidates: dict[str, dict[str, Any]] = {}
-    resolved_keys: set[str] = set()
+    text_available_keys: set[str] = set()
+    items_seen = 0
+    text_occurrences = 0
+    empty_text_occurrences = 0
+    empty_text_with_media_occurrences = 0
     paths = sorted(
         path
         for path in corpus_root.glob("ano=*/mes=*/*.jsonl")
@@ -243,13 +250,17 @@ def scan_camara_media_candidates(
             for item in data:
                 if not isinstance(item, dict):
                     continue
+                items_seen += 1
                 unit_key = _camara_unit_key(item, deputy_id=deputy_id)
                 if _has_text(item.get("transcricao")):
-                    resolved_keys.add(unit_key)
+                    text_occurrences += 1
+                    text_available_keys.add(unit_key)
                     continue
+                empty_text_occurrences += 1
                 media_url, media_source = _camara_preferred_media(item)
                 if not media_url:
                     continue
+                empty_text_with_media_occurrences += 1
 
                 date_value = _string(item.get("dataHoraInicio"))
                 event_uri = _string(item.get("uriEvento"))
@@ -297,15 +308,20 @@ def scan_camara_media_candidates(
                         previous["raw_occurrences"] = row["raw_occurrences"]
 
         if progress and (file_index == 1 or file_index % 25 == 0 or file_index == len(paths)):
+            pending_unique = sum(
+                row["speech_id"] not in text_available_keys for row in candidates.values()
+            )
             progress(
-                f"Câmara: {file_index}/{len(paths)} arquivos; "
-                f"{len(candidates)} candidatos; {len(resolved_keys)} resolvidos"
+                f"Câmara: {file_index}/{len(paths)} arquivos; itens={items_seen}; "
+                f"com_texto={text_occurrences}; sem_texto={empty_text_occurrences}; "
+                f"sem_texto_com_midia={empty_text_with_media_occurrences}; "
+                f"pendentes_unicos={pending_unique}"
             )
 
     rows = [
         row
         for candidate_id, row in candidates.items()
-        if candidate_id.rsplit(":", 1)[-1] not in resolved_keys
+        if candidate_id.rsplit(":", 1)[-1] not in text_available_keys
     ]
     return sorted(rows, key=_candidate_sort_key)
 

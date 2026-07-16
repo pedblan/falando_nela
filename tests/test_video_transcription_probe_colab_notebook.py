@@ -31,6 +31,9 @@ def test_legacy_transcription_recovery_notebook_is_valid_and_guarded() -> None:
     assert 'REPO_REF = "main"' in combined
     assert "scan_camara_media_candidates" in combined
     assert "scan_senado_transcription_queue" in combined
+    assert "importlib.reload(transcricoes_audiovisuais)" in combined
+    assert '"INVENTORY_CODE_VERSION", 0' in combined
+    assert '"/content/falando_nela/"' in combined
     assert "1R5Xz3tydoPYHSjzmKM8_KDvTzQ51RFk2" in combined
     assert "252_122_904" in combined
     assert "validate_parquet_magic" in combined

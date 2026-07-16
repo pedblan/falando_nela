@@ -267,18 +267,38 @@ def build_notebook() -> nbformat.NotebookNode:
             Na Câmara, entram itens com mídia e sem `transcricao`; se outra
             ocorrência da mesma unidade já contém texto, ela é retirada. No
             Senado, o ponto de partida é a fila explícita do coletor.
+
+            No progresso da Câmara, `com_texto` conta ocorrências raw que já
+            trazem transcrição — não recuperações feitas por este caderno.
+            `sem_texto_com_midia` conta ocorrências candidatas antes da
+            deduplicação, e `pendentes_unicos` é a fila provisória após excluir
+            unidades observadas com texto em outro run.
             """
         ),
         code(
             """
-            from coleta.transcricoes_audiovisuais import (
-                scan_camara_media_candidates,
-                scan_senado_transcription_queue,
+            import importlib
+            from coleta import transcricoes_audiovisuais
+
+            transcricoes_audiovisuais = importlib.reload(transcricoes_audiovisuais)
+            assert getattr(transcricoes_audiovisuais, "INVENTORY_CODE_VERSION", 0) >= 2, (
+                "Módulo antigo ainda carregado. Reexecute a preparação do repositório "
+                "e depois esta célula."
+            )
+            print("Módulo de inventário:", transcricoes_audiovisuais.__file__)
+            print("Versão do inventário:", transcricoes_audiovisuais.INVENTORY_CODE_VERSION)
+            assert "/content/falando_nela/" in str(transcricoes_audiovisuais.__file__), (
+                "O módulo foi importado de outro checkout: "
+                f"{transcricoes_audiovisuais.__file__}"
             )
 
             current = pd.DataFrame([
-                *scan_camara_media_candidates(DATA_ROOT, progress=print),
-                *scan_senado_transcription_queue(DATA_ROOT, progress=print),
+                *transcricoes_audiovisuais.scan_camara_media_candidates(
+                    DATA_ROOT, progress=print
+                ),
+                *transcricoes_audiovisuais.scan_senado_transcription_queue(
+                    DATA_ROOT, progress=print
+                ),
             ])
             assert not current.empty, "Nenhuma lacuna audiovisual encontrada"
             assert current["candidate_id"].is_unique

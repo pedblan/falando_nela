@@ -6,12 +6,17 @@ from pathlib import Path
 import pytest
 
 from coleta.transcricoes_audiovisuais import (
+    INVENTORY_CODE_VERSION,
     infer_old_parquet_columns,
     scan_camara_media_candidates,
     scan_senado_transcription_queue,
     select_probe_sample,
     validate_parquet_magic,
 )
+
+
+def test_inventory_code_version_requires_monthly_only_scan() -> None:
+    assert INVENTORY_CODE_VERSION >= 2
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
@@ -215,10 +220,15 @@ def test_camara_inventory_ignores_invalid_metadata_jsonl(tmp_path: Path) -> None
         ],
     )
 
-    rows = scan_camara_media_candidates(tmp_path)
+    progress: list[str] = []
+    rows = scan_camara_media_candidates(tmp_path, progress=progress.append)
 
     assert len(rows) == 1
     assert rows[0]["raw_path"].startswith("raw/camara/plenario_discursos/ano=2024/")
+    assert progress == [
+        "Câmara: 1/1 arquivos; itens=1; com_texto=0; sem_texto=1; "
+        "sem_texto_com_midia=1; pendentes_unicos=1"
+    ]
 
 
 def test_camara_inventory_still_rejects_invalid_monthly_corpus(tmp_path: Path) -> None:
