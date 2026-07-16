@@ -114,6 +114,10 @@ Os testes devem cobrir:
   gravacao de outras paginas recuperaveis do mesmo mes.
 - Paginação mensal reconstrói cada URL com os filtros mensais originais; um
   `rel=next` sem as datas não pode ampliar o escopo da coleta.
+- O inventário operacional do backfill só conta uma página raw cuja requisição
+  registrada confirme o mesmo `dataInicio` e `dataFim` do seu período. Página
+  imutável de uma execução anterior sem essas datas é diagnosticada e excluída
+  do gate, para que a página corrigida possa ser auditada separadamente.
 - Quando o fallback `itens=1` for acionado, paginas recuperadas podem aparecer
   com indices nao contiguos se uma pagina intermediaria persistir com 500; a
   lacuna deve estar registrada no erro correspondente em `metadata/`.
