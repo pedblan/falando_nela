@@ -64,8 +64,15 @@
   `vigencia_inicio…vigencia_fim`.
 - Registrar ausência, múltiplos candidatos e critério de desempate.
 - Preservar `genero_oficial` sem alterações.
-- Aplicar uma camada pesquisada somente a candidatos aprovados por humano.
-- `genero_presumido=true` deve significar pesquisa pública revisada, não dado oficial.
+- Na rodada `analise-plenario-20260717-v1`, não pesquisar nem publicar gênero
+  para deputados; casos ausentes permanecem `nao_informado`.
+- Não inferir gênero por nome, foto, aparência ou tratamento.
+- Preservar os metadados oficiais existentes, inclusive os senatoriais.
+- O caderno 01 deve ser somente leitura, sem API, fila ou escrita no Drive.
+- Artefatos antigos de pesquisa podem ser preservados para auditoria, mas não
+  entram no snapshot nem nos cadernos 02–09.
+- A síntese metodológica deve classificar `01_genero` como `suspensa`, não como
+  etapa analítica faltante.
 
 ## Descritivas
 

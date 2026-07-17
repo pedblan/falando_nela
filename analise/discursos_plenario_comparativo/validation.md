@@ -63,10 +63,15 @@
 - Testar datas nas duas bordas do intervalo de vigência.
 - Testar parlamentar sem ID, data ausente, ausência de período e múltiplos períodos.
 - Demonstrar que `genero_oficial` permanece inalterado.
-- Rejeitar candidato identificado sem URL, título e trecho.
-- Rejeitar publicação sem `revisor` e `revisado_em`.
-- Demonstrar que candidatos pendentes e rejeitados não alteram o snapshot.
-- Simular cliente GPT; não realizar pesquisa web em testes automatizados.
+- Verificar que o caderno 01 declara a pesquisa da Câmara como suspensa e
+  mantém `RODAR_ETAPA=False`.
+- Rejeitar no caderno 01 chamadas à API, acesso a `OPENAI_API_KEY`, criação de
+  fila ou publicação de revisão.
+- Demonstrar que o caderno apenas lê a cobertura oficial do snapshot e que
+  artefatos antigos não são consumidos a jusante.
+- Demonstrar que casos sem metadado permanecem `nao_informado` e que o
+  metadado oficial dos senadores continua inalterado.
+- Confirmar que a síntese classifica `01_genero` como `suspensa`.
 
 ## Estatística sintética
 

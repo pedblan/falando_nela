@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +31,7 @@ def methodological_status(run_root: str | Path) -> pd.DataFrame:
     rows = []
     stage_labels = {
         "00_snapshot": "reproducao",
-        "01_genero": "validacao",
+        "01_genero": "suspensa",
         "02_descritivas": "reproducao",
         "03_apartes": "reproducao",
         "04_nlp": "reproducao",

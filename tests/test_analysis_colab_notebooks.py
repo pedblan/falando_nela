@@ -8,6 +8,8 @@ import nbformat
 import pandas as pd
 import pytest
 
+from analise.discursos_plenario.sintese import methodological_status
+
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_DIR = ROOT / "notebooks" / "analise"
@@ -71,6 +73,36 @@ def test_analysis_notebooks_match_generator() -> None:
         check=False,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_gender_notebook_is_read_only_and_research_is_suspended() -> None:
+    notebook = nbformat.read(
+        NOTEBOOK_DIR / "01_enriquecimento_genero_colab.ipynb", as_version=4
+    )
+    source = "\n".join(
+        cell.source for cell in notebook.cells if cell.cell_type == "code"
+    )
+
+    assert 'GENERO_RESEARCH_POLICY = "suspended_for_camara_official_only"' in source
+    assert "official_only_no_research" in source
+    assert "official_metadata" in source
+    assert "existing_artifacts_consumed_downstream" in source
+    assert "assert not RODAR_ETAPA" in source
+    assert "research_gender_candidates" not in source
+    assert "run_gender_enrichment_setup" not in source
+    assert "publish_gender_review" not in source
+    assert "RODAR_PESQUISA_WEB" not in source
+    assert "PUBLICAR_REVISAO" not in source
+    assert "OPENAI_API_KEY" not in source
+
+
+def test_synthesis_marks_gender_stage_as_suspended(tmp_path: Path) -> None:
+    status = methodological_status(tmp_path)
+    gender = status.loc[status["etapa"].eq("01_genero")].iloc[0]
+
+    assert gender["tipo"] == "suspensa"
+    assert not gender["executada"]
+    assert gender["manifest"] is None
 
 
 def test_snapshot_validation_cell_is_standalone_and_synchronized() -> None:

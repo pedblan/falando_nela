@@ -162,102 +162,62 @@ NOTEBOOKS = [
     },
     {
         "filename": "01_enriquecimento_genero_colab.ipynb",
-        "title": "01 — Enriquecimento revisado de gênero",
-        "description": "Prepara casos desconhecidos, pesquisa evidências públicas e publica somente candidatos aprovados.",
-        "method": "A informação oficial nunca é alterada. Nome, foto, aparência e tratamento isolados são evidências inválidas; toda candidatura identificada requer revisão humana.",
+        "title": "01 — Gênero oficial; pesquisa de deputados suspensa",
+        "description": "Audita a cobertura do metadado oficial sem pesquisar, inferir ou publicar gênero para deputados.",
+        "method": "Nesta rodada, gênero vem somente do metadado oficial já congelado no snapshot. Casos sem informação permanecem `nao_informado`; nome, inclusive casos aparentemente óbvios, não é usado como inferência.",
         "preflight": """
-            GENERO_PERIODS_PATH = INPUT_PATHS["parliamentarian_periods"]
-            assert GENERO_PERIODS_PATH.exists(), GENERO_PERIODS_PATH
-            GENERO_RESEARCH_MODEL = ANALYSIS_CONFIG.raw["openai"]["gender_research_model"]
-            RODAR_PESQUISA_WEB = False
-            PUBLICAR_REVISAO = False
-            MAX_CASOS_PESQUISA = None
-            print("Modelo de pesquisa:", GENERO_RESEARCH_MODEL)
-        """,
-        "run": """
-            from analise.discursos_plenario.genero import run_gender_enrichment_setup
-
-            GENERO_SETUP_RESULT = None
-            if RODAR_ETAPA:
-                GENERO_SETUP_RESULT = run_gender_enrichment_setup(
-                    data_root=DATA_ROOT,
-                    run_id=RUN_ID,
-                    config_path=CONFIG_PATH,
-                    overwrite=False,
-                )
-                print(GENERO_SETUP_RESULT["manifest_path"])
-            else:
-                print("Fila não gerada. Defina RODAR_ETAPA=True após revisar o contrato.")
-        """,
-        "validate": """
             import pandas as pd
 
-            GENERO_UNKNOWN_PATH = RUN_OUTPUT_ROOT / "01_genero" / "parlamentares_genero_desconhecido.csv"
-            if GENERO_UNKNOWN_PATH.exists():
-                GENERO_UNKNOWNS = pd.read_csv(GENERO_UNKNOWN_PATH)
-                assert GENERO_UNKNOWNS["parlamentar_key"].is_unique
-                display(GENERO_UNKNOWNS.head())
+            GENERO_SNAPSHOT_PATH = (
+                RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+            )
+            assert GENERO_SNAPSHOT_PATH.exists(), "Execute e valide o caderno 00."
+            GENERO_RESEARCH_POLICY = "suspended_for_camara_official_only"
+            GENERO_SNAPSHOT = pd.read_parquet(
+                GENERO_SNAPSHOT_PATH,
+                columns=["arena", "genero_oficial", "genero_analitico"],
+            )
+            GENERO_SNAPSHOT["genero_oficial"] = (
+                GENERO_SNAPSHOT["genero_oficial"].fillna("nao_informado")
+            )
+            GENERO_COVERAGE = (
+                GENERO_SNAPSHOT.groupby(
+                    ["arena", "genero_oficial"], dropna=False, observed=True
+                )
+                .size()
+                .rename("discursos")
+                .reset_index()
+            )
+            display(GENERO_COVERAGE)
+            print("Política:", GENERO_RESEARCH_POLICY)
         """,
-        "extra": [
-            (
-                "Pesquisa pública opcional",
-                "A célula abaixo usa a chave disponível no ambiente ou nos Secrets do Colab. Ela não imprime nem persiste a chave. Resultados continuam pendentes até revisão.",
-                """
-                import os
-                import pandas as pd
-                from openai import OpenAI
-                from analise.discursos_plenario.genero import research_gender_candidates
-                from analise.discursos_plenario.io import write_dataframe_atomic
-
-                GENERO_RESEARCH_RESULT = None
-                if RODAR_PESQUISA_WEB:
-                    if not os.environ.get("OPENAI_API_KEY"):
-                        try:
-                            from google.colab import userdata
-                            GENERO_SECRET = userdata.get("OPENAI_API_KEY")
-                        except Exception:
-                            GENERO_SECRET = None
-                        if GENERO_SECRET:
-                            os.environ["OPENAI_API_KEY"] = GENERO_SECRET
-                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
-                    GENERO_CLIENT = OpenAI()
-                    GENERO_UNKNOWNS_FOR_RESEARCH = pd.read_csv(GENERO_UNKNOWN_PATH)
-                    GENERO_CANDIDATES, GENERO_ERRORS = research_gender_candidates(
-                        GENERO_UNKNOWNS_FOR_RESEARCH,
-                        client=GENERO_CLIENT,
-                        model=GENERO_RESEARCH_MODEL,
-                        prompt_version=ANALYSIS_CONFIG.raw["openai"]["gender_prompt_version"],
-                        limit=MAX_CASOS_PESQUISA,
-                    )
-                    write_dataframe_atomic(GENERO_CANDIDATES, RUN_OUTPUT_ROOT / "01_genero" / "revisao_genero.csv")
-                    write_dataframe_atomic(GENERO_ERRORS, RUN_OUTPUT_ROOT / "01_genero" / "erros_pesquisa_genero.csv")
-                    GENERO_RESEARCH_RESULT = {"candidatos": len(GENERO_CANDIDATES), "erros": len(GENERO_ERRORS)}
-                    print(GENERO_RESEARCH_RESULT)
-                else:
-                    print("Pesquisa web desativada.")
-                """,
-            ),
-            (
-                "Publicação após revisão humana",
-                "Edite `revisao_genero.csv` no Drive e preencha status, revisor e data. A função rejeita linhas incompletas.",
-                """
-                from analise.discursos_plenario.genero import publish_gender_review
-
-                GENERO_PUBLICATION_RESULT = None
-                GENERO_REVIEW_PATH = RUN_OUTPUT_ROOT / "01_genero" / "revisao_genero.csv"
-                if PUBLICAR_REVISAO:
-                    GENERO_PUBLICATION_RESULT = publish_gender_review(
-                        data_root=DATA_ROOT,
-                        run_id=RUN_ID,
-                        review_path=GENERO_REVIEW_PATH,
-                        config_path=CONFIG_PATH,
-                    )
-                    print(GENERO_PUBLICATION_RESULT["manifest_path"])
-                else:
-                    print("Publicação desativada.")
-                """,
-            ),
-        ],
+        "run": """
+            assert not RODAR_ETAPA, (
+                "A etapa de pesquisa de gênero está suspensa nesta rodada. "
+                "Mantenha RODAR_ETAPA=False."
+            )
+            print(
+                "Nenhuma pesquisa ou publicação foi executada. "
+                "Prossiga diretamente para o caderno 02."
+            )
+        """,
+        "validate": """
+            GENERO_STAGE_PATH = RUN_OUTPUT_ROOT / "01_genero"
+            GENERO_EXISTING_ARTIFACTS = (
+                sorted(str(path.name) for path in GENERO_STAGE_PATH.iterdir())
+                if GENERO_STAGE_PATH.exists()
+                else []
+            )
+            GENERO_SUSPENSION_STATUS = {
+                "status": "suspensa",
+                "camara_policy": "official_only_no_research",
+                "senado_policy": "official_metadata",
+                "existing_artifacts_preserved": GENERO_EXISTING_ARTIFACTS,
+                "existing_artifacts_consumed_downstream": False,
+                "next_notebook": "02_descritivas_discursos_plenario_colab.ipynb",
+            }
+            display(GENERO_SUSPENSION_STATUS)
+        """,
     },
     {
         "filename": "02_descritivas_discursos_plenario_colab.ipynb",

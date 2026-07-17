@@ -4,7 +4,7 @@ Esta pasta contém a versão narrativa canônica, em português, dos cadernos
 Colab. Execute-os em ordem e use o mesmo `RUN_ID`:
 
 1. `00_snapshot_discursos_plenario_colab.ipynb`;
-2. `01_enriquecimento_genero_colab.ipynb`;
+2. `01_enriquecimento_genero_colab.ipynb` — pesquisa de deputados suspensa;
 3. `02_descritivas_discursos_plenario_colab.ipynb`;
 4. `03_apartes_relacionais_colab.ipynb`, incluindo ponte, segmentação,
    codebooks de atos de fala, possível descortesia e piloto humano;
@@ -40,8 +40,17 @@ runtime, conecte uma sessão nova e rode o caderno desde o início.
 Cada etapa cara começa com `RODAR_ETAPA = False`. Revise configuração,
 entradas e cadernos anteriores; mude para `True` apenas quando desejar criar os
 artefatos. O caderno de figuras lê `OPENAI_API_KEY` do ambiente no momento da
-chamada e nunca a imprime ou grava. O mesmo vale para a pesquisa de gênero e a
-classificação qualitativa dos apartes.
+chamada e nunca a imprime ou grava. O mesmo vale para a classificação
+qualitativa dos apartes.
+
+Na rodada `analise-plenario-20260717-v1`, a pesquisa pública de gênero para
+deputados está suspensa por custo e baixa qualidade. O caderno 01 é somente
+leitura: mostra a cobertura do metadado oficial, não cria fila, não chama API e
+não publica enriquecimento. Casos sem metadado permanecem `nao_informado`;
+gênero não é inferido pelo nome. Metadados oficiais já existentes, inclusive
+os do Senado, continuam preservados. Artefatos eventualmente criados por uma
+execução anterior do caderno 01 não são apagados nem consumidos pelos cadernos
+seguintes. Prossiga diretamente ao caderno 02.
 
 No caderno 03, a análise relacional pode ser executada antes da qualitativa. O
 Batch de atos de fala permanece bloqueado até uma amostra humana confirmar a

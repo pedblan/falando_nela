@@ -90,12 +90,14 @@ identificador não vazio. Quando uma fala do Senado e outra do Congresso
 representarem o mesmo registro, preserva-se a arena Congresso e documenta-se a
 remoção da cópia do Senado. Sem essa concordância, o par segue para revisão.
 
-### 01 — Enriquecimento de gênero
+### 01 — Gênero oficial; pesquisa suspensa
 
-Selecionar somente parlamentares com gênero oficial desconhecido, reconsultar
-fontes oficiais e preparar pesquisa pública estruturada. A pesquisa por modelo
-gera candidatos, nunca publicação. Todos os candidatos identificados dependem
-de evidência textual citável e aprovação humana.
+Nesta rodada, usar somente `genero_oficial` já congelado no snapshot. A
+pesquisa pública de deputados fica suspensa por custo e baixa qualidade; o
+caderno 01 apenas mostra a cobertura por arena. Casos sem metadado permanecem
+`nao_informado`, sem inferência por nome. Metadados oficiais do Senado são
+preservados. Artefatos antigos da tentativa de pesquisa não são apagados nem
+consumidos pelas etapas seguintes.
 
 ### 02 — Estatística descritiva
 
