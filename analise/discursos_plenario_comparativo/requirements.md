@@ -11,6 +11,15 @@
 - Runs existentes não podem ser sobrescritos silenciosamente.
 - Manifests e saídas não podem conter credenciais ou o valor de variáveis de ambiente.
 
+## Identidade da rodada
+
+- Os dez cadernos analíticos e a célula autônoma de validação usam por padrão
+  `RUN_ID=analise-plenario-20260717-v1`.
+- O mesmo `RUN_ID` deve ser preservado do caderno 00 ao 09.
+- A data da rodada não altera o corte `date_end=2026-07-13` da configuração.
+- O snapshot validado com 384.191 discursos é imutável; etapas posteriores não
+  podem regenerá-lo ou sobrescrevê-lo.
+
 ## Ambiente Colab
 
 - `requirements-analise.txt` deve fixar conjuntamente `numpy==2.0.2` e

@@ -18,6 +18,17 @@
 - Confirmar ausência de magias indispensáveis e credenciais literais.
 - Executar o gerador em modo de conferência e exigir árvore limpa.
 
+## Identidade da rodada
+
+- Verificar no gerador, nos dez cadernos e no fallback da célula autônoma o
+  valor exato `analise-plenario-20260717-v1`.
+- Rejeitar a presença do antigo default `analise-plenario-20260713-v1` em
+  qualquer célula executável da suíte.
+- Confirmar que a mudança de `RUN_ID` não altera o corte temporal
+  `2010-02-02…2026-07-13`.
+- Não reexecutar a geração do snapshot já validado; os cadernos 01–09 devem
+  apenas lê-lo pelo mesmo `RUN_ID`.
+
 ## Snapshot sintético
 
 - Incluir exatamente `2010-02-02` e `2026-07-13`.

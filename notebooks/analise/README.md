@@ -15,6 +15,12 @@ Colab. Execute-os em ordem e use o mesmo `RUN_ID`:
 9. `08_figuras_linguagem_gpt56_colab.ipynb`;
 10. `09_sintese_comparativa_colab.ipynb`.
 
+A rodada analítica ativa usa, por padrão,
+`RUN_ID = "analise-plenario-20260717-v1"`. Seu snapshot validado contém
+384.191 discursos e mantém o corte analítico da configuração em
+`2026-07-13`. A data do `RUN_ID` identifica a rodada; não amplia por si só o
+recorte temporal.
+
 ## Execução
 
 A primeira célula executável monta o Drive. A segunda prepara o repositório e
@@ -52,6 +58,9 @@ analises/discursos_plenario/v1/{RUN_ID}/
 
 O snapshot e o manifest 00 devem ser considerados imutáveis após a revisão. Se
 o corpus ou a configuração mudar, use outro `RUN_ID`.
+Como o snapshot de `analise-plenario-20260717-v1` já foi validado, prossiga do
+caderno 01 em diante e não reexecute a geração do caderno 00 com
+`RODAR_ETAPA=True`.
 
 A validação final do caderno 00 também está disponível como célula autônoma em
 `notebooks/analise/celulas/00_validacao_snapshot.py`. Ela pode ser adicionada

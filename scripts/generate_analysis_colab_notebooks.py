@@ -107,7 +107,7 @@ CONTROL_CELL = code(
     """
     from analise.discursos_plenario.config import load_config, resolve_input_paths, resolve_output_root
 
-    RUN_ID = "analise-plenario-20260713-v1"
+    RUN_ID = "analise-plenario-20260717-v1"
     CONFIG_PATH = REPO_DIR / "analise" / "discursos_plenario" / "config.v1.json"
     ANALYSIS_CONFIG = load_config(CONFIG_PATH)
     RUN_OUTPUT_ROOT = resolve_output_root(ANALYSIS_CONFIG, DATA_ROOT, RUN_ID)

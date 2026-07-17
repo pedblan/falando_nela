@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 
-SNAPSHOT_RUN_ID = globals().get("RUN_ID", "analise-plenario-20260713-v1")
+SNAPSHOT_RUN_ID = globals().get("RUN_ID", "analise-plenario-20260717-v1")
 SNAPSHOT_DATA_ROOT = Path(
     globals().get("DATA_ROOT", "/content/drive/MyDrive/falando_nela/data")
 )
@@ -108,8 +108,8 @@ SNAPSHOT_COMPLETE_MISSING = [
     ]
 ]
 
-display(SNAPSHOT_SUMMARY)
-display(SNAPSHOT_COVERAGE)
+display(SNAPSHOT_SUMMARY)  # noqa: F821 - fornecido pelo ambiente Jupyter/Colab
+display(SNAPSHOT_COVERAGE)  # noqa: F821 - fornecido pelo ambiente Jupyter/Colab
 
 SNAPSHOT_MISSING_YEARS = {
     arena: SNAPSHOT_COVERAGE.index[SNAPSHOT_COVERAGE[arena].eq(0)].tolist()

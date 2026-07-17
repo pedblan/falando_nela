@@ -12,6 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_DIR = ROOT / "notebooks" / "analise"
 SNAPSHOT_VALIDATION_CELL_PATH = NOTEBOOK_DIR / "celulas" / "00_validacao_snapshot.py"
+EXPECTED_RUN_ID = "analise-plenario-20260717-v1"
 EXPECTED = [
     "00_snapshot_discursos_plenario_colab.ipynb",
     "01_enriquecimento_genero_colab.ipynb",
@@ -44,6 +45,8 @@ def test_analysis_notebooks_are_valid_colab_orchestrators() -> None:
         assert "ABI_CHECK" in code_cells[1].source
         source = "\n".join(cell.source for cell in code_cells)
         assert "RODAR_ETAPA = False" in source
+        assert f'RUN_ID = "{EXPECTED_RUN_ID}"' in source
+        assert "analise-plenario-20260713-v1" not in source
         assert "2010-02-02" in source
         assert "2026-07-13" in source
         assert "get_ipython" not in source
@@ -80,6 +83,8 @@ def test_snapshot_validation_cell_is_standalone_and_synchronized() -> None:
     standalone_source = SNAPSHOT_VALIDATION_CELL_PATH.read_text(encoding="utf-8").strip()
     assert validation_cell.source == standalone_source
     assert 'globals().get("RUN_ID"' in standalone_source
+    assert EXPECTED_RUN_ID in standalone_source
+    assert "analise-plenario-20260713-v1" not in standalone_source
     assert 'globals().get("DATA_ROOT"' in standalone_source
     assert "SNAPSHOT_OBSERVED_ARENAS == set(SNAPSHOT_EXPECTED_ARENAS)" in standalone_source
     assert "SNAPSHOT_COVERAGE" in standalone_source

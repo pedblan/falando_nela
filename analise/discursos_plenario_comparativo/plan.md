@@ -12,6 +12,13 @@ gráficos e persistência pertencem a `analise.discursos_plenario`, de modo que 
 mesma implementação possa sustentar cadernos Marimo e variantes narrativas em
 inglês no futuro.
 
+## Rodada analítica ativa
+
+A suíte 00–09 usa por padrão `analise-plenario-20260717-v1`. O snapshot 00
+dessa rodada foi validado com 384.191 discursos e deve permanecer imutável. Os
+cadernos seguintes reutilizam esse mesmo `RUN_ID`; a configuração conserva o
+corte analítico em `2026-07-13`.
+
 ## Gate de cobertura anual
 
 Na etapa 00, construir a matriz cartesiana de todas as arenas configuradas e
