@@ -112,9 +112,10 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   limpeza aprovadas e fazer juncao temporal com `parlamentares_periodos`.
 - Criar camada derivada e humanamente revisada para genero oficial desconhecido,
   sem alterar `parlamentares/v1`.
-- Produzir descritivas, apartes relacionais, segmentacao de turnos, atos de
-  fala, possivel descortesia, NLP, inferencia temporal, clusterizacao, BERTopic,
-  figuras de linguagem com GPT-5.6 e sintese comparativa.
+- Produzir descritivas, apartes relacionais, episódios multiturno v2
+  reconstruídos localmente, atos de fala após gate humano, possível
+  descortesia, NLP, inferência temporal, clusterização, BERTopic, figuras de
+  linguagem com GPT-5.6 e síntese comparativa.
 - Exigir piloto humano e evidencias textuais nas classificacoes; usar Batch API
   e Structured Outputs somente por celula de comando explicita.
 - Manter cadernos Jupyter/Colab em portugues como primeira entrega, com logica

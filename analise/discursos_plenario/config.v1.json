@@ -86,6 +86,19 @@
     "min_reviewed": 100,
     "min_precision": 0.95
   },
+  "interjection_episode_linking_v2": {
+    "method": "ia_turnos_subturnos_v2",
+    "prompt_version": "apartes-episodios-turnos-v2",
+    "subturn_max_chars": 360,
+    "review_sample_size": 30,
+    "min_reviewed": 30,
+    "min_precision": 0.95,
+    "required_diagnostic_cases": [
+      "geovania_rogerio_episodios_sobrepostos",
+      "julio_campos_aparte_multiturno_perfeito",
+      "izalci_pedido_concessao_fora_aparte"
+    ]
+  },
   "rhetorical_figures": [
     "aliteracao",
     "analogia",

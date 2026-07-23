@@ -92,30 +92,40 @@
 - Medir precisão contra um conjunto ouro sintético.
 - Demonstrar que ausência de conjunto ouro bloqueia denominadores.
 - Testar limiares imediatamente abaixo, no valor e acima do corte.
-- Demonstrar que a divisão em blocos preserva, caractere a caractere, a
-  transcrição Unicode e que os offsets reconstruídos recortam exatamente a
-  fonte local.
+- Demonstrar que turnos brutos concatenados reproduzem, caractere a caractere,
+  a transcrição Unicode, inclusive preâmbulo e travessões mistos.
+- Confirmar IDs determinísticos, offsets exatos e divisão em subturnos sem
+  perder nem deslocar caracteres selecionados.
 - Agrupar dois ou mais apartes do mesmo discurso em uma única requisição.
-- Simular saída com resposta, sem resposta explícita, aparte não localizado,
-  incerteza, bloco inválido e request ausente.
+- Confirmar que o roster contém somente pessoas conhecidas na base relacional,
+  que Python resolve nomes inequívocos e que a IA só altera turnos ambíguos.
+- Simular múltiplos episódios por candidato, sobreposição entre candidatos,
+  backchannels, contexto interveniente, ausência, incerteza, ID inválido e
+  request ausente.
+- Verificar Geovania/Rogério com episódios sobrepostos; Júlio Campos com aparte
+  multiturno e todos os “Perfeito”; e Izalci com pedido/concessão apenas no
+  contexto.
 - Reconciliar saídas fora de ordem por `custom_id` e separar erros sem recorrer
   à heurística diagnóstica.
 - Forçar limites pequenos em teste e confirmar divisão determinística, IDs
   únicos entre partes e arquivos abaixo dos limites configurados.
 - Reiniciar o runtime entre preparação, envio e download e confirmar que os
   manifests bastam para retomar sem duplicar submissões.
-- Confirmar que classificação e revisão leem
-  `interacoes_segmentadas_ia.parquet`, nunca o artefato legado sem sufixo.
-- Confirmar que o texto inteiro do discurso nunca substitui `texto_aparte`.
+- Confirmar que o fluxo v2 lê os artefatos v1 apenas como âncoras e mantém
+  inalterados seus hashes e os controles de Batch existentes.
+- Confirmar tabelas normalizadas de participantes, turnos, episódios e vínculos
+  episódio–turno, com ordem cronológica estável.
 - Confirmar que a saída estruturada contém somente IDs/status e não repete os
   trechos da transcrição.
-- Revisar 200 casos balanceados quando houver ao menos 200 elegíveis e exigir
-  ao menos 100 preenchidos no gate.
+- Revisar aproximadamente 30 episódios e exigir ao menos 30 completos no gate.
 - Demonstrar que células vazias não contam como falsas nem como revisadas e
   que valores booleanos `False` preenchidos contam corretamente.
-- Testar o gate de 95% separadamente para aparte e resposta.
+- Testar 95% separadamente para participantes, completude, respostas e contexto
+  e exigir aprovação dos três diagnósticos.
+- Confirmar que a geração de atos falha antes do gate v2 e que a submissão paga
+  ainda requer autorização separada.
 - Confirmar que reexecuções preservam o codebook e as linhas humanas ligadas ao
-  mesmo fingerprint, e bloqueiam a perda de revisão quando a segmentação muda.
+  mesmo episódio/fingerprint, bloqueando migração silenciosa.
 - Validar que o schema contém todas as dez categorias de aparte, nove de
   resposta e `possivel_descortesia`, sem duplicatas.
 - Confirmar que ato presente sem evidência é rejeitado pelo pós-processamento.

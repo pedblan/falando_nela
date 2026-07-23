@@ -1142,6 +1142,747 @@ NOTEBOOKS = [
 ]
 
 
+# A segunda metade do caderno 03 usa artefatos v2 paralelos. A especificação
+# original permanece no histórico do Git; esta substituição evita qualquer
+# escrita acidental nos resultados diagnósticos v1.
+NOTEBOOKS[3] = {
+    "filename": "03_apartes_relacionais_colab.ipynb",
+    "title": "03 — Apartes relacionais e episódios de interação v2",
+    "description": (
+        "Preserva o recorte, as díades e as pontes, mas associa episódios "
+        "multiturno por IDs e reconstrói todos os textos localmente."
+    ),
+    "method": (
+        "Python cria turnos e subturnos determinísticos com offsets. A IA "
+        "recebe os participantes relacionais conhecidos e devolve somente "
+        "IDs; episódios podem se sobrepor. Os artefatos v1 são âncoras "
+        "diagnósticas imutáveis, e atos de fala dependem do novo gate humano."
+    ),
+    "preflight": """
+        import json
+        from analise.discursos_plenario.io import sha256_file
+
+        APARTES_PATH = INPUT_PATHS["interjections"]
+        APARTES_SNAPSHOT_PATH = (
+            RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
+        )
+        assert APARTES_PATH.exists(), APARTES_PATH
+        assert APARTES_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+
+        PREPARAR_TURNOS_V2 = False
+        GERAR_JSONL_EPISODIOS_V2 = False
+        ENVIAR_BATCH_EPISODIOS_V2 = False
+        BAIXAR_BATCH_EPISODIOS_V2 = False
+        PROCESSAR_BATCH_EPISODIOS_V2 = False
+        VALIDAR_EPISODIOS_V2 = False
+        GERAR_JSONL_ATOS_FALA_V2 = False
+        ENVIAR_BATCH_ATOS_FALA_V2 = False
+        BAIXAR_BATCH_ATOS_FALA_V2 = False
+        PROCESSAR_BATCH_ATOS_FALA_V2 = False
+        AUTORIZAR_NOVO_BATCH_PAGO_V2 = False
+
+        APARTES_OPENAI_CONFIG = ANALYSIS_CONFIG.raw["openai"]
+        APARTES_EPISODE_MODEL = APARTES_OPENAI_CONFIG.get(
+            "interjection_segmentation_model",
+            APARTES_OPENAI_CONFIG["interjection_default_model"],
+        )
+        APARTES_QUALITATIVE_MODEL = APARTES_OPENAI_CONFIG[
+            "interjection_default_model"
+        ]
+        APARTES_STAGE_ROOT = RUN_OUTPUT_ROOT / "03_apartes"
+
+        APARTES_V1_PROTECTED_PATHS = [
+            APARTES_STAGE_ROOT / "interacoes_segmentadas_ia.parquet",
+            APARTES_STAGE_ROOT / "revisao_segmentacao_ia.csv",
+            *sorted(APARTES_STAGE_ROOT.glob("batch_segmentacao*.json*")),
+            *sorted(APARTES_STAGE_ROOT.glob("batch_atos_fala_*.json*")),
+        ]
+        APARTES_V1_HASHES = {
+            str(path): sha256_file(path)
+            for path in APARTES_V1_PROTECTED_PATHS
+            if path.exists()
+        }
+
+        APARTES_SOURCES_V2_PATH = APARTES_STAGE_ROOT / "fontes_episodios_v2.parquet"
+        APARTES_CUT_V2_PATH = APARTES_STAGE_ROOT / "recorte_apartes_v2.csv"
+        APARTES_PARTICIPANTS_V2_PATH = (
+            APARTES_STAGE_ROOT / "participantes_interacao_v2.parquet"
+        )
+        APARTES_TURNS_V2_PATH = APARTES_STAGE_ROOT / "turnos_brutos_v2.parquet"
+        APARTES_EPISODES_V2_PATH = APARTES_STAGE_ROOT / "episodios_interacao_v2.parquet"
+        APARTES_LINKS_V2_PATH = APARTES_STAGE_ROOT / "episodio_turnos_v2.parquet"
+        APARTES_ASSIGNMENTS_V2_PATH = (
+            APARTES_STAGE_ROOT / "atribuicoes_falantes_v2.parquet"
+        )
+        APARTES_REVIEW_V2_PATH = APARTES_STAGE_ROOT / "revisao_episodios_v2.csv"
+        APARTES_QUALITY_V2_PATH = APARTES_STAGE_ROOT / "episodios_qualidade_v2.json"
+        APARTES_QUALITATIVE_VIEW_V2_PATH = (
+            APARTES_STAGE_ROOT / "interacoes_qualitativas_episodios_v2.parquet"
+        )
+        APARTES_EPISODE_REQUEST_PATH = (
+            APARTES_STAGE_ROOT / f"batch_episodios_v2_{APARTES_EPISODE_MODEL}.jsonl"
+        )
+        APARTES_EPISODE_REQUEST_MANIFEST_PATH = (
+            APARTES_STAGE_ROOT / "batch_episodios_v2_requests.json"
+        )
+        APARTES_EPISODE_BATCH_CONTROL_PATH = (
+            APARTES_STAGE_ROOT / "batch_episodios_v2.json"
+        )
+        APARTES_CODEBOOK_PATH = APARTES_STAGE_ROOT / "codebook_atos_fala.csv"
+        APARTES_ACT_REQUEST_PATH = (
+            APARTES_STAGE_ROOT
+            / f"batch_atos_fala_episodios_v2_{APARTES_QUALITATIVE_MODEL}.jsonl"
+        )
+        APARTES_ACT_REQUEST_MANIFEST_PATH = (
+            APARTES_STAGE_ROOT / "batch_atos_fala_episodios_v2_requests.json"
+        )
+        APARTES_ACT_BATCH_CONTROL_PATH = (
+            APARTES_STAGE_ROOT / "batch_atos_fala_episodios_v2.json"
+        )
+        print(
+            "Todos os envios pagos estão bloqueados:",
+            not AUTORIZAR_NOVO_BATCH_PAGO_V2,
+        )
+    """,
+    "run": """
+        from analise.discursos_plenario.apartes_episodios import (
+            prepare_episode_analysis_v2,
+        )
+        from analise.discursos_plenario.io import sha256_file
+
+        APARTES_RESULT_V2 = None
+        if PREPARAR_TURNOS_V2:
+            APARTES_RESULT_V2 = prepare_episode_analysis_v2(
+                data_root=DATA_ROOT,
+                run_id=RUN_ID,
+                config_path=CONFIG_PATH,
+            )
+            print(APARTES_RESULT_V2["manifest_path"])
+        else:
+            print("Preparação v2 não executada.")
+
+        assert all(
+            path.exists() and sha256_file(path) == expected_hash
+            for path_text, expected_hash in APARTES_V1_HASHES.items()
+            for path in [Path(path_text)]
+        ), "Um artefato diagnóstico v1 foi alterado."
+    """,
+    "validate": """
+        import json
+        import pandas as pd
+
+        APARTES_UNIVERSE_V2_PATH = APARTES_STAGE_ROOT / "universo_episodios_v2.csv"
+        APARTES_DIAGNOSTICS_V2_PATH = (
+            APARTES_STAGE_ROOT / "diagnosticos_episodios_v2.csv"
+        )
+        if APARTES_CUT_V2_PATH.exists():
+            APARTES_CUT_V2 = pd.read_csv(APARTES_CUT_V2_PATH)
+            display(APARTES_CUT_V2)
+        if APARTES_UNIVERSE_V2_PATH.exists():
+            APARTES_UNIVERSE_V2 = pd.read_csv(APARTES_UNIVERSE_V2_PATH)
+            display(APARTES_UNIVERSE_V2)
+        if APARTES_DIAGNOSTICS_V2_PATH.exists():
+            APARTES_DIAGNOSTICS_V2 = pd.read_csv(APARTES_DIAGNOSTICS_V2_PATH)
+            APARTES_REQUIRED_DIAGNOSTICS = set(
+                ANALYSIS_CONFIG.raw["interjection_episode_linking_v2"][
+                    "required_diagnostic_cases"
+                ]
+            )
+            assert APARTES_REQUIRED_DIAGNOSTICS <= set(
+                APARTES_DIAGNOSTICS_V2["caso_diagnostico"]
+            )
+            display(APARTES_DIAGNOSTICS_V2)
+        if APARTES_TURNS_V2_PATH.exists():
+            APARTES_TURNS_V2 = pd.read_parquet(APARTES_TURNS_V2_PATH)
+            assert APARTES_TURNS_V2["turno_id"].str.fullmatch(r"T[0-9]{6}").all()
+            assert APARTES_TURNS_V2["char_start"].lt(
+                APARTES_TURNS_V2["char_end"]
+            ).all()
+            display(APARTES_TURNS_V2.head())
+        if APARTES_QUALITY_V2_PATH.exists():
+            display(
+                json.loads(APARTES_QUALITY_V2_PATH.read_text(encoding="utf-8"))
+            )
+    """,
+    "extra": [
+        (
+            "Gerar os JSONLs de associação v2",
+            (
+                "Uma requisição reúne todos os candidatos da mesma "
+                "transcrição. A divisão por tamanho é automática e o "
+                "manifesto fixa os hashes."
+            ),
+            """
+            import json
+            import pandas as pd
+            from analise.discursos_plenario.apartes_episodios import (
+                EPISODE_PIPELINE_VERSION,
+                write_episode_batch_jsonl_v2,
+            )
+            from analise.discursos_plenario.io import artifact_record, write_json_atomic
+
+            if GERAR_JSONL_EPISODIOS_V2:
+                APARTES_SOURCES_V2 = pd.read_parquet(APARTES_SOURCES_V2_PATH)
+                assert APARTES_SOURCES_V2["texto_id"].is_unique
+                APARTES_EPISODE_REQUEST_PATHS = write_episode_batch_jsonl_v2(
+                    APARTES_SOURCES_V2,
+                    APARTES_EPISODE_REQUEST_PATH,
+                    config=ANALYSIS_CONFIG,
+                    model=APARTES_EPISODE_MODEL,
+                )
+                assert APARTES_EPISODE_REQUEST_PATHS
+                APARTES_EPISODE_REQUEST_RECORDS = [
+                    artifact_record(path)
+                    for path in APARTES_EPISODE_REQUEST_PATHS
+                ]
+                APARTES_EPISODE_REQUEST_COUNT = sum(
+                    len(path.read_text(encoding="utf-8").splitlines())
+                    for path in APARTES_EPISODE_REQUEST_PATHS
+                )
+                assert APARTES_EPISODE_REQUEST_COUNT == len(APARTES_SOURCES_V2)
+                write_json_atomic(
+                    APARTES_EPISODE_REQUEST_MANIFEST_PATH,
+                    {
+                        "pipeline_version": EPISODE_PIPELINE_VERSION,
+                        "model": APARTES_EPISODE_MODEL,
+                        "source_transcripts": len(APARTES_SOURCES_V2),
+                        "request_paths": [
+                            str(path) for path in APARTES_EPISODE_REQUEST_PATHS
+                        ],
+                        "requests": APARTES_EPISODE_REQUEST_RECORDS,
+                    },
+                )
+                print(
+                    "Transcrições/requisições:",
+                    APARTES_EPISODE_REQUEST_COUNT,
+                    "Partes:",
+                    len(APARTES_EPISODE_REQUEST_PATHS),
+                )
+            else:
+                print("JSONLs v2 não gerados.")
+            """,
+        ),
+        (
+            "Enviar o Batch de episódios v2",
+            (
+                "O envio exige duas chaves explícitas. O controle usa o hash "
+                "de cada parte para retomar sem submissões duplicadas."
+            ),
+            """
+            import json
+            import os
+            from pathlib import Path
+            from openai import OpenAI
+            from analise.discursos_plenario.apartes_episodios import (
+                EPISODE_PIPELINE_VERSION,
+            )
+            from analise.discursos_plenario.figuras import submit_responses_batch
+            from analise.discursos_plenario.io import sha256_file, write_json_atomic
+
+            if ENVIAR_BATCH_EPISODIOS_V2:
+                assert AUTORIZAR_NOVO_BATCH_PAGO_V2, (
+                    "Nova autorização explícita é obrigatória para enviar."
+                )
+                APARTES_EPISODE_REQUEST_MANIFEST = json.loads(
+                    APARTES_EPISODE_REQUEST_MANIFEST_PATH.read_text(
+                        encoding="utf-8"
+                    )
+                )
+                assert (
+                    APARTES_EPISODE_REQUEST_MANIFEST["pipeline_version"]
+                    == EPISODE_PIPELINE_VERSION
+                )
+                assert (
+                    APARTES_EPISODE_REQUEST_MANIFEST["model"]
+                    == APARTES_EPISODE_MODEL
+                )
+                APARTES_EPISODE_REQUEST_PATHS = [
+                    Path(path)
+                    for path in APARTES_EPISODE_REQUEST_MANIFEST["request_paths"]
+                ]
+                APARTES_EPISODE_REQUEST_HASHES = {
+                    item["path"]: item["sha256"]
+                    for item in APARTES_EPISODE_REQUEST_MANIFEST["requests"]
+                }
+                assert all(
+                    path.exists()
+                    and sha256_file(path)
+                    == APARTES_EPISODE_REQUEST_HASHES[str(path)]
+                    for path in APARTES_EPISODE_REQUEST_PATHS
+                )
+                if not os.environ.get("OPENAI_API_KEY"):
+                    try:
+                        from google.colab import userdata
+                        APARTES_EPISODE_SECRET = userdata.get("OPENAI_API_KEY")
+                    except Exception:
+                        APARTES_EPISODE_SECRET = None
+                    if APARTES_EPISODE_SECRET:
+                        os.environ["OPENAI_API_KEY"] = APARTES_EPISODE_SECRET
+                assert os.environ.get("OPENAI_API_KEY")
+                APARTES_EPISODE_CLIENT = OpenAI()
+                if APARTES_EPISODE_BATCH_CONTROL_PATH.exists():
+                    APARTES_EPISODE_BATCH_CONTROL = json.loads(
+                        APARTES_EPISODE_BATCH_CONTROL_PATH.read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                else:
+                    APARTES_EPISODE_BATCH_CONTROL = {
+                        "pipeline_version": EPISODE_PIPELINE_VERSION,
+                        "model": APARTES_EPISODE_MODEL,
+                        "batches": [],
+                    }
+                assert (
+                    APARTES_EPISODE_BATCH_CONTROL["pipeline_version"]
+                    == EPISODE_PIPELINE_VERSION
+                )
+                assert (
+                    APARTES_EPISODE_BATCH_CONTROL["model"]
+                    == APARTES_EPISODE_MODEL
+                )
+                APARTES_EPISODE_SUBMITTED_HASHES = {
+                    item["request_sha256"]
+                    for item in APARTES_EPISODE_BATCH_CONTROL["batches"]
+                }
+                APARTES_EPISODE_SUBMITTED_PATHS = {
+                    item["request_path"]: item["request_sha256"]
+                    for item in APARTES_EPISODE_BATCH_CONTROL["batches"]
+                }
+                for APARTES_EPISODE_PART, APARTES_EPISODE_REQUEST in enumerate(
+                    APARTES_EPISODE_REQUEST_PATHS,
+                    start=1,
+                ):
+                    APARTES_EPISODE_HASH = APARTES_EPISODE_REQUEST_HASHES[
+                        str(APARTES_EPISODE_REQUEST)
+                    ]
+                    if APARTES_EPISODE_HASH in APARTES_EPISODE_SUBMITTED_HASHES:
+                        print("Parte já enviada:", APARTES_EPISODE_REQUEST)
+                        continue
+                    assert (
+                        str(APARTES_EPISODE_REQUEST)
+                        not in APARTES_EPISODE_SUBMITTED_PATHS
+                    ), "O mesmo caminho já foi enviado com outro conteúdo."
+                    APARTES_EPISODE_SUBMISSION = submit_responses_batch(
+                        APARTES_EPISODE_CLIENT,
+                        APARTES_EPISODE_REQUEST,
+                        description=(
+                            f"{RUN_ID}:episodios-v2:{APARTES_EPISODE_MODEL}:"
+                            f"parte-{APARTES_EPISODE_PART:05d}"
+                        ),
+                    )
+                    APARTES_EPISODE_OUTPUT = APARTES_EPISODE_REQUEST.with_name(
+                        f"{APARTES_EPISODE_REQUEST.stem}_output.jsonl"
+                    )
+                    APARTES_EPISODE_BATCH_CONTROL["batches"].append(
+                        {
+                            "batch_id": APARTES_EPISODE_SUBMISSION.id,
+                            "request_path": str(APARTES_EPISODE_REQUEST),
+                            "request_sha256": APARTES_EPISODE_HASH,
+                            "output_path": str(APARTES_EPISODE_OUTPUT),
+                        }
+                    )
+                    write_json_atomic(
+                        APARTES_EPISODE_BATCH_CONTROL_PATH,
+                        APARTES_EPISODE_BATCH_CONTROL,
+                    )
+                    print("Batch criado:", APARTES_EPISODE_SUBMISSION.id)
+            else:
+                print("Envio pago de episódios v2 bloqueado.")
+            """,
+        ),
+        (
+            "Baixar e reconstruir episódios localmente",
+            (
+                "As saídas são reconciliadas por custom_id. Python recorta "
+                "os textos pelos offsets e grava participantes, episódios e "
+                "vínculos normalizados."
+            ),
+            """
+            import json
+            import os
+            from pathlib import Path
+            from openai import OpenAI
+            from analise.discursos_plenario.apartes_episodios import (
+                EPISODE_PIPELINE_VERSION,
+                run_episode_results_v2,
+            )
+            from analise.discursos_plenario.figuras import download_completed_batch
+            from analise.discursos_plenario.io import sha256_file
+
+            APARTES_EPISODE_CONTROL_LOADED = None
+            if BAIXAR_BATCH_EPISODIOS_V2 or PROCESSAR_BATCH_EPISODIOS_V2:
+                APARTES_EPISODE_CONTROL_LOADED = json.loads(
+                    APARTES_EPISODE_BATCH_CONTROL_PATH.read_text(
+                        encoding="utf-8"
+                    )
+                )
+                assert (
+                    APARTES_EPISODE_CONTROL_LOADED["pipeline_version"]
+                    == EPISODE_PIPELINE_VERSION
+                )
+                assert APARTES_EPISODE_CONTROL_LOADED["batches"]
+                assert all(
+                    sha256_file(item["request_path"]) == item["request_sha256"]
+                    for item in APARTES_EPISODE_CONTROL_LOADED["batches"]
+                )
+            if BAIXAR_BATCH_EPISODIOS_V2:
+                if not os.environ.get("OPENAI_API_KEY"):
+                    try:
+                        from google.colab import userdata
+                        APARTES_EPISODE_DOWNLOAD_SECRET = userdata.get(
+                            "OPENAI_API_KEY"
+                        )
+                    except Exception:
+                        APARTES_EPISODE_DOWNLOAD_SECRET = None
+                    if APARTES_EPISODE_DOWNLOAD_SECRET:
+                        os.environ["OPENAI_API_KEY"] = (
+                            APARTES_EPISODE_DOWNLOAD_SECRET
+                        )
+                assert os.environ.get("OPENAI_API_KEY")
+                APARTES_EPISODE_DOWNLOAD_CLIENT = OpenAI()
+                for item in APARTES_EPISODE_CONTROL_LOADED["batches"]:
+                    download_completed_batch(
+                        APARTES_EPISODE_DOWNLOAD_CLIENT,
+                        item["batch_id"],
+                        Path(item["output_path"]),
+                    )
+            APARTES_EPISODE_RESULT = None
+            if PROCESSAR_BATCH_EPISODIOS_V2:
+                APARTES_EPISODE_REQUEST_PATHS = [
+                    Path(item["request_path"])
+                    for item in APARTES_EPISODE_CONTROL_LOADED["batches"]
+                ]
+                APARTES_EPISODE_OUTPUT_PATHS = [
+                    Path(item["output_path"])
+                    for item in APARTES_EPISODE_CONTROL_LOADED["batches"]
+                ]
+                assert all(path.exists() for path in APARTES_EPISODE_OUTPUT_PATHS)
+                APARTES_EPISODE_RESULT = run_episode_results_v2(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    batch_output_path=APARTES_EPISODE_OUTPUT_PATHS,
+                    request_path=APARTES_EPISODE_REQUEST_PATHS,
+                    model=APARTES_EPISODE_MODEL,
+                    config_path=CONFIG_PATH,
+                )
+                print(APARTES_EPISODE_RESULT["manifest_path"])
+            else:
+                print("Reconstrução v2 não executada.")
+            """,
+        ),
+        (
+            "Revisar o piloto de aproximadamente 30 episódios",
+            (
+                "Preencha as quatro colunas de validação. Os três casos "
+                "diagnósticos são obrigatórios e o gate é exclusivo do v2."
+            ),
+            """
+            import json
+            import pandas as pd
+            from analise.discursos_plenario.apartes_episodios import (
+                episode_quality_v2,
+            )
+            from analise.discursos_plenario.io import write_json_atomic
+
+            if APARTES_REVIEW_V2_PATH.exists():
+                APARTES_REVIEW_V2 = pd.read_csv(
+                    APARTES_REVIEW_V2_PATH,
+                    keep_default_na=False,
+                )
+                print(
+                    "Linhas do piloto:",
+                    len(APARTES_REVIEW_V2),
+                    "Preencha:",
+                    [
+                        "atribuicao_participantes_correta",
+                        "episodio_completo",
+                        "atribuicao_respostas_correta",
+                        "contexto_suficiente",
+                    ],
+                )
+                display(APARTES_REVIEW_V2)
+            if VALIDAR_EPISODIOS_V2:
+                APARTES_EPISODES_V2 = pd.read_parquet(APARTES_EPISODES_V2_PATH)
+                APARTES_REVIEW_V2 = pd.read_csv(
+                    APARTES_REVIEW_V2_PATH,
+                    keep_default_na=False,
+                )
+                APARTES_EPISODE_CONFIG = ANALYSIS_CONFIG.raw[
+                    "interjection_episode_linking_v2"
+                ]
+                APARTES_GATE_V2 = episode_quality_v2(
+                    APARTES_EPISODES_V2,
+                    APARTES_REVIEW_V2,
+                    min_reviewed=APARTES_EPISODE_CONFIG["min_reviewed"],
+                    min_precision=APARTES_EPISODE_CONFIG["min_precision"],
+                    required_diagnostic_cases=APARTES_EPISODE_CONFIG[
+                        "required_diagnostic_cases"
+                    ],
+                )
+                APARTES_QUALITY_EXISTING_V2 = (
+                    json.loads(
+                        APARTES_QUALITY_V2_PATH.read_text(encoding="utf-8")
+                    )
+                    if APARTES_QUALITY_V2_PATH.exists()
+                    else {}
+                )
+                APARTES_GATE_V2 = {
+                    **APARTES_QUALITY_EXISTING_V2,
+                    **APARTES_GATE_V2,
+                }
+                write_json_atomic(APARTES_QUALITY_V2_PATH, APARTES_GATE_V2)
+                print(APARTES_GATE_V2)
+            else:
+                print("Validação v2 desativada.")
+            """,
+        ),
+        (
+            "Preparar atos de fala somente após o gate v2",
+            (
+                "O contexto cronológico acompanha cada episódio, mas nenhum "
+                "JSONL de atos é criado antes da aprovação humana."
+            ),
+            """
+            import json
+            import pandas as pd
+            from analise.discursos_plenario.apartes_qualitativos import (
+                write_qualitative_batch_jsonl,
+            )
+            from analise.discursos_plenario.io import artifact_record, write_json_atomic
+
+            if GERAR_JSONL_ATOS_FALA_V2:
+                APARTES_GATE_V2 = json.loads(
+                    APARTES_QUALITY_V2_PATH.read_text(encoding="utf-8")
+                )
+                assert APARTES_GATE_V2["qualitative_authorized_v2"] is True, (
+                    "O novo gate humano ainda não foi aprovado."
+                )
+                APARTES_CODEBOOK = pd.read_csv(APARTES_CODEBOOK_PATH).fillna("")
+                APARTES_CODEBOOK_FIELDS = [
+                    "definicao_operacional",
+                    "criterio_positivo",
+                    "criterio_negativo",
+                    "caso_limitrofe",
+                ]
+                assert APARTES_CODEBOOK[APARTES_CODEBOOK_FIELDS].apply(
+                    lambda column: column.str.strip().ne("").all()
+                ).all()
+                APARTES_INTERACTIONS_FOR_ACTS_V2 = pd.read_parquet(
+                    APARTES_QUALITATIVE_VIEW_V2_PATH
+                )
+                APARTES_ACT_REQUEST_PATHS = write_qualitative_batch_jsonl(
+                    APARTES_INTERACTIONS_FOR_ACTS_V2,
+                    APARTES_ACT_REQUEST_PATH,
+                    codebook=APARTES_CODEBOOK.to_csv(index=False),
+                    config=ANALYSIS_CONFIG,
+                    model=APARTES_QUALITATIVE_MODEL,
+                )
+                assert APARTES_ACT_REQUEST_PATHS
+                write_json_atomic(
+                    APARTES_ACT_REQUEST_MANIFEST_PATH,
+                    {
+                        "pipeline_version": "atos_fala_episodios_v2",
+                        "episode_gate_sha256": artifact_record(
+                            APARTES_QUALITY_V2_PATH
+                        )["sha256"],
+                        "model": APARTES_QUALITATIVE_MODEL,
+                        "request_paths": [
+                            str(path) for path in APARTES_ACT_REQUEST_PATHS
+                        ],
+                        "requests": [
+                            artifact_record(path)
+                            for path in APARTES_ACT_REQUEST_PATHS
+                        ],
+                    },
+                )
+                print("Partes de atos v2:", len(APARTES_ACT_REQUEST_PATHS))
+            else:
+                print("JSONLs de atos v2 bloqueados até o novo gate.")
+            """,
+        ),
+        (
+            "Enviar o Batch de atos de fala v2",
+            (
+                "Mesmo após o gate, o envio pago continua exigindo nova "
+                "autorização e retoma por hash."
+            ),
+            """
+            import json
+            import os
+            from pathlib import Path
+            from openai import OpenAI
+            from analise.discursos_plenario.figuras import submit_responses_batch
+            from analise.discursos_plenario.io import sha256_file, write_json_atomic
+
+            if ENVIAR_BATCH_ATOS_FALA_V2:
+                assert AUTORIZAR_NOVO_BATCH_PAGO_V2
+                APARTES_GATE_V2 = json.loads(
+                    APARTES_QUALITY_V2_PATH.read_text(encoding="utf-8")
+                )
+                assert APARTES_GATE_V2["qualitative_authorized_v2"] is True
+                APARTES_ACT_REQUEST_MANIFEST = json.loads(
+                    APARTES_ACT_REQUEST_MANIFEST_PATH.read_text(encoding="utf-8")
+                )
+                APARTES_ACT_REQUEST_PATHS = [
+                    Path(path)
+                    for path in APARTES_ACT_REQUEST_MANIFEST["request_paths"]
+                ]
+                APARTES_ACT_REQUEST_HASHES = {
+                    item["path"]: item["sha256"]
+                    for item in APARTES_ACT_REQUEST_MANIFEST["requests"]
+                }
+                assert all(
+                    sha256_file(path) == APARTES_ACT_REQUEST_HASHES[str(path)]
+                    for path in APARTES_ACT_REQUEST_PATHS
+                )
+                if not os.environ.get("OPENAI_API_KEY"):
+                    try:
+                        from google.colab import userdata
+                        APARTES_ACT_SECRET = userdata.get("OPENAI_API_KEY")
+                    except Exception:
+                        APARTES_ACT_SECRET = None
+                    if APARTES_ACT_SECRET:
+                        os.environ["OPENAI_API_KEY"] = APARTES_ACT_SECRET
+                assert os.environ.get("OPENAI_API_KEY")
+                APARTES_ACT_CLIENT = OpenAI()
+                if APARTES_ACT_BATCH_CONTROL_PATH.exists():
+                    APARTES_ACT_BATCH_CONTROL = json.loads(
+                        APARTES_ACT_BATCH_CONTROL_PATH.read_text(encoding="utf-8")
+                    )
+                else:
+                    APARTES_ACT_BATCH_CONTROL = {
+                        "pipeline_version": "atos_fala_episodios_v2",
+                        "model": APARTES_QUALITATIVE_MODEL,
+                        "batches": [],
+                    }
+                APARTES_ACT_SUBMITTED_HASHES = {
+                    item["request_sha256"]
+                    for item in APARTES_ACT_BATCH_CONTROL["batches"]
+                }
+                APARTES_ACT_SUBMITTED_PATHS = {
+                    item["request_path"]: item["request_sha256"]
+                    for item in APARTES_ACT_BATCH_CONTROL["batches"]
+                }
+                for APARTES_ACT_PART, APARTES_ACT_REQUEST in enumerate(
+                    APARTES_ACT_REQUEST_PATHS,
+                    start=1,
+                ):
+                    APARTES_ACT_HASH = APARTES_ACT_REQUEST_HASHES[
+                        str(APARTES_ACT_REQUEST)
+                    ]
+                    if APARTES_ACT_HASH in APARTES_ACT_SUBMITTED_HASHES:
+                        print("Parte já enviada:", APARTES_ACT_REQUEST)
+                        continue
+                    assert str(APARTES_ACT_REQUEST) not in APARTES_ACT_SUBMITTED_PATHS
+                    APARTES_ACT_SUBMISSION = submit_responses_batch(
+                        APARTES_ACT_CLIENT,
+                        APARTES_ACT_REQUEST,
+                        description=(
+                            f"{RUN_ID}:atos-fala-episodios-v2:"
+                            f"{APARTES_QUALITATIVE_MODEL}:"
+                            f"parte-{APARTES_ACT_PART:05d}"
+                        ),
+                    )
+                    APARTES_ACT_OUTPUT = APARTES_ACT_REQUEST.with_name(
+                        f"{APARTES_ACT_REQUEST.stem}_output.jsonl"
+                    )
+                    APARTES_ACT_BATCH_CONTROL["batches"].append(
+                        {
+                            "batch_id": APARTES_ACT_SUBMISSION.id,
+                            "request_path": str(APARTES_ACT_REQUEST),
+                            "request_sha256": APARTES_ACT_HASH,
+                            "output_path": str(APARTES_ACT_OUTPUT),
+                        }
+                    )
+                    write_json_atomic(
+                        APARTES_ACT_BATCH_CONTROL_PATH,
+                        APARTES_ACT_BATCH_CONTROL,
+                    )
+                    print("Batch criado:", APARTES_ACT_SUBMISSION.id)
+            else:
+                print("Envio pago de atos v2 bloqueado.")
+            """,
+        ),
+        (
+            "Baixar e processar atos de fala v2",
+            (
+                "Os resultados futuros usam nomes v2 e não sobrescrevem "
+                "nenhuma saída qualitativa anterior."
+            ),
+            """
+            import json
+            import os
+            from pathlib import Path
+            from openai import OpenAI
+            from analise.discursos_plenario.apartes_qualitativos import (
+                run_qualitative_results,
+            )
+            from analise.discursos_plenario.figuras import download_completed_batch
+            from analise.discursos_plenario.io import sha256_file
+
+            APARTES_ACT_CONTROL_LOADED = None
+            if BAIXAR_BATCH_ATOS_FALA_V2 or PROCESSAR_BATCH_ATOS_FALA_V2:
+                APARTES_ACT_CONTROL_LOADED = json.loads(
+                    APARTES_ACT_BATCH_CONTROL_PATH.read_text(encoding="utf-8")
+                )
+                assert (
+                    APARTES_ACT_CONTROL_LOADED["pipeline_version"]
+                    == "atos_fala_episodios_v2"
+                )
+                assert all(
+                    sha256_file(item["request_path"]) == item["request_sha256"]
+                    for item in APARTES_ACT_CONTROL_LOADED["batches"]
+                )
+            if BAIXAR_BATCH_ATOS_FALA_V2:
+                if not os.environ.get("OPENAI_API_KEY"):
+                    try:
+                        from google.colab import userdata
+                        APARTES_ACT_DOWNLOAD_SECRET = userdata.get(
+                            "OPENAI_API_KEY"
+                        )
+                    except Exception:
+                        APARTES_ACT_DOWNLOAD_SECRET = None
+                    if APARTES_ACT_DOWNLOAD_SECRET:
+                        os.environ["OPENAI_API_KEY"] = (
+                            APARTES_ACT_DOWNLOAD_SECRET
+                        )
+                assert os.environ.get("OPENAI_API_KEY")
+                APARTES_ACT_DOWNLOAD_CLIENT = OpenAI()
+                for item in APARTES_ACT_CONTROL_LOADED["batches"]:
+                    download_completed_batch(
+                        APARTES_ACT_DOWNLOAD_CLIENT,
+                        item["batch_id"],
+                        Path(item["output_path"]),
+                    )
+            if PROCESSAR_BATCH_ATOS_FALA_V2:
+                APARTES_ACT_RESULT_V2 = run_qualitative_results(
+                    data_root=DATA_ROOT,
+                    run_id=RUN_ID,
+                    batch_output_path=[
+                        Path(item["output_path"])
+                        for item in APARTES_ACT_CONTROL_LOADED["batches"]
+                    ],
+                    request_path=[
+                        Path(item["request_path"])
+                        for item in APARTES_ACT_CONTROL_LOADED["batches"]
+                    ],
+                    model=APARTES_QUALITATIVE_MODEL,
+                    config_path=CONFIG_PATH,
+                    interactions_filename=(
+                        "interacoes_qualitativas_episodios_v2.parquet"
+                    ),
+                    human_filename="piloto_atos_fala_episodios_v2.csv",
+                    output_version="_episodios_v2",
+                )
+                print(APARTES_ACT_RESULT_V2["manifest_path"])
+            else:
+                print("Processamento de atos v2 não executado.")
+            """,
+        ),
+    ],
+}
+
+
 def build_notebook(spec: dict[str, object]) -> nbformat.NotebookNode:
     stem = Path(str(spec["filename"])).stem
     cells = [

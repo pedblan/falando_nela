@@ -69,6 +69,8 @@ Módulos:
 - `genero.py`: fila de pesquisa, evidências e publicação revisada;
 - `descritivas.py`: painéis exatos e bootstrap opcional por orador;
 - `apartes.py`: ponte da Câmara, díades e testes de associação;
+- `apartes_episodios.py`: turnos determinísticos, episódios multiturno v2,
+  reconstrução local e gate humano;
 - `nlp.py`: TextDescriptives, morfossintaxe e padrões específicos;
 - `inferencia.py`: correlações, primeiras diferenças, BH e tendências HAC;
 - `clusterizacao.py`: avaliação de `k=2…8` e estabilidade;
@@ -125,34 +127,36 @@ limiares declarados, além da cobertura mínima.
 
 Nem todo discurso contém aparte. O universo de segmentação começa nos
 registros da base processada de apartes, não em todos os discursos do
-snapshot. Depois da ponte, agrupar os candidatos por `texto_id` e enviar uma
-única requisição por transcrição ligada. Dividir o texto localmente em blocos
-determinísticos com offsets conhecidos; a IA devolve somente `aparte_id`,
-status e IDs dos blocos inicial/final do aparte e da primeira resposta
-explícita. Texto e offsets de caracteres são reconstruídos localmente. A
-heurística por marcas taquigráficas permanece apenas como diagnóstico, não
-como resultado oficial.
+snapshot. Depois da ponte, agrupar os candidatos por `texto_id`. Python cria
+turnos brutos e subturnos determinísticos com IDs, falantes observados, ordem
+e offsets Unicode exatos. O cadastro de participantes vem da base relacional;
+a IA pode resolver apenas atribuições ambíguas e associar IDs.
 
-`aparte_nao_localizado`, `incerto` e
-`segmentado_sem_resposta_explicita` são resultados válidos e distintos de
-erro de Batch. A saída usa Structured Outputs em `/v1/responses`, uma linha
-JSONL por discurso e reconciliação por `custom_id`, sem depender da ordem da
-resposta.
+Uma requisição por transcrição reúne todos os candidatos. Para cada candidato,
+a saída estruturada devolve status, zero ou mais episódios e listas de IDs
+para falas do participante, backchannels, respostas do orador e intervenções
+de contexto. Ela não devolve texto. Python reconstrói todos os trechos,
+preserva a cronologia e grava tabelas normalizadas de participantes, turnos,
+episódios e vínculos episódio–turno.
+
+Episódios podem se sobrepor e compartilhar contexto; um participante pode ter
+mais de um episódio. Subturnos separam respostas dirigidas a pessoas
+diferentes dentro do mesmo turno bruto. Pedido e concessão de aparte ficam em
+contexto, não na fala substantiva.
 
 Os pedidos são particionados automaticamente antes de 50.000 linhas ou 190
-MiB. Um manifesto registra todas as partes e um controle registra cada
-`batch_id`, pedido e saída, permitindo retomar envio, download e processamento
-após reinício do Colab sem reenviar partes concluídas.
+MiB. Manifests registram hashes de fontes e partes; o controle retoma por hash
+sem duplicar submissões.
 
-Uma amostra balanceada de até 200 interações segmentadas deve ser revisada.
-Campos vazios não contam como revisão; a classificação só é liberada com pelo
-menos 100 casos completamente revistos e precisão mínima de 95% tanto para o
-aparte quanto para a resposta.
+Antes de atos de fala, revisar aproximadamente 30 episódios, incluindo
+Geovania/Rogério, Júlio Campos e Izalci. O gate exige booleanos válidos para
+atribuição dos participantes, completude, atribuição das respostas e
+suficiência do contexto, com precisão mínima de 95% em cada dimensão.
 
-`revisao_segmentacao_ia.csv`, `piloto_atos_fala_ia.csv` e o codebook são
-artefatos humanos persistentes. A reexecução copia anotações apenas quando a
-chave e o fingerprint da segmentação continuam iguais; divergências preenchidas
-são interrompidas para migração explícita.
+`interacoes_segmentadas_ia.parquet`, `revisao_segmentacao_ia.csv` e os Batches
+existentes permanecem integralmente como diagnóstico v1. Todos os artefatos
+novos recebem `v2`. Nenhum Batch de atos v2 pode ser gerado antes do novo gate,
+e nenhum Batch pago pode ser enviado sem autorização explícita adicional.
 
 Reproduzir a análise qualitativa do TD 355 com dois codebooks:
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .apartes import run_interjection_analysis
+from .apartes_episodios import prepare_episode_analysis_v2
 from .clusterizacao import run_clustering
 from .descritivas import run_descriptives
 from .figuras import prepare_figures_stage
@@ -22,6 +23,7 @@ STAGES = {
     "genero": run_gender_enrichment_setup,
     "descritivas": run_descriptives,
     "apartes": run_interjection_analysis,
+    "apartes-episodios-v2": prepare_episode_analysis_v2,
     "nlp": run_nlp_analysis,
     "inferencia": run_temporal_inference,
     "clusterizacao": run_clustering,

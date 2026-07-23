@@ -990,6 +990,21 @@ def make_qualitative_batch_request(
 ) -> dict[str, Any]:
     interaction_id = str(interaction["interaction_id"])
     custom_id = "apartes-" + hashlib.sha256(interaction_id.encode("utf-8")).hexdigest()[:24]
+    chronological_context = str(
+        interaction.get("texto_episodio_cronologico") or ""
+    ).strip()
+    context_section = (
+        "\n\nEPISÓDIO COMPLETO EM ORDEM CRONOLÓGICA "
+        "(somente para contexto e atribuição):\n"
+        f"{chronological_context}"
+        if chronological_context
+        else ""
+    )
+    prompt_version = (
+        "apartes-atos-fala-episodios-v2"
+        if interaction.get("episodio_id")
+        else "apartes-atos-fala-v1"
+    )
     prompt = f"""Classifique a interação parlamentar segundo o codebook abaixo.
 
 Regras obrigatórias:
@@ -1011,6 +1026,7 @@ APARTE:
 
 RESPOSTA DO ORADOR PRINCIPAL:
 {interaction.get('texto_resposta') or '[sem resposta explícita segmentada]'}
+{context_section}
 """
     return {
         "custom_id": custom_id,
@@ -1029,7 +1045,7 @@ RESPOSTA DO ORADOR PRINCIPAL:
             },
             "metadata": {
                 "interaction_id": interaction_id,
-                "prompt_version": "apartes-atos-fala-v1",
+                "prompt_version": prompt_version,
             },
         },
     }
@@ -1258,11 +1274,20 @@ def run_qualitative_results(
     request_path: str | Path | Sequence[str | Path],
     model: str,
     config_path: str | Path | None = None,
+    interactions_filename: str = "interacoes_segmentadas_ia.parquet",
+    human_filename: str = "piloto_atos_fala_ia.csv",
+    output_version: str = "",
 ) -> dict[str, Any]:
     config = load_config(config_path)
     root = resolve_output_root(config, data_root, run_id)
-    interactions_path = root / "03_apartes" / "interacoes_segmentadas_ia.parquet"
-    human_path = root / "03_apartes" / "piloto_atos_fala_ia.csv"
+    if Path(interactions_filename).name != interactions_filename:
+        raise ValueError("interactions_filename deve ser um nome de arquivo")
+    if Path(human_filename).name != human_filename:
+        raise ValueError("human_filename deve ser um nome de arquivo")
+    if output_version and not re.fullmatch(r"_[a-z0-9_]+", output_version):
+        raise ValueError("output_version deve ser vazio ou um sufixo seguro")
+    interactions_path = root / "03_apartes" / interactions_filename
+    human_path = root / "03_apartes" / human_filename
     interactions = pd.read_parquet(interactions_path)
     request_paths = _coerce_paths(request_path)
     output_paths = _coerce_paths(batch_output_path)
@@ -1292,7 +1317,10 @@ def run_qualitative_results(
         ("atos_fala_prevalencia_anual", prevalence, ".csv"),
         ("atos_fala_prevalencia_genero", prevalence_gender, ".csv"),
     ]:
-        path = write_dataframe_atomic(frame, root / "03_apartes" / f"{name}{suffix}")
+        path = write_dataframe_atomic(
+            frame,
+            root / "03_apartes" / f"{name}{output_version}{suffix}",
+        )
         outputs.append(artifact_record(path, rows=len(frame)))
     evaluation_counts: dict[str, Any] = {"human_adjudicated_rows": 0}
     if human_path.exists():
@@ -1302,12 +1330,17 @@ def run_qualitative_results(
         if not adjudicated.empty:
             summary, labels = evaluate_qualitative_against_human(adjudicated, results, config)
             for name, frame in [("atos_fala_avaliacao_resumo", summary), ("atos_fala_avaliacao_categorias", labels)]:
-                path = write_dataframe_atomic(frame, root / "03_apartes" / f"{name}.csv")
+                path = write_dataframe_atomic(
+                    frame,
+                    root
+                    / "03_apartes"
+                    / f"{name}{output_version}.csv",
+                )
                 outputs.append(artifact_record(path, rows=len(frame)))
     manifest = base_manifest(
         config=config,
         run_id=run_id,
-        stage="03_apartes_qualitativo_resultados",
+        stage=f"03_apartes_qualitativo_resultados{output_version}",
         inputs=[
             artifact_record(interactions_path, rows=len(interactions)),
             *(artifact_record(path) for path in request_paths),
@@ -1323,7 +1356,12 @@ def run_qualitative_results(
             **evaluation_counts,
         },
     )
-    manifest_path = write_json_atomic(root / "03_apartes" / f"manifest_qualitativo_{model}.json", manifest)
+    manifest_path = write_json_atomic(
+        root
+        / "03_apartes"
+        / f"manifest_qualitativo{output_version}_{model}.json",
+        manifest,
+    )
     return {**manifest, "manifest_path": str(manifest_path)}
 
 

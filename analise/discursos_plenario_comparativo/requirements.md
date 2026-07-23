@@ -102,18 +102,26 @@
   candidato, ligado e enviado à IA separadamente.
 - Agrupar todos os candidatos do mesmo `texto_id` em uma requisição, evitando
   repetir a transcrição no custo de entrada.
-- Dividir a transcrição localmente em blocos determinísticos de até 240
-  caracteres, preservando seus offsets exatos.
-- Exigir da IA somente IDs de bloco e status estruturados; reconstruir os
-  trechos e offsets de caracteres Unicode do Python a partir do texto local.
-- Tratar `aparte_nao_localizado`, `incerto` e ausência de resposta explícita
-  como estados substantivos válidos, separados de erro técnico.
-- Manter a segmentação por marcadores apenas como diagnóstico e nunca
-  substituir silenciosamente uma saída de IA ausente por ela.
-- Persistir o resultado oficial em `interacoes_segmentadas_ia.parquet` e não
-  consumir o antigo `interacoes_segmentadas.parquet`.
-- Extrair o turno do aparte e a resposta subsequente do orador principal como
-  campos diferentes.
+- Criar em Python turnos brutos e subturnos determinísticos, com IDs, falantes,
+  ordem e offsets Unicode exatos.
+- Formar o roster somente com participantes conhecidos da base relacional; a
+  IA pode resolver atribuições ambíguas, mas não substituir uma atribuição
+  Python inequívoca nem inventar pessoas.
+- Exigir para cada candidato status e zero ou mais episódios com listas de IDs
+  de falas do participante, backchannels, respostas do orador e intervenções
+  de contexto; a IA nunca devolve os textos.
+- Admitir episódios sobrepostos, múltiplos participantes, mais de um episódio
+  por candidato e respostas a pessoas diferentes dentro do mesmo turno bruto.
+- Manter pedido e concessão de aparte como contexto quando não forem fala
+  substantiva do participante.
+- Reconstruir localmente os textos por papel e a visão cronológica, validando
+  todos os IDs, falantes e offsets contra a fonte com hash.
+- Persistir tabelas normalizadas v2 de participantes, turnos, episódios,
+  vínculos episódio–turno, atribuições ambíguas e resultados por candidato.
+- Reutilizar a segmentação e a revisão v1 apenas como âncoras diagnósticas;
+  nunca tratá-las como verdade obrigatória ou fallback silencioso.
+- Preservar integralmente `interacoes_segmentadas_ia.parquet`,
+  `revisao_segmentacao_ia.csv` e todos os Batches existentes.
 - Produzir Batch em `/v1/responses` com Structured Outputs, `custom_id` único
   e reconciliação independente da ordem das respostas.
 - Dividir automaticamente cada fluxo em JSONLs com no máximo 50.000
@@ -123,22 +131,23 @@
 - Permitir baixar e processar as partes em uma sessão nova do Colab a partir
   dos manifests persistidos, sem depender de variáveis criadas na célula de
   preparação.
-- Revisar amostra balanceada de até 200 interações por arena, período e direção
-  de gênero, preenchendo 200 sempre que houver ao menos 200 elegíveis.
-- Contar como revisadas somente linhas com os dois campos de correção
-  preenchidos com booleanos válidos.
-- Exigir pelo menos 100 revisões e precisão de 95% para aparte e resposta antes
-  de liberar a classificação qualitativa.
+- Revisar piloto determinístico de aproximadamente 30 episódios, forçando os
+  casos Geovania/Rogério, Júlio Campos e Izalci e reutilizando casos v1
+  revisados como testes diagnósticos.
+- Contar como revisadas somente linhas com quatro booleanos válidos:
+  participantes, completude, respostas e contexto.
+- Exigir pelo menos 30 revisões, precisão de 95% em cada dimensão e aprovação
+  dos três diagnósticos antes de liberar atos de fala v2.
+- Proibir a geração do JSONL de atos de fala antes do gate v2 e exigir ainda
+  uma autorização explícita separada antes de qualquer submissão paga.
 - Manter exatamente as dez categorias de aparte e nove categorias de resposta
   registradas no config, além de `possivel_descortesia`.
 - Não converter automaticamente “sem resposta explícita” em ato `ignorar`.
 - Classificação de ato presente exige evidência textual da unidade correta.
 - Gerar piloto humano adjudicado, avaliação por modelo, prevalência anual,
   diferença para mediana histórica e painéis por direção de gênero.
-- Preservar edições humanas no codebook, em
-  `revisao_segmentacao_ia.csv` e em `piloto_atos_fala_ia.csv`; uma nova
-  segmentação incompatível deve bloquear a reexecução em vez de sobrescrever
-  anotações.
+- Preservar edições humanas no codebook e nos artefatos de revisão; a revisão
+  v2 só pode ser reaproveitada quando `episodio_id` e fingerprint coincidirem.
 
 ## NLP
 

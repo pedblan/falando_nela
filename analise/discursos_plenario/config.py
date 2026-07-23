@@ -60,6 +60,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "clustering",
         "openai",
         "interjection_segmentation",
+        "interjection_episode_linking_v2",
         "rhetorical_figures",
         "interjection_speech_acts",
         "response_speech_acts",
@@ -115,6 +116,37 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("min_precision deve estar em (0, 1]")
     if not str(config["openai"].get("interjection_segmentation_model") or "").strip():
         raise ValueError("interjection_segmentation_model deve ser informado")
+    episodes = config["interjection_episode_linking_v2"]
+    episode_required = {
+        "method",
+        "prompt_version",
+        "subturn_max_chars",
+        "review_sample_size",
+        "min_reviewed",
+        "min_precision",
+        "required_diagnostic_cases",
+    }
+    if missing_episodes := episode_required.difference(episodes):
+        raise ValueError(
+            f"Configuracao de episodios v2 incompleta: {sorted(missing_episodes)}"
+        )
+    if episodes["method"] != "ia_turnos_subturnos_v2":
+        raise ValueError("Metodo de episodios v2 nao suportado")
+    if int(episodes["subturn_max_chars"]) < 80:
+        raise ValueError("subturn_max_chars deve ser pelo menos 80")
+    if int(episodes["review_sample_size"]) < int(episodes["min_reviewed"]):
+        raise ValueError(
+            "review_sample_size v2 deve ser maior ou igual a min_reviewed"
+        )
+    if not 0 < float(episodes["min_precision"]) <= 1:
+        raise ValueError("min_precision v2 deve estar em (0, 1]")
+    diagnostics = episodes["required_diagnostic_cases"]
+    if not isinstance(diagnostics, list) or len(diagnostics) != 3:
+        raise ValueError(
+            "required_diagnostic_cases deve listar os tres casos v2"
+        )
+    if len(set(map(str, diagnostics))) != len(diagnostics):
+        raise ValueError("required_diagnostic_cases nao pode repetir casos")
 
 
 def resolve_input_paths(config: AnalysisConfig, data_root: str | Path) -> dict[str, Path]:

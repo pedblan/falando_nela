@@ -96,7 +96,7 @@ def test_gender_notebook_is_read_only_and_research_is_suspended() -> None:
     assert "OPENAI_API_KEY" not in source
 
 
-def test_interjection_notebook_uses_ai_block_segmentation_after_date_cut() -> None:
+def test_interjection_notebook_uses_multiturn_episode_pipeline_v2() -> None:
     notebook = nbformat.read(
         NOTEBOOK_DIR / "03_apartes_relacionais_colab.ipynb", as_version=4
     )
@@ -104,21 +104,33 @@ def test_interjection_notebook_uses_ai_block_segmentation_after_date_cut() -> No
         cell.source for cell in notebook.cells if cell.cell_type == "code"
     )
 
-    assert "recorte_apartes.csv" in source
+    assert "recorte_apartes_v2.csv" in source
     assert ".tail()" not in source
-    assert "GERAR_JSONL_SEGMENTACAO = False" in source
-    assert "ENVIAR_BATCH_SEGMENTACAO = False" in source
-    assert "PROCESSAR_BATCH_SEGMENTACAO = False" in source
-    assert "write_segmentation_batch_jsonl" in source
-    assert "run_segmentation_results" in source
-    assert 'ANALYSIS_CONFIG.raw["openai"]["interjection_segmentation_model"]' in source
+    assert "PREPARAR_TURNOS_V2 = False" in source
+    assert "GERAR_JSONL_EPISODIOS_V2 = False" in source
+    assert "ENVIAR_BATCH_EPISODIOS_V2 = False" in source
+    assert "PROCESSAR_BATCH_EPISODIOS_V2 = False" in source
+    assert "AUTORIZAR_NOVO_BATCH_PAGO_V2 = False" in source
+    assert "write_episode_batch_jsonl_v2" in source
+    assert "run_episode_results_v2" in source
+    assert "prepare_episode_analysis_v2" in source
+    assert "interjection_segmentation_model" in source
+    assert "episodios_interacao_v2.parquet" in source
+    assert "episodio_turnos_v2.parquet" in source
+    assert "participantes_interacao_v2.parquet" in source
+    assert "atribuicoes_falantes_v2.parquet" in source
     assert "interacoes_segmentadas_ia.parquet" in source
     assert '"interacoes_segmentadas.parquet"' not in source
     assert "OPENAI_API_KEY" in source
+    assert "revisao_episodios_v2.csv" in source
     assert "revisao_segmentacao_ia.csv" in source
-    assert "piloto_atos_fala_ia.csv" in source
+    assert "qualitative_authorized_v2" in source
+    assert "interacoes_qualitativas_episodios_v2.parquet" in source
+    assert "piloto_atos_fala_episodios_v2.csv" in source
     assert "request_paths" in source
     assert '"batches"' in source
+    assert "run_segmentation_results" not in source
+    assert "write_segmentation_batch_jsonl" not in source
 
 
 def test_synthesis_marks_gender_stage_as_suspended(tmp_path: Path) -> None:
