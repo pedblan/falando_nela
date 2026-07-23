@@ -251,19 +251,37 @@ NOTEBOOKS = [
     {
         "filename": "03_apartes_relacionais_colab.ipynb",
         "title": "03 — Apartes relacionais, segmentação e atos de fala",
-        "description": "Analisa díades, constrói pontes para o corpus e prepara a análise qualitativa dos apartes e respostas.",
-        "method": "Sem precisão contra conjunto ouro, a ponte não autoriza denominadores e a segmentação não autoriza classificação. A taxonomia de atos de fala reproduz o TD 355 e permanece revisável.",
+        "description": "Aplica o recorte temporal, analisa díades, constrói pontes e segmenta com IA apenas os discursos candidatos.",
+        "method": "Nem todo discurso contém aparte. A base de apartes define os candidatos; a IA devolve somente IDs de blocos e a máquina local reconstrói texto e offsets. Ponte e segmentação continuam bloqueadas por validação humana.",
         "preflight": """
             APARTES_PATH = INPUT_PATHS["interjections"]
             APARTES_SNAPSHOT_PATH = RUN_OUTPUT_ROOT / "00_snapshot" / "discursos_plenario_snapshot.parquet"
             assert APARTES_PATH.exists(), APARTES_PATH
             assert APARTES_SNAPSHOT_PATH.exists(), "Execute o caderno 00."
+            GERAR_JSONL_SEGMENTACAO = False
+            ENVIAR_BATCH_SEGMENTACAO = False
+            BAIXAR_BATCH_SEGMENTACAO = False
+            PROCESSAR_BATCH_SEGMENTACAO = False
             VALIDAR_SEGMENTACAO = False
             GERAR_JSONL_ATOS_FALA = False
             ENVIAR_BATCH_ATOS_FALA = False
             BAIXAR_BATCH_ATOS_FALA = False
             PROCESSAR_BATCH_ATOS_FALA = False
+            APARTES_SEGMENTATION_MODEL = ANALYSIS_CONFIG.raw["openai"]["interjection_segmentation_model"]
             APARTES_QUALITATIVE_MODEL = ANALYSIS_CONFIG.raw["openai"]["interjection_default_model"]
+            APARTES_STAGE_ROOT = RUN_OUTPUT_ROOT / "03_apartes"
+            APARTES_SEGMENTATION_SOURCES_PATH = APARTES_STAGE_ROOT / "fontes_segmentacao_ia.parquet"
+            APARTES_INTERACTIONS_PATH = APARTES_STAGE_ROOT / "interacoes_segmentadas_ia.parquet"
+            APARTES_SEGMENTATION_QUALITY_PATH = APARTES_STAGE_ROOT / "segmentacao_qualidade.json"
+            APARTES_SEGMENTATION_REVIEW_PATH = APARTES_STAGE_ROOT / "revisao_segmentacao_ia.csv"
+            APARTES_SEGMENTATION_BATCH_REQUEST_PATH = APARTES_STAGE_ROOT / f"batch_segmentacao_{APARTES_SEGMENTATION_MODEL}.jsonl"
+            APARTES_SEGMENTATION_REQUEST_MANIFEST_PATH = APARTES_STAGE_ROOT / "batch_segmentacao_requests.json"
+            APARTES_SEGMENTATION_BATCH_CONTROL_PATH = APARTES_STAGE_ROOT / "batch_segmentacao.json"
+            APARTES_CODEBOOK_PATH = APARTES_STAGE_ROOT / "codebook_atos_fala.csv"
+            APARTES_BATCH_REQUEST_PATH = APARTES_STAGE_ROOT / f"batch_atos_fala_{APARTES_QUALITATIVE_MODEL}.jsonl"
+            APARTES_REQUEST_MANIFEST_PATH = APARTES_STAGE_ROOT / "batch_atos_fala_requests.json"
+            APARTES_BATCH_CONTROL_PATH = APARTES_STAGE_ROOT / "batch_atos_fala.json"
+            APARTES_HUMAN_PILOT_PATH = APARTES_STAGE_ROOT / "piloto_atos_fala_ia.csv"
         """,
         "run": """
             from analise.discursos_plenario.apartes import run_interjection_analysis
@@ -279,43 +297,265 @@ NOTEBOOKS = [
             import json
             import pandas as pd
 
+            APARTES_CUT_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "recorte_apartes.csv"
             APARTES_TESTS_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "testes_associacao.csv"
+            APARTES_UNIVERSE_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "universo_segmentacao.csv"
             APARTES_BRIDGE_QUALITY_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "ponte_camara_qualidade.json"
-            APARTES_SEGMENTATION_QUALITY_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "segmentacao_qualidade.json"
+            if APARTES_CUT_PATH.exists():
+                APARTES_CUT = pd.read_csv(APARTES_CUT_PATH)
+                display(APARTES_CUT)
             if APARTES_TESTS_PATH.exists():
                 APARTES_TESTS = pd.read_csv(APARTES_TESTS_PATH)
-                display(APARTES_TESTS.tail())
+                display(APARTES_TESTS)
+            if APARTES_UNIVERSE_PATH.exists():
+                APARTES_UNIVERSE = pd.read_csv(APARTES_UNIVERSE_PATH)
+                display(APARTES_UNIVERSE)
             if APARTES_BRIDGE_QUALITY_PATH.exists():
                 APARTES_BRIDGE_QUALITY = json.loads(APARTES_BRIDGE_QUALITY_PATH.read_text(encoding="utf-8"))
-                assert APARTES_BRIDGE_QUALITY["denominators_authorized"] is False
-                print(APARTES_BRIDGE_QUALITY)
+                print(
+                    "Denominadores autorizados:",
+                    APARTES_BRIDGE_QUALITY.get("denominators_authorized", False),
+                )
+                display(APARTES_BRIDGE_QUALITY)
             if APARTES_SEGMENTATION_QUALITY_PATH.exists():
                 APARTES_SEGMENTATION_QUALITY = json.loads(APARTES_SEGMENTATION_QUALITY_PATH.read_text(encoding="utf-8"))
                 print(APARTES_SEGMENTATION_QUALITY)
         """,
         "extra": [
             (
+                "Preparar o Batch de segmentação por IA",
+                "É gerada uma requisição por discurso ligado, reunindo todos os candidatos daquele texto. O modelo vê blocos numerados e devolve apenas status e limites; não devolve os trechos.",
+                """
+                import pandas as pd
+                from analise.discursos_plenario.apartes_qualitativos import write_segmentation_batch_jsonl
+                from analise.discursos_plenario.io import artifact_record, write_json_atomic
+
+                if GERAR_JSONL_SEGMENTACAO:
+                    APARTES_SEGMENTATION_SOURCES = pd.read_parquet(APARTES_SEGMENTATION_SOURCES_PATH)
+                    APARTES_SEGMENTATION_REQUEST_PATHS = write_segmentation_batch_jsonl(
+                        APARTES_SEGMENTATION_SOURCES,
+                        APARTES_SEGMENTATION_BATCH_REQUEST_PATH,
+                        config=ANALYSIS_CONFIG,
+                        model=APARTES_SEGMENTATION_MODEL,
+                    )
+                    assert APARTES_SEGMENTATION_REQUEST_PATHS, "Nenhum discurso elegível para o Batch."
+                    write_json_atomic(
+                        APARTES_SEGMENTATION_REQUEST_MANIFEST_PATH,
+                        {
+                            "model": APARTES_SEGMENTATION_MODEL,
+                            "request_paths": [str(path) for path in APARTES_SEGMENTATION_REQUEST_PATHS],
+                            "requests": [
+                                artifact_record(path)
+                                for path in APARTES_SEGMENTATION_REQUEST_PATHS
+                            ],
+                        },
+                    )
+                    print("Discursos no Batch:", len(APARTES_SEGMENTATION_SOURCES))
+                    print("Partes do Batch:", len(APARTES_SEGMENTATION_REQUEST_PATHS))
+                    for APARTES_SEGMENTATION_REQUEST_PATH in APARTES_SEGMENTATION_REQUEST_PATHS:
+                        print(APARTES_SEGMENTATION_REQUEST_PATH)
+                else:
+                    print("JSONL de segmentação não gerado.")
+                """,
+            ),
+            (
+                "Enviar o Batch de segmentação",
+                "O envio é explícito. A chave já configurada é lida de `OPENAI_API_KEY` no ambiente ou dos Secrets do Colab e nunca é impressa ou gravada.",
+                """
+                import json
+                import os
+                from pathlib import Path
+                from openai import OpenAI
+                from analise.discursos_plenario.figuras import submit_responses_batch
+                from analise.discursos_plenario.io import sha256_file, write_json_atomic
+
+                if ENVIAR_BATCH_SEGMENTACAO:
+                    assert APARTES_SEGMENTATION_REQUEST_MANIFEST_PATH.exists(), "Gere e inspecione os JSONLs primeiro."
+                    APARTES_SEGMENTATION_REQUEST_MANIFEST = json.loads(
+                        APARTES_SEGMENTATION_REQUEST_MANIFEST_PATH.read_text(encoding="utf-8")
+                    )
+                    assert APARTES_SEGMENTATION_REQUEST_MANIFEST["model"] == APARTES_SEGMENTATION_MODEL
+                    APARTES_SEGMENTATION_REQUEST_PATHS = [
+                        Path(path) for path in APARTES_SEGMENTATION_REQUEST_MANIFEST["request_paths"]
+                    ]
+                    APARTES_SEGMENTATION_REQUEST_HASHES = {
+                        item["path"]: item["sha256"]
+                        for item in APARTES_SEGMENTATION_REQUEST_MANIFEST["requests"]
+                    }
+                    assert APARTES_SEGMENTATION_REQUEST_PATHS
+                    assert all(path.exists() for path in APARTES_SEGMENTATION_REQUEST_PATHS)
+                    assert all(
+                        sha256_file(path) == APARTES_SEGMENTATION_REQUEST_HASHES[str(path)]
+                        for path in APARTES_SEGMENTATION_REQUEST_PATHS
+                    ), "Um JSONL mudou depois da criação do manifesto."
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            APARTES_SEGMENTATION_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            APARTES_SEGMENTATION_SECRET = None
+                        if APARTES_SEGMENTATION_SECRET:
+                            os.environ["OPENAI_API_KEY"] = APARTES_SEGMENTATION_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    APARTES_SEGMENTATION_CLIENT = OpenAI()
+                    if APARTES_SEGMENTATION_BATCH_CONTROL_PATH.exists():
+                        APARTES_SEGMENTATION_BATCH_CONTROL = json.loads(
+                            APARTES_SEGMENTATION_BATCH_CONTROL_PATH.read_text(encoding="utf-8")
+                        )
+                        assert APARTES_SEGMENTATION_BATCH_CONTROL["model"] == APARTES_SEGMENTATION_MODEL
+                    else:
+                        APARTES_SEGMENTATION_BATCH_CONTROL = {
+                            "model": APARTES_SEGMENTATION_MODEL,
+                            "batches": [],
+                        }
+                    APARTES_SEGMENTATION_ALREADY_SUBMITTED = {
+                        item["request_path"]: item["request_sha256"]
+                        for item in APARTES_SEGMENTATION_BATCH_CONTROL["batches"]
+                    }
+                    for APARTES_SEGMENTATION_PART_NUMBER, APARTES_SEGMENTATION_REQUEST_PATH in enumerate(
+                        APARTES_SEGMENTATION_REQUEST_PATHS,
+                        start=1,
+                    ):
+                        if str(APARTES_SEGMENTATION_REQUEST_PATH) in APARTES_SEGMENTATION_ALREADY_SUBMITTED:
+                            assert (
+                                APARTES_SEGMENTATION_ALREADY_SUBMITTED[str(APARTES_SEGMENTATION_REQUEST_PATH)]
+                                == APARTES_SEGMENTATION_REQUEST_HASHES[str(APARTES_SEGMENTATION_REQUEST_PATH)]
+                            ), "A parte já enviada tem conteúdo diferente; use outro RUN_ID."
+                            print("Parte já enviada:", APARTES_SEGMENTATION_REQUEST_PATH)
+                            continue
+                        APARTES_SEGMENTATION_BATCH_SUBMISSION = submit_responses_batch(
+                            APARTES_SEGMENTATION_CLIENT,
+                            APARTES_SEGMENTATION_REQUEST_PATH,
+                            description=(
+                                f"{RUN_ID}:segmentacao-apartes:{APARTES_SEGMENTATION_MODEL}:"
+                                f"parte-{APARTES_SEGMENTATION_PART_NUMBER:05d}"
+                            ),
+                        )
+                        APARTES_SEGMENTATION_OUTPUT_PATH = APARTES_SEGMENTATION_REQUEST_PATH.with_name(
+                            f"{APARTES_SEGMENTATION_REQUEST_PATH.stem}_output.jsonl"
+                        )
+                        APARTES_SEGMENTATION_BATCH_CONTROL["batches"].append(
+                            {
+                                "batch_id": APARTES_SEGMENTATION_BATCH_SUBMISSION.id,
+                                "request_path": str(APARTES_SEGMENTATION_REQUEST_PATH),
+                                "request_sha256": APARTES_SEGMENTATION_REQUEST_HASHES[
+                                    str(APARTES_SEGMENTATION_REQUEST_PATH)
+                                ],
+                                "output_path": str(APARTES_SEGMENTATION_OUTPUT_PATH),
+                            }
+                        )
+                        write_json_atomic(
+                            APARTES_SEGMENTATION_BATCH_CONTROL_PATH,
+                            APARTES_SEGMENTATION_BATCH_CONTROL,
+                        )
+                        print("Batch criado:", APARTES_SEGMENTATION_BATCH_SUBMISSION.id)
+                else:
+                    print("Envio da segmentação desativado.")
+                """,
+            ),
+            (
+                "Baixar e reconstruir os segmentos localmente",
+                "As respostas podem chegar fora de ordem. A reconciliação usa `custom_id`; os IDs dos blocos viram offsets e os trechos são recortados do texto local, sem aceitar palpites silenciosos.",
+                """
+                import json
+                import os
+                from pathlib import Path
+                from openai import OpenAI
+                from analise.discursos_plenario.apartes_qualitativos import run_segmentation_results
+                from analise.discursos_plenario.figuras import download_completed_batch
+                from analise.discursos_plenario.io import sha256_file
+
+                APARTES_SEGMENTATION_BATCH_CONTROL_LOADED = None
+                if BAIXAR_BATCH_SEGMENTACAO or PROCESSAR_BATCH_SEGMENTACAO:
+                    assert APARTES_SEGMENTATION_BATCH_CONTROL_PATH.exists(), APARTES_SEGMENTATION_BATCH_CONTROL_PATH
+                    APARTES_SEGMENTATION_BATCH_CONTROL_LOADED = json.loads(
+                        APARTES_SEGMENTATION_BATCH_CONTROL_PATH.read_text(encoding="utf-8")
+                    )
+                    assert APARTES_SEGMENTATION_BATCH_CONTROL_LOADED["model"] == APARTES_SEGMENTATION_MODEL
+                    assert APARTES_SEGMENTATION_BATCH_CONTROL_LOADED["batches"]
+                    assert all(
+                        sha256_file(item["request_path"]) == item["request_sha256"]
+                        for item in APARTES_SEGMENTATION_BATCH_CONTROL_LOADED["batches"]
+                    ), "Um JSONL mudou depois do envio; não é seguro reconciliar a saída."
+                if BAIXAR_BATCH_SEGMENTACAO:
+                    if not os.environ.get("OPENAI_API_KEY"):
+                        try:
+                            from google.colab import userdata
+                            APARTES_SEGMENTATION_DOWNLOAD_SECRET = userdata.get("OPENAI_API_KEY")
+                        except Exception:
+                            APARTES_SEGMENTATION_DOWNLOAD_SECRET = None
+                        if APARTES_SEGMENTATION_DOWNLOAD_SECRET:
+                            os.environ["OPENAI_API_KEY"] = APARTES_SEGMENTATION_DOWNLOAD_SECRET
+                    assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
+                    APARTES_SEGMENTATION_DOWNLOAD_CLIENT = OpenAI()
+                    for APARTES_SEGMENTATION_BATCH_PART in APARTES_SEGMENTATION_BATCH_CONTROL_LOADED["batches"]:
+                        APARTES_SEGMENTATION_BATCH_OUTPUT_PATH = Path(
+                            APARTES_SEGMENTATION_BATCH_PART["output_path"]
+                        )
+                        download_completed_batch(
+                            APARTES_SEGMENTATION_DOWNLOAD_CLIENT,
+                            APARTES_SEGMENTATION_BATCH_PART["batch_id"],
+                            APARTES_SEGMENTATION_BATCH_OUTPUT_PATH,
+                        )
+                        print(APARTES_SEGMENTATION_BATCH_OUTPUT_PATH)
+                APARTES_SEGMENTATION_RESULT = None
+                if PROCESSAR_BATCH_SEGMENTACAO:
+                    APARTES_SEGMENTATION_REQUEST_PATHS = [
+                        Path(item["request_path"])
+                        for item in APARTES_SEGMENTATION_BATCH_CONTROL_LOADED["batches"]
+                    ]
+                    APARTES_SEGMENTATION_BATCH_OUTPUT_PATHS = [
+                        Path(item["output_path"])
+                        for item in APARTES_SEGMENTATION_BATCH_CONTROL_LOADED["batches"]
+                    ]
+                    assert all(path.exists() for path in APARTES_SEGMENTATION_REQUEST_PATHS)
+                    assert all(path.exists() for path in APARTES_SEGMENTATION_BATCH_OUTPUT_PATHS)
+                    APARTES_SEGMENTATION_RESULT = run_segmentation_results(
+                        data_root=DATA_ROOT,
+                        run_id=RUN_ID,
+                        batch_output_path=APARTES_SEGMENTATION_BATCH_OUTPUT_PATHS,
+                        request_path=APARTES_SEGMENTATION_REQUEST_PATHS,
+                        model=APARTES_SEGMENTATION_MODEL,
+                        config_path=CONFIG_PATH,
+                    )
+                    print(APARTES_SEGMENTATION_RESULT["manifest_path"])
+                else:
+                    print("Reconstrução da segmentação desativada.")
+                """,
+            ),
+            (
                 "Revisar a segmentação dos turnos",
-                "O caderno cria uma amostra balanceada de 200 interações. Revise se o trecho é realmente o aparte e se a resposta pertence ao orador principal; só então recalcule a qualidade.",
+                "Depois da reconstrução, o caderno cria até 200 interações balanceadas. Linhas vazias não contam como revisadas; são necessários 100 casos completos e 95% de precisão em cada trecho.",
                 """
                 import json
                 import pandas as pd
                 from analise.discursos_plenario.apartes_qualitativos import segmentation_quality
                 from analise.discursos_plenario.io import write_json_atomic
 
-                APARTES_INTERACTIONS_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "interacoes_segmentadas.parquet"
-                APARTES_SEGMENTATION_REVIEW_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "revisao_segmentacao.csv"
                 APARTES_SEGMENTATION_VALIDATION = None
                 if VALIDAR_SEGMENTACAO:
                     APARTES_INTERACTIONS = pd.read_parquet(APARTES_INTERACTIONS_PATH)
-                    APARTES_SEGMENTATION_GOLD = pd.read_csv(APARTES_SEGMENTATION_REVIEW_PATH)
+                    APARTES_SEGMENTATION_GOLD = pd.read_csv(APARTES_SEGMENTATION_REVIEW_PATH, keep_default_na=False)
+                    APARTES_SEGMENTATION_CONFIG = ANALYSIS_CONFIG.raw["interjection_segmentation"]
                     APARTES_SEGMENTATION_VALIDATION = segmentation_quality(
                         APARTES_INTERACTIONS,
                         APARTES_SEGMENTATION_GOLD,
-                        min_precision=0.95,
-                        min_reviewed=100,
+                        min_precision=APARTES_SEGMENTATION_CONFIG["min_precision"],
+                        min_reviewed=APARTES_SEGMENTATION_CONFIG["min_reviewed"],
                     )
-                    write_json_atomic(APARTES_SEGMENTATION_QUALITY_PATH, APARTES_SEGMENTATION_VALIDATION)
+                    APARTES_SEGMENTATION_QUALITY_EXISTING = (
+                        json.loads(APARTES_SEGMENTATION_QUALITY_PATH.read_text(encoding="utf-8"))
+                        if APARTES_SEGMENTATION_QUALITY_PATH.exists()
+                        else {}
+                    )
+                    APARTES_SEGMENTATION_VALIDATION = {
+                        **APARTES_SEGMENTATION_QUALITY_EXISTING,
+                        **APARTES_SEGMENTATION_VALIDATION,
+                    }
+                    write_json_atomic(
+                        APARTES_SEGMENTATION_QUALITY_PATH,
+                        APARTES_SEGMENTATION_VALIDATION,
+                    )
                     print(APARTES_SEGMENTATION_VALIDATION)
                 else:
                     print("Validação desativada; preencha primeiro a amostra de revisão.")
@@ -325,11 +565,11 @@ NOTEBOOKS = [
                 "Preparar atos de fala e possível descortesia",
                 "Complete o codebook do TD 355. O JSONL contém somente os turnos segmentados; respostas ausentes ficam explicitamente marcadas.",
                 """
+                import json
                 import pandas as pd
                 from analise.discursos_plenario.apartes_qualitativos import write_qualitative_batch_jsonl
+                from analise.discursos_plenario.io import artifact_record, write_json_atomic
 
-                APARTES_CODEBOOK_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "codebook_atos_fala.csv"
-                APARTES_BATCH_REQUEST_PATH = RUN_OUTPUT_ROOT / "03_apartes" / f"batch_atos_fala_{APARTES_QUALITATIVE_MODEL}.jsonl"
                 if GERAR_JSONL_ATOS_FALA:
                     APARTES_SEGMENTATION_GATE = json.loads(APARTES_SEGMENTATION_QUALITY_PATH.read_text(encoding="utf-8"))
                     assert APARTES_SEGMENTATION_GATE["classification_authorized"] is True, "A segmentação ainda não atingiu o gate."
@@ -337,14 +577,28 @@ NOTEBOOKS = [
                     APARTES_CODEBOOK_FIELDS = ["definicao_operacional", "criterio_positivo", "criterio_negativo", "caso_limitrofe"]
                     assert APARTES_CODEBOOK[APARTES_CODEBOOK_FIELDS].apply(lambda column: column.str.strip().ne("").all()).all(), "Complete o codebook."
                     APARTES_INTERACTIONS_FOR_BATCH = pd.read_parquet(APARTES_INTERACTIONS_PATH)
-                    write_qualitative_batch_jsonl(
+                    APARTES_REQUEST_PATHS = write_qualitative_batch_jsonl(
                         APARTES_INTERACTIONS_FOR_BATCH,
                         APARTES_BATCH_REQUEST_PATH,
                         codebook=APARTES_CODEBOOK.to_csv(index=False),
                         config=ANALYSIS_CONFIG,
                         model=APARTES_QUALITATIVE_MODEL,
                     )
-                    print(APARTES_BATCH_REQUEST_PATH)
+                    assert APARTES_REQUEST_PATHS, "Nenhuma interação elegível para o Batch."
+                    write_json_atomic(
+                        APARTES_REQUEST_MANIFEST_PATH,
+                        {
+                            "model": APARTES_QUALITATIVE_MODEL,
+                            "request_paths": [str(path) for path in APARTES_REQUEST_PATHS],
+                            "requests": [
+                                artifact_record(path)
+                                for path in APARTES_REQUEST_PATHS
+                            ],
+                        },
+                    )
+                    print("Partes do Batch:", len(APARTES_REQUEST_PATHS))
+                    for APARTES_REQUEST_PATH in APARTES_REQUEST_PATHS:
+                        print(APARTES_REQUEST_PATH)
                 else:
                     print("JSONL de atos de fala não gerado.")
                 """,
@@ -353,14 +607,32 @@ NOTEBOOKS = [
                 "Enviar o Batch de atos de fala",
                 "O envio é uma ação separada e explícita. A chave vem do ambiente ou dos Secrets do Colab e não é gravada.",
                 """
+                import json
                 import os
+                from pathlib import Path
                 from openai import OpenAI
                 from analise.discursos_plenario.figuras import submit_responses_batch
-                from analise.discursos_plenario.io import write_json_atomic
+                from analise.discursos_plenario.io import sha256_file, write_json_atomic
 
-                APARTES_BATCH_SUBMISSION = None
                 if ENVIAR_BATCH_ATOS_FALA:
-                    assert APARTES_BATCH_REQUEST_PATH.exists(), "Gere e inspecione o JSONL primeiro."
+                    assert APARTES_REQUEST_MANIFEST_PATH.exists(), "Gere e inspecione os JSONLs primeiro."
+                    APARTES_REQUEST_MANIFEST = json.loads(
+                        APARTES_REQUEST_MANIFEST_PATH.read_text(encoding="utf-8")
+                    )
+                    assert APARTES_REQUEST_MANIFEST["model"] == APARTES_QUALITATIVE_MODEL
+                    APARTES_REQUEST_PATHS = [
+                        Path(path) for path in APARTES_REQUEST_MANIFEST["request_paths"]
+                    ]
+                    APARTES_REQUEST_HASHES = {
+                        item["path"]: item["sha256"]
+                        for item in APARTES_REQUEST_MANIFEST["requests"]
+                    }
+                    assert APARTES_REQUEST_PATHS
+                    assert all(path.exists() for path in APARTES_REQUEST_PATHS)
+                    assert all(
+                        sha256_file(path) == APARTES_REQUEST_HASHES[str(path)]
+                        for path in APARTES_REQUEST_PATHS
+                    ), "Um JSONL mudou depois da criação do manifesto."
                     if not os.environ.get("OPENAI_API_KEY"):
                         try:
                             from google.colab import userdata
@@ -371,18 +643,57 @@ NOTEBOOKS = [
                             os.environ["OPENAI_API_KEY"] = APARTES_SECRET
                     assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
                     APARTES_OPENAI_CLIENT = OpenAI()
-                    APARTES_BATCH_SUBMISSION = submit_responses_batch(
-                        APARTES_OPENAI_CLIENT,
-                        APARTES_BATCH_REQUEST_PATH,
-                        description=f"{RUN_ID}:atos-fala:{APARTES_QUALITATIVE_MODEL}",
-                    )
-                    APARTES_BATCH_CONTROL = {
-                        "batch_id": APARTES_BATCH_SUBMISSION.id,
-                        "model": APARTES_QUALITATIVE_MODEL,
-                        "request_path": str(APARTES_BATCH_REQUEST_PATH),
+                    if APARTES_BATCH_CONTROL_PATH.exists():
+                        APARTES_BATCH_CONTROL = json.loads(
+                            APARTES_BATCH_CONTROL_PATH.read_text(encoding="utf-8")
+                        )
+                        assert APARTES_BATCH_CONTROL["model"] == APARTES_QUALITATIVE_MODEL
+                    else:
+                        APARTES_BATCH_CONTROL = {
+                            "model": APARTES_QUALITATIVE_MODEL,
+                            "batches": [],
+                        }
+                    APARTES_ALREADY_SUBMITTED = {
+                        item["request_path"]: item["request_sha256"]
+                        for item in APARTES_BATCH_CONTROL["batches"]
                     }
-                    write_json_atomic(RUN_OUTPUT_ROOT / "03_apartes" / "batch_atos_fala.json", APARTES_BATCH_CONTROL)
-                    print("Batch criado:", APARTES_BATCH_SUBMISSION.id)
+                    for APARTES_PART_NUMBER, APARTES_REQUEST_PATH in enumerate(
+                        APARTES_REQUEST_PATHS,
+                        start=1,
+                    ):
+                        if str(APARTES_REQUEST_PATH) in APARTES_ALREADY_SUBMITTED:
+                            assert (
+                                APARTES_ALREADY_SUBMITTED[str(APARTES_REQUEST_PATH)]
+                                == APARTES_REQUEST_HASHES[str(APARTES_REQUEST_PATH)]
+                            ), "A parte já enviada tem conteúdo diferente; use outro RUN_ID."
+                            print("Parte já enviada:", APARTES_REQUEST_PATH)
+                            continue
+                        APARTES_BATCH_SUBMISSION = submit_responses_batch(
+                            APARTES_OPENAI_CLIENT,
+                            APARTES_REQUEST_PATH,
+                            description=(
+                                f"{RUN_ID}:atos-fala:{APARTES_QUALITATIVE_MODEL}:"
+                                f"parte-{APARTES_PART_NUMBER:05d}"
+                            ),
+                        )
+                        APARTES_BATCH_OUTPUT_PATH = APARTES_REQUEST_PATH.with_name(
+                            f"{APARTES_REQUEST_PATH.stem}_output.jsonl"
+                        )
+                        APARTES_BATCH_CONTROL["batches"].append(
+                            {
+                                "batch_id": APARTES_BATCH_SUBMISSION.id,
+                                "request_path": str(APARTES_REQUEST_PATH),
+                                "request_sha256": APARTES_REQUEST_HASHES[
+                                    str(APARTES_REQUEST_PATH)
+                                ],
+                                "output_path": str(APARTES_BATCH_OUTPUT_PATH),
+                            }
+                        )
+                        write_json_atomic(
+                            APARTES_BATCH_CONTROL_PATH,
+                            APARTES_BATCH_CONTROL,
+                        )
+                        print("Batch criado:", APARTES_BATCH_SUBMISSION.id)
                 else:
                     print("Envio desativado.")
                 """,
@@ -393,14 +704,25 @@ NOTEBOOKS = [
                 """
                 import json
                 import os
+                from pathlib import Path
                 from openai import OpenAI
                 from analise.discursos_plenario.apartes_qualitativos import run_qualitative_results
                 from analise.discursos_plenario.figuras import download_completed_batch
+                from analise.discursos_plenario.io import sha256_file
 
-                APARTES_BATCH_OUTPUT_PATH = RUN_OUTPUT_ROOT / "03_apartes" / f"batch_atos_fala_{APARTES_QUALITATIVE_MODEL}_output.jsonl"
-                APARTES_BATCH_CONTROL_PATH = RUN_OUTPUT_ROOT / "03_apartes" / "batch_atos_fala.json"
-                if BAIXAR_BATCH_ATOS_FALA:
+                APARTES_BATCH_CONTROL_LOADED = None
+                if BAIXAR_BATCH_ATOS_FALA or PROCESSAR_BATCH_ATOS_FALA:
                     assert APARTES_BATCH_CONTROL_PATH.exists(), APARTES_BATCH_CONTROL_PATH
+                    APARTES_BATCH_CONTROL_LOADED = json.loads(
+                        APARTES_BATCH_CONTROL_PATH.read_text(encoding="utf-8")
+                    )
+                    assert APARTES_BATCH_CONTROL_LOADED["model"] == APARTES_QUALITATIVE_MODEL
+                    assert APARTES_BATCH_CONTROL_LOADED["batches"]
+                    assert all(
+                        sha256_file(item["request_path"]) == item["request_sha256"]
+                        for item in APARTES_BATCH_CONTROL_LOADED["batches"]
+                    ), "Um JSONL mudou depois do envio; não é seguro reconciliar a saída."
+                if BAIXAR_BATCH_ATOS_FALA:
                     if not os.environ.get("OPENAI_API_KEY"):
                         try:
                             from google.colab import userdata
@@ -411,21 +733,31 @@ NOTEBOOKS = [
                             os.environ["OPENAI_API_KEY"] = APARTES_DOWNLOAD_SECRET
                     assert os.environ.get("OPENAI_API_KEY"), "Configure OPENAI_API_KEY no ambiente ou nos Secrets do Colab."
                     APARTES_DOWNLOAD_CLIENT = OpenAI()
-                    APARTES_BATCH_CONTROL_LOADED = json.loads(APARTES_BATCH_CONTROL_PATH.read_text(encoding="utf-8"))
-                    download_completed_batch(
-                        APARTES_DOWNLOAD_CLIENT,
-                        APARTES_BATCH_CONTROL_LOADED["batch_id"],
-                        APARTES_BATCH_OUTPUT_PATH,
-                    )
-                    print(APARTES_BATCH_OUTPUT_PATH)
+                    for APARTES_BATCH_PART in APARTES_BATCH_CONTROL_LOADED["batches"]:
+                        APARTES_BATCH_OUTPUT_PATH = Path(APARTES_BATCH_PART["output_path"])
+                        download_completed_batch(
+                            APARTES_DOWNLOAD_CLIENT,
+                            APARTES_BATCH_PART["batch_id"],
+                            APARTES_BATCH_OUTPUT_PATH,
+                        )
+                        print(APARTES_BATCH_OUTPUT_PATH)
                 APARTES_QUALITATIVE_RESULT = None
                 if PROCESSAR_BATCH_ATOS_FALA:
-                    assert APARTES_BATCH_OUTPUT_PATH.exists(), APARTES_BATCH_OUTPUT_PATH
+                    APARTES_REQUEST_PATHS = [
+                        Path(item["request_path"])
+                        for item in APARTES_BATCH_CONTROL_LOADED["batches"]
+                    ]
+                    APARTES_BATCH_OUTPUT_PATHS = [
+                        Path(item["output_path"])
+                        for item in APARTES_BATCH_CONTROL_LOADED["batches"]
+                    ]
+                    assert all(path.exists() for path in APARTES_REQUEST_PATHS)
+                    assert all(path.exists() for path in APARTES_BATCH_OUTPUT_PATHS)
                     APARTES_QUALITATIVE_RESULT = run_qualitative_results(
                         data_root=DATA_ROOT,
                         run_id=RUN_ID,
-                        batch_output_path=APARTES_BATCH_OUTPUT_PATH,
-                        request_path=APARTES_BATCH_REQUEST_PATH,
+                        batch_output_path=APARTES_BATCH_OUTPUT_PATHS,
+                        request_path=APARTES_REQUEST_PATHS,
                         model=APARTES_QUALITATIVE_MODEL,
                         config_path=CONFIG_PATH,
                     )

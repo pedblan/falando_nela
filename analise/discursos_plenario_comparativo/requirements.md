@@ -86,6 +86,8 @@
 
 ## Apartes
 
+- Aplicar o recorte inclusivo configurado à base de apartes antes de todas as
+  análises da etapa e auditar datas ausentes, anteriores e posteriores.
 - Calcular tabela observada e esperada por independência dos marginais.
 - Reportar razão observado/esperado, χ², graus de liberdade, valor-p, menor
   esperado e V de Cramér.
@@ -95,11 +97,36 @@
 - Classificar vínculos em `exato`, `provavel_unico`, `ambiguo` e `ausente`.
 - Não autorizar denominadores sem conjunto ouro, precisão e cobertura mensuradas.
 - Ligar apartes do Senado por `pronunciamento_id` e auditar ambiguidades.
-- Segmentar apenas fronteiras explícitas de turno; não inventar falas quando
-  marcas taquigráficas estiverem ausentes.
+- Não usar todos os discursos do snapshot como universo de apartes: partir dos
+  candidatos da base processada, ligar à transcrição e registrar os universos
+  candidato, ligado e enviado à IA separadamente.
+- Agrupar todos os candidatos do mesmo `texto_id` em uma requisição, evitando
+  repetir a transcrição no custo de entrada.
+- Dividir a transcrição localmente em blocos determinísticos de até 240
+  caracteres, preservando seus offsets exatos.
+- Exigir da IA somente IDs de bloco e status estruturados; reconstruir os
+  trechos e offsets de caracteres Unicode do Python a partir do texto local.
+- Tratar `aparte_nao_localizado`, `incerto` e ausência de resposta explícita
+  como estados substantivos válidos, separados de erro técnico.
+- Manter a segmentação por marcadores apenas como diagnóstico e nunca
+  substituir silenciosamente uma saída de IA ausente por ela.
+- Persistir o resultado oficial em `interacoes_segmentadas_ia.parquet` e não
+  consumir o antigo `interacoes_segmentadas.parquet`.
 - Extrair o turno do aparte e a resposta subsequente do orador principal como
   campos diferentes.
-- Revisar amostra balanceada de 200 interações por arena, período e direção de gênero.
+- Produzir Batch em `/v1/responses` com Structured Outputs, `custom_id` único
+  e reconciliação independente da ordem das respostas.
+- Dividir automaticamente cada fluxo em JSONLs com no máximo 50.000
+  requisições e limite operacional de 190 MiB por arquivo, abaixo do teto de
+  200 MB da Batch API; persistir manifesto e controle por parte para retomada
+  sem reenvio das partes já submetidas.
+- Permitir baixar e processar as partes em uma sessão nova do Colab a partir
+  dos manifests persistidos, sem depender de variáveis criadas na célula de
+  preparação.
+- Revisar amostra balanceada de até 200 interações por arena, período e direção
+  de gênero, preenchendo 200 sempre que houver ao menos 200 elegíveis.
+- Contar como revisadas somente linhas com os dois campos de correção
+  preenchidos com booleanos válidos.
 - Exigir pelo menos 100 revisões e precisão de 95% para aparte e resposta antes
   de liberar a classificação qualitativa.
 - Manter exatamente as dez categorias de aparte e nove categorias de resposta
@@ -108,6 +135,10 @@
 - Classificação de ato presente exige evidência textual da unidade correta.
 - Gerar piloto humano adjudicado, avaliação por modelo, prevalência anual,
   diferença para mediana histórica e painéis por direção de gênero.
+- Preservar edições humanas no codebook, em
+  `revisao_segmentacao_ia.csv` e em `piloto_atos_fala_ia.csv`; uma nova
+  segmentação incompatível deve bloquear a reexecução em vez de sobrescrever
+  anotações.
 
 ## NLP
 

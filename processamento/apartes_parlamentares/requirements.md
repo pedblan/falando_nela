@@ -165,6 +165,16 @@ A classificacao qualitativa exige o turno validado do aparte e, separadamente,
 a resposta do orador principal. Metadado relacional, URL e discurso inteiro
 nao podem ser apresentados como se fossem o texto do aparte.
 
+Na etapa analitica, o Parquet processado define candidatos, nao a afirmacao de
+que todo discurso contenha aparte. A segmentacao pode usar IA em Batch sobre
+transcricoes ligadas, agrupadas por discurso, com blocos e offsets criados
+localmente. A IA devolve apenas limites estruturados; o texto e reconstruido
+da copia local. `aparte_nao_localizado` deve ser preservado como resultado
+valido e nao altera o schema canonico desta base.
+Os JSONLs analiticos sao particionados automaticamente antes dos limites da
+Batch API, e manifests por parte permitem retomada sem alterar este contrato de
+processamento nem os artefatos canonicos.
+
 ## Relatorios Anuais
 
 Gerar pelo menos:

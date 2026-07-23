@@ -108,6 +108,11 @@ qual pretende generalizar; usar 2.000 repetições e semente `20260713`.
 
 ### 03 — Apartes e ponte da Câmara
 
+Aplicar `2010-02-02…2026-07-13`, inclusivo, à base de apartes antes de
+qualquer contagem, díade, teste, ponte ou segmentação. Registrar entrada,
+linhas no recorte, datas ausentes e exclusões anteriores/posteriores por
+fonte.
+
 Calcular relações, díades de gênero observadas/esperadas, razão O/E, χ², Fisher
 para tabela 2×2 esparsa e V de Cramér. Corrigir valores-p por BH dentro da
 família arena-ano.
@@ -118,11 +123,36 @@ estados são `exato`, `provavel_unico`, `ambiguo` e `ausente`. Denominadores só
 podem ser usados após mensurar precisão contra conjunto ouro e atingir os
 limiares declarados, além da cobertura mínima.
 
-Depois da ponte, segmentar separadamente o turno do aparte e a primeira
-resposta explícita do orador principal a partir das marcas taquigráficas. Uma
-amostra balanceada de 200 interações deve ser revisada; a classificação só é
-liberada com pelo menos 100 casos revistos e precisão mínima de 95% tanto para
-o aparte quanto para a resposta.
+Nem todo discurso contém aparte. O universo de segmentação começa nos
+registros da base processada de apartes, não em todos os discursos do
+snapshot. Depois da ponte, agrupar os candidatos por `texto_id` e enviar uma
+única requisição por transcrição ligada. Dividir o texto localmente em blocos
+determinísticos com offsets conhecidos; a IA devolve somente `aparte_id`,
+status e IDs dos blocos inicial/final do aparte e da primeira resposta
+explícita. Texto e offsets de caracteres são reconstruídos localmente. A
+heurística por marcas taquigráficas permanece apenas como diagnóstico, não
+como resultado oficial.
+
+`aparte_nao_localizado`, `incerto` e
+`segmentado_sem_resposta_explicita` são resultados válidos e distintos de
+erro de Batch. A saída usa Structured Outputs em `/v1/responses`, uma linha
+JSONL por discurso e reconciliação por `custom_id`, sem depender da ordem da
+resposta.
+
+Os pedidos são particionados automaticamente antes de 50.000 linhas ou 190
+MiB. Um manifesto registra todas as partes e um controle registra cada
+`batch_id`, pedido e saída, permitindo retomar envio, download e processamento
+após reinício do Colab sem reenviar partes concluídas.
+
+Uma amostra balanceada de até 200 interações segmentadas deve ser revisada.
+Campos vazios não contam como revisão; a classificação só é liberada com pelo
+menos 100 casos completamente revistos e precisão mínima de 95% tanto para o
+aparte quanto para a resposta.
+
+`revisao_segmentacao_ia.csv`, `piloto_atos_fala_ia.csv` e o codebook são
+artefatos humanos persistentes. A reexecução copia anotações apenas quando a
+chave e o fingerprint da segmentação continuam iguais; divergências preenchidas
+são interrompidas para migração explícita.
 
 Reproduzir a análise qualitativa do TD 355 com dois codebooks:
 

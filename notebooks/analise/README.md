@@ -52,10 +52,31 @@ os do Senado, continuam preservados. Artefatos eventualmente criados por uma
 execução anterior do caderno 01 não são apagados nem consumidos pelos cadernos
 seguintes. Prossiga diretamente ao caderno 02.
 
-No caderno 03, a análise relacional pode ser executada antes da qualitativa. O
-Batch de atos de fala permanece bloqueado até uma amostra humana confirmar a
-segmentação do turno do aparte e da resposta. Discurso inteiro, URL ou metadado
-relacional não substituem o texto segmentado.
+No caderno 03, o recorte temporal é reaplicado à base de apartes antes de
+qualquer resultado. Nem todo discurso é considerado um aparte: a base
+processada fornece os candidatos, a ponte seleciona as transcrições ligadas e
+cada discurso é enviado uma única vez à IA, mesmo quando possui vários
+candidatos. A transcrição é dividida localmente em blocos numerados; o modelo
+devolve somente status e limites de blocos, e texto/offsets são reconstruídos
+na máquina local.
+
+A segmentação por marcadores permanece como diagnóstico. O resultado oficial
+`interacoes_segmentadas_ia.parquet` é criado apenas após processar o Batch de
+segmentação; o antigo `interacoes_segmentadas.parquet` não é consumido por
+nenhuma etapa nova. `aparte_nao_localizado`,
+`incerto` e ausência de resposta explícita são estados válidos. O Batch de
+atos de fala permanece bloqueado até pelo menos 100 revisões humanas completas
+confirmarem precisão de 95% para aparte e resposta; campos vazios não contam
+como revisão. Discurso inteiro, URL ou metadado relacional não substituem o
+texto segmentado.
+
+Os dois Batches do caderno 03 são divididos automaticamente em partes de até
+50.000 pedidos e 190 MiB. Os manifests `batch_segmentacao_requests.json` e
+`batch_atos_fala_requests.json`, junto dos controles de submissão, permitem
+retomar o trabalho depois de reiniciar o Colab sem reenviar partes já
+registradas. O codebook e os arquivos `revisao_segmentacao_ia.csv` e
+`piloto_atos_fala_ia.csv` preservam preenchimentos humanos; os artefatos
+legados sem `_ia` não são consumidos.
 
 ## Resultados
 

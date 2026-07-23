@@ -83,17 +83,39 @@
 
 ## Ponte
 
+- Incluir apartes exatamente em `2010-02-02` e `2026-07-13`, inclusive com
+  horário, e excluir os dias imediatamente anterior e posterior.
+- Demonstrar que díades, testes, pontes e fontes da IA recebem somente as
+  linhas do recorte; conferir `recorte_apartes.csv`.
 - Criar casos exato, provável único, ambíguo e ausente.
 - Verificar que sessão diferente impede remoção/ligação automática indevida.
 - Medir precisão contra um conjunto ouro sintético.
 - Demonstrar que ausência de conjunto ouro bloqueia denominadores.
 - Testar limiares imediatamente abaixo, no valor e acima do corte.
-- Segmentar transcrição sintética com aparte e resposta marcados.
-- Testar texto sem marcador, aparteante ausente, múltiplos turnos candidatos e
-  resposta não explícita.
+- Demonstrar que a divisão em blocos preserva, caractere a caractere, a
+  transcrição Unicode e que os offsets reconstruídos recortam exatamente a
+  fonte local.
+- Agrupar dois ou mais apartes do mesmo discurso em uma única requisição.
+- Simular saída com resposta, sem resposta explícita, aparte não localizado,
+  incerteza, bloco inválido e request ausente.
+- Reconciliar saídas fora de ordem por `custom_id` e separar erros sem recorrer
+  à heurística diagnóstica.
+- Forçar limites pequenos em teste e confirmar divisão determinística, IDs
+  únicos entre partes e arquivos abaixo dos limites configurados.
+- Reiniciar o runtime entre preparação, envio e download e confirmar que os
+  manifests bastam para retomar sem duplicar submissões.
+- Confirmar que classificação e revisão leem
+  `interacoes_segmentadas_ia.parquet`, nunca o artefato legado sem sufixo.
 - Confirmar que o texto inteiro do discurso nunca substitui `texto_aparte`.
-- Revisar 200 casos balanceados e exigir ao menos 100 preenchidos no gate.
+- Confirmar que a saída estruturada contém somente IDs/status e não repete os
+  trechos da transcrição.
+- Revisar 200 casos balanceados quando houver ao menos 200 elegíveis e exigir
+  ao menos 100 preenchidos no gate.
+- Demonstrar que células vazias não contam como falsas nem como revisadas e
+  que valores booleanos `False` preenchidos contam corretamente.
 - Testar o gate de 95% separadamente para aparte e resposta.
+- Confirmar que reexecuções preservam o codebook e as linhas humanas ligadas ao
+  mesmo fingerprint, e bloqueiam a perda de revisão quando a segmentação muda.
 - Validar que o schema contém todas as dez categorias de aparte, nove de
   resposta e `possivel_descortesia`, sem duplicatas.
 - Confirmar que ato presente sem evidência é rejeitado pelo pós-processamento.

@@ -59,6 +59,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "eligibility",
         "clustering",
         "openai",
+        "interjection_segmentation",
         "rhetorical_figures",
         "interjection_speech_acts",
         "response_speech_acts",
@@ -93,6 +94,27 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("A ontologia de atos de aparte deve conter exatamente 10 categorias")
     if len(config["response_speech_acts"]) != 9:
         raise ValueError("A ontologia de respostas deve conter exatamente 9 categorias")
+    segmentation = config["interjection_segmentation"]
+    segmentation_required = {
+        "method",
+        "prompt_version",
+        "block_max_chars",
+        "review_sample_size",
+        "min_reviewed",
+        "min_precision",
+    }
+    if missing_segmentation := segmentation_required.difference(segmentation):
+        raise ValueError(f"Configuracao de segmentacao incompleta: {sorted(missing_segmentation)}")
+    if segmentation["method"] != "ia_blocos_offsets_v1":
+        raise ValueError("Metodo de segmentacao nao suportado")
+    if int(segmentation["block_max_chars"]) < 80:
+        raise ValueError("block_max_chars deve ser pelo menos 80")
+    if int(segmentation["review_sample_size"]) < int(segmentation["min_reviewed"]):
+        raise ValueError("review_sample_size deve ser maior ou igual a min_reviewed")
+    if not 0 < float(segmentation["min_precision"]) <= 1:
+        raise ValueError("min_precision deve estar em (0, 1]")
+    if not str(config["openai"].get("interjection_segmentation_model") or "").strip():
+        raise ValueError("interjection_segmentation_model deve ser informado")
 
 
 def resolve_input_paths(config: AnalysisConfig, data_root: str | Path) -> dict[str, Path]:

@@ -13,18 +13,29 @@ from analise.discursos_plenario.apartes import (
     bridge_quality,
     build_camara_speech_bridge,
     denominators_authorized,
+    filter_interjections_by_date,
     observed_expected_dyads,
 )
 from analise.discursos_plenario.apartes_qualitativos import (
+    build_segmentation_candidates,
+    build_segmentation_sources,
     build_senate_speech_bridge,
+    ensure_qualitative_codebook,
     extract_interaction_turns,
     make_qualitative_batch_request,
+    make_segmentation_batch_request,
     manual_coding_template,
+    parse_qualitative_batch_output,
+    parse_segmentation_batch_output,
     qualitative_codebook_template,
     qualitative_output_schema,
     qualitative_review_sample,
+    segment_text_blocks,
     segment_transcript_turns,
+    segmentation_output_schema,
     segmentation_quality,
+    write_qualitative_batch_jsonl,
+    write_segmentation_batch_jsonl,
 )
 from analise.discursos_plenario.config import load_config
 from analise.discursos_plenario.descritivas import clustered_speaker_bootstrap, descriptive_panel
@@ -368,6 +379,44 @@ def test_observed_expected_association_and_bh_known_values() -> None:
     assert np.isnan(adjusted.iloc[3])
 
 
+def test_interjection_date_cut_is_inclusive_and_precedes_analysis() -> None:
+    frame = pd.DataFrame(
+        {
+            "aparte_id": ["before", "start", "end", "after", "missing"],
+            "source": ["camara", "camara", "senado", "senado", "camara"],
+            "data": ["2010-02-01", "2010-02-02T23:59:59", "2026-07-13T12:00:00", "2026-07-14", None],
+            "ano": [1900] * 5,
+        }
+    )
+    filtered, audit = filter_interjections_by_date(
+        frame,
+        date_start="2010-02-02",
+        date_end="2026-07-13",
+    )
+    assert filtered["aparte_id"].tolist() == ["start", "end"]
+    assert filtered["ano"].astype(int).tolist() == [2010, 2026]
+    total = audit.loc[audit["source"].eq("total")].iloc[0]
+    assert total[["entrada", "no_recorte", "data_ausente", "antes_do_recorte", "depois_do_recorte"]].tolist() == [5, 2, 1, 1, 1]
+
+
+def test_interjection_date_cut_uses_brazilian_calendar_for_aware_timestamps() -> None:
+    frame = pd.DataFrame(
+        {
+            "aparte_id": ["previous_local_day", "first_local_instant"],
+            "source": ["camara", "camara"],
+            "data": ["2010-02-02T01:30:00Z", "2010-02-02T03:00:00Z"],
+        }
+    )
+    filtered, audit = filter_interjections_by_date(
+        frame,
+        date_start="2010-02-02",
+        date_end="2010-02-02",
+    )
+    assert filtered["aparte_id"].tolist() == ["first_local_instant"]
+    total = audit.loc[audit["source"].eq("total")].iloc[0]
+    assert total["antes_do_recorte"] == 1
+
+
 def test_camara_bridge_and_denominator_gate() -> None:
     interjections = pd.DataFrame(
         [
@@ -406,6 +455,13 @@ def test_camara_bridge_and_denominator_gate() -> None:
     empty_bridge = build_camara_speech_bridge(interjections.head(0), speeches)
     assert "ponte_status" in empty_bridge
     assert bridge_quality(empty_bridge)["n"] == 0
+
+    conflicting_session = speeches.assign(sessao_id="S2")
+    conflict_bridge = build_camara_speech_bridge(
+        interjections,
+        conflicting_session,
+    )
+    assert conflict_bridge.loc[0, "ponte_status"] == "ausente"
 
 
 def test_turn_segmentation_qualitative_gate_and_taxonomy() -> None:
@@ -468,6 +524,332 @@ O SR. JOÃO SOUZA (ABC - SP) – Muito obrigado, Senador. Responderei ao ponto.
     assert request["url"] == "/v1/responses"
     assert request["body"]["model"] == "gpt-5.6-sol"
     assert "Muito obrigado" in request["body"]["input"]
+
+
+def test_ai_segmentation_blocks_reconstruct_exact_local_offsets() -> None:
+    transcript = (
+        "O SR. JOÃO SOUZA – Abertura do discurso.\\n"
+        "O SR. CARLOS LIMA – Este é o aparte solicitado.\\n"
+        "O SR. JOÃO SOUZA – Esta é a resposta explícita.\\n"
+    )
+    blocks = segment_text_blocks(transcript, max_chars=80)
+    assert "".join(block["text"] for block in blocks) == transcript
+    apart_block = next(block for block in blocks if "CARLOS LIMA" in block["text"])
+    response_block = next(block for block in blocks if "resposta explícita" in block["text"])
+    interjections = pd.DataFrame(
+        [
+            {
+                "aparte_id": "a1",
+                "source": "senado",
+                "data": "2020-01-10",
+                "ano": 2020,
+                "orador_id": "1",
+                "orador_nome": "João Souza",
+                "orador_genero": "masculino",
+                "aparteante_id": "2",
+                "aparteante_nome": "Carlos Lima",
+                "aparteante_genero": "masculino",
+            },
+            {
+                "aparte_id": "a2",
+                "source": "senado",
+                "data": "2020-01-10",
+                "ano": 2020,
+                "orador_nome": "João Souza",
+                "aparteante_nome": "Pessoa Ausente",
+            },
+            {
+                "aparte_id": "a3",
+                "source": "senado",
+                "data": "2020-01-10",
+                "ano": 2020,
+                "orador_nome": "João Souza",
+                "aparteante_nome": "Outra Pessoa",
+            },
+        ]
+    )
+    bridge = pd.DataFrame(
+        [
+            {"aparte_id": "a1", "texto_id": "t1", "ponte_status": "exato", "ponte_score": 6.0},
+            {"aparte_id": "a2", "texto_id": None, "ponte_status": "ausente", "ponte_score": 0.0},
+            {"aparte_id": "a3", "texto_id": "t1", "ponte_status": "exato", "ponte_score": 6.0},
+        ]
+    )
+    candidates = build_segmentation_candidates(interjections, bridge)
+    speeches = pd.DataFrame([{"texto_id": "t1", "texto_analitico": transcript}])
+    sources = build_segmentation_sources(candidates, speeches, block_max_chars=80)
+    assert sources[["texto_id", "candidatos"]].to_dict("records") == [{"texto_id": "t1", "candidatos": 2}]
+    request = make_segmentation_batch_request(sources.iloc[0], config=CONFIG)
+    assert request["url"] == "/v1/responses"
+    assert request["body"]["model"] == "gpt-5.6-sol"
+    assert "nunca devolva a transcrição" in request["body"]["input"]
+    assert segmentation_output_schema()["additionalProperties"] is False
+    payload = {
+        "texto_id": "t1",
+        "segmentos": [
+            {
+                "aparte_id": "a1",
+                "status": "segmentado_com_resposta",
+                "aparte_bloco_inicio": apart_block["block_id"],
+                "aparte_bloco_fim": apart_block["block_id"],
+                "resposta_bloco_inicio": response_block["block_id"],
+                "resposta_bloco_fim": response_block["block_id"],
+            },
+            {
+                "aparte_id": "a3",
+                "status": "aparte_nao_localizado",
+                "aparte_bloco_inicio": None,
+                "aparte_bloco_fim": None,
+                "resposta_bloco_inicio": None,
+                "resposta_bloco_fim": None,
+            },
+        ],
+    }
+    output_line = json.dumps(
+        {
+            "custom_id": request["custom_id"],
+            "response": {"status_code": 200, "body": {"output_text": json.dumps(payload)}},
+        }
+    )
+    interactions, errors = parse_segmentation_batch_output(
+        [output_line],
+        request_index={request["custom_id"]: "t1"},
+        sources=sources,
+        candidates=candidates,
+        model="gpt-5.6-sol",
+    )
+    assert errors.empty
+    result = interactions.set_index("aparte_id")
+    assert result.loc["a1", "texto_aparte"] == transcript[apart_block["char_start"] : apart_block["char_end"]]
+    assert result.loc["a1", "aparte_char_start"] == apart_block["char_start"]
+    assert result.loc["a1", "resposta_char_end"] == response_block["char_end"]
+    assert result.loc["a2", "segmentacao_status"] == "sem_texto_validado"
+    assert result.loc["a3", "segmentacao_status"] == "aparte_nao_localizado"
+
+    missing_interactions, missing_errors = parse_segmentation_batch_output(
+        [],
+        request_index={request["custom_id"]: "t1"},
+        sources=sources,
+        candidates=candidates,
+        model="gpt-5.6-sol",
+    )
+    assert missing_errors["error"].tolist() == ["request sem linha correspondente na saida do Batch"]
+    assert (
+        missing_interactions.set_index("aparte_id")
+        .loc[["a1", "a3"], "segmentacao_status"]
+        .eq("ia_sem_resultado")
+        .all()
+    )
+
+    invalid_payload = json.loads(json.dumps(payload))
+    invalid_payload["segmentos"][0]["aparte_bloco_inicio"] = "B999999"
+    invalid_line = json.dumps(
+        {
+            "custom_id": request["custom_id"],
+            "response": {"status_code": 200, "body": {"output_text": json.dumps(invalid_payload)}},
+        }
+    )
+    invalid_interactions, invalid_errors = parse_segmentation_batch_output(
+        [invalid_line],
+        request_index={request["custom_id"]: "t1"},
+        sources=sources,
+        candidates=candidates,
+        model="gpt-5.6-sol",
+    )
+    assert len(invalid_errors) == 1
+    assert "bloco inexistente" in invalid_errors.loc[0, "error"]
+    assert invalid_interactions["segmentacao_status"].isin(["ia_sem_resultado", "sem_texto_validado"]).all()
+
+
+def test_segmentation_review_counts_only_complete_valid_answers_and_fills_sample() -> None:
+    interactions = pd.DataFrame(
+        [
+            {
+                "interaction_id": f"a{index:03d}",
+                "segmentacao_status": "segmentado_com_resposta",
+                "arena": "senado" if index % 2 else "camara",
+                "ano": 2020,
+                "aparteante_genero": "feminino" if index % 3 else "masculino",
+                "orador_genero": "masculino",
+                "texto_aparte": f"Aparte {index}",
+                "texto_resposta": f"Resposta {index}",
+            }
+            for index in range(138)
+        ]
+    )
+    assert len(qualitative_review_sample(interactions, size=200, seed=7)) == 138
+    larger = pd.concat([interactions, interactions.assign(interaction_id=lambda frame: "x" + frame["interaction_id"])], ignore_index=True)
+    assert len(qualitative_review_sample(larger, size=200, seed=7)) == 200
+    gold = pd.DataFrame(
+        [
+            {"interaction_id": "a000", "segmentacao_aparte_correta": "", "segmentacao_resposta_correta": ""},
+            {"interaction_id": "a001", "segmentacao_aparte_correta": False, "segmentacao_resposta_correta": True},
+            {"interaction_id": "a002", "segmentacao_aparte_correta": "talvez", "segmentacao_resposta_correta": True},
+        ]
+    )
+    quality = segmentation_quality(interactions, gold, min_reviewed=1)
+    assert quality["review_rows_total"] == 3
+    assert quality["reviewed"] == 1
+    assert quality["review_rows_invalid"] == 1
+    assert quality["precision_aparte"] == 0.0
+    assert quality["precision_resposta"] == 1.0
+    assert quality["classification_authorized"] is False
+
+    whitespace = interactions.iloc[[0]].copy()
+    whitespace["texto_aparte"] = "   "
+    whitespace["texto_resposta"] = "\n"
+    assert segmentation_quality(whitespace)["segmented"] == 0
+    assert qualitative_review_sample(whitespace).empty
+
+
+def test_batch_jsonl_writers_split_limits_and_keep_unique_ids(
+    tmp_path: Path,
+) -> None:
+    sources = pd.DataFrame(
+        [
+                {
+                    "texto_id": f"t{index}",
+                    "texto_fonte": "Discurso",
+                    "texto_fonte_sha256": f"hash-{index}",
+                "blocos_json": json.dumps(
+                    [
+                        {
+                            "block_id": "B000001",
+                            "char_start": 0,
+                            "char_end": 8,
+                            "text": "Discurso",
+                        }
+                    ]
+                ),
+                "candidatos_json": json.dumps(
+                    [{"aparte_id": f"a{index}"}]
+                ),
+            }
+            for index in range(3)
+        ]
+    )
+    segmentation_parts = write_segmentation_batch_jsonl(
+        sources,
+        tmp_path / "segmentacao.jsonl",
+        config=CONFIG,
+        max_requests=1,
+    )
+    assert len(segmentation_parts) == 3
+    segmentation_requests = [
+        json.loads(line)
+        for path in segmentation_parts
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len({record["custom_id"] for record in segmentation_requests}) == 3
+    assert all(path.stat().st_size > 0 for path in segmentation_parts)
+
+    interactions = pd.DataFrame(
+        [
+            {
+                "interaction_id": f"a{index}",
+                "segmentacao_status": "segmentado_com_resposta",
+                "texto_aparte": f"Aparte {index}",
+                "texto_resposta": f"Resposta {index}",
+            }
+            for index in range(3)
+        ]
+    )
+    qualitative_parts = write_qualitative_batch_jsonl(
+        interactions,
+        tmp_path / "qualitativo.jsonl",
+        codebook="codebook preenchido",
+        config=CONFIG,
+        max_requests=1,
+    )
+    assert len(qualitative_parts) == 3
+    qualitative_requests = [
+        json.loads(line)
+        for path in qualitative_parts
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len({record["custom_id"] for record in qualitative_requests}) == 3
+    largest_line = max(
+        len(
+            (
+                json.dumps(
+                    record,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            ).encode("utf-8")
+        )
+        for record in qualitative_requests
+    )
+    byte_limited_parts = write_qualitative_batch_jsonl(
+        interactions,
+        tmp_path / "qualitativo_por_bytes.jsonl",
+        codebook="codebook preenchido",
+        config=CONFIG,
+        max_bytes=largest_line + 1,
+    )
+    assert len(byte_limited_parts) == 3
+    assert all(
+        path.stat().st_size <= largest_line + 1
+        for path in byte_limited_parts
+    )
+
+
+def test_qualitative_batch_parser_reconciles_ids_and_missing_rows() -> None:
+    payload = {
+        "interaction_id": "i1",
+        "atos_aparte": [
+            {"categoria": category, "presente": False, "evidencia": None}
+            for category in CONFIG.raw["interjection_speech_acts"]
+        ],
+        "atos_resposta": [
+            {"categoria": category, "presente": False, "evidencia": None}
+            for category in CONFIG.raw["response_speech_acts"]
+        ],
+        "possivel_descortesia": False,
+        "evidencia_descortesia": None,
+        "observacao": None,
+    }
+    valid = json.dumps(
+        {
+            "custom_id": "k1",
+            "response": {
+                "status_code": 200,
+                "body": {"output_text": json.dumps(payload)},
+            },
+        }
+    )
+    unknown = json.dumps(
+        {
+            "custom_id": "unknown",
+            "response": {"status_code": 500},
+        }
+    )
+    results, errors = parse_qualitative_batch_output(
+        [valid, unknown, valid, "{json inválido"],
+        request_index={"k1": "i1", "k2": "i2"},
+        model="gpt-test",
+        config=CONFIG,
+    )
+    assert len(results) == 20
+    assert results["interaction_id"].eq("i1").all()
+    messages = errors["error"].tolist()
+    assert "custom_id desconhecido" in messages
+    assert "custom_id duplicado na saída" in messages
+    assert "request sem linha correspondente na saída do Batch" in messages
+    assert any("Expecting property name" in message for message in messages)
+
+
+def test_existing_qualitative_codebook_is_never_overwritten(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "codebook.csv"
+    created = ensure_qualitative_codebook(path, CONFIG)
+    edited = created.copy()
+    edited.loc[0, "definicao_operacional"] = "Definição humana"
+    edited.to_csv(path, index=False)
+    preserved = ensure_qualitative_codebook(path, CONFIG)
+    assert preserved.loc[0, "definicao_operacional"] == "Definição humana"
 
 
 def test_correlations_levels_and_differences_report_number_of_years() -> None:

@@ -96,6 +96,31 @@ def test_gender_notebook_is_read_only_and_research_is_suspended() -> None:
     assert "OPENAI_API_KEY" not in source
 
 
+def test_interjection_notebook_uses_ai_block_segmentation_after_date_cut() -> None:
+    notebook = nbformat.read(
+        NOTEBOOK_DIR / "03_apartes_relacionais_colab.ipynb", as_version=4
+    )
+    source = "\n".join(
+        cell.source for cell in notebook.cells if cell.cell_type == "code"
+    )
+
+    assert "recorte_apartes.csv" in source
+    assert ".tail()" not in source
+    assert "GERAR_JSONL_SEGMENTACAO = False" in source
+    assert "ENVIAR_BATCH_SEGMENTACAO = False" in source
+    assert "PROCESSAR_BATCH_SEGMENTACAO = False" in source
+    assert "write_segmentation_batch_jsonl" in source
+    assert "run_segmentation_results" in source
+    assert 'ANALYSIS_CONFIG.raw["openai"]["interjection_segmentation_model"]' in source
+    assert "interacoes_segmentadas_ia.parquet" in source
+    assert '"interacoes_segmentadas.parquet"' not in source
+    assert "OPENAI_API_KEY" in source
+    assert "revisao_segmentacao_ia.csv" in source
+    assert "piloto_atos_fala_ia.csv" in source
+    assert "request_paths" in source
+    assert '"batches"' in source
+
+
 def test_synthesis_marks_gender_stage_as_suspended(tmp_path: Path) -> None:
     status = methodological_status(tmp_path)
     gender = status.loc[status["etapa"].eq("01_genero")].iloc[0]

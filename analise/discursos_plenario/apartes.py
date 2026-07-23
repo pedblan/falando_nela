@@ -141,6 +141,45 @@ def analyze_interjections_by_arena_year(interjections: pd.DataFrame) -> tuple[pd
     return dyad_frame, test_frame
 
 
+def filter_interjections_by_date(
+    interjections: pd.DataFrame,
+    *,
+    date_start: str,
+    date_end: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Apply the analysis cut before any interjection statistic or bridge."""
+
+    if "data" not in interjections:
+        raise ValueError("Apartes sem coluna data")
+    dates = interjections["data"].map(_analysis_calendar_date)
+    dates = pd.to_datetime(dates, errors="coerce")
+    start = pd.Timestamp(date_start)
+    end = pd.Timestamp(date_end)
+    missing = dates.isna()
+    before = dates.lt(start) & ~missing
+    after = dates.gt(end) & ~missing
+    included = dates.between(start, end, inclusive="both")
+    source = interjections.get("source", pd.Series("desconhecido", index=interjections.index)).fillna("desconhecido")
+    rows = []
+    for label in ["total", *sorted(source.astype(str).unique())]:
+        selected = pd.Series(True, index=interjections.index) if label == "total" else source.astype(str).eq(label)
+        rows.append(
+            {
+                "source": label,
+                "date_start": date_start,
+                "date_end": date_end,
+                "entrada": int(selected.sum()),
+                "no_recorte": int((selected & included).sum()),
+                "data_ausente": int((selected & missing).sum()),
+                "antes_do_recorte": int((selected & before).sum()),
+                "depois_do_recorte": int((selected & after).sum()),
+            }
+        )
+    filtered = interjections.loc[included].copy()
+    filtered["ano"] = dates.loc[included].dt.year.astype("Int64")
+    return filtered.reset_index(drop=True), pd.DataFrame(rows)
+
+
 def benjamini_hochberg(values: Sequence[float] | pd.Series) -> pd.Series:
     series = pd.Series(values, dtype=float)
     valid = series.dropna()
@@ -174,6 +213,8 @@ def build_camara_speech_bridge(
         candidates = speech_frame.loc[speech_frame["_date"].eq(date_key)].copy()
         scored: list[tuple[float, int, list[str]]] = []
         for index, speech in candidates.iterrows():
+            if _conflicting_nonempty(aparte.get("sessao_id"), speech.get("sessao_id")):
+                continue
             score, evidence = _bridge_score(aparte, speech)
             if score > 0:
                 scored.append((score, int(index), evidence))
@@ -223,12 +264,11 @@ def denominators_authorized(quality: Mapping[str, Any], *, min_precision: float 
 
 def run_interjection_analysis(*, data_root: str | Path, run_id: str, config_path: str | Path | None = None) -> dict[str, Any]:
     from .apartes_qualitativos import (
+        build_segmentation_candidates,
+        build_segmentation_sources,
         build_senate_speech_bridge,
+        ensure_qualitative_codebook,
         extract_interaction_turns,
-        manual_coding_template,
-        qualitative_codebook_template,
-        qualitative_review_sample,
-        segmentation_quality,
     )
 
     config = load_config(config_path)
@@ -236,15 +276,28 @@ def run_interjection_analysis(*, data_root: str | Path, run_id: str, config_path
     path = resolve_input_paths(config, data_root)["interjections"]
     if not path.exists():
         raise FileNotFoundError(path)
-    interjections = pd.read_parquet(path)
+    raw_interjections = pd.read_parquet(path)
+    interjections, cut_audit = filter_interjections_by_date(
+        raw_interjections,
+        date_start=config.date_start,
+        date_end=config.date_end,
+    )
     dyads, tests = analyze_interjections_by_arena_year(interjections)
     outputs = []
+    cut_path = write_dataframe_atomic(cut_audit, root / "03_apartes" / "recorte_apartes.csv")
+    outputs.append(artifact_record(cut_path, rows=len(cut_audit)))
     for name, frame in [("diades_genero", dyads), ("testes_associacao", tests)]:
         output = write_dataframe_atomic(frame, root / "03_apartes" / f"{name}.csv")
         outputs.append(artifact_record(output, rows=len(frame)))
     snapshot_path = root / "00_snapshot" / "discursos_plenario_snapshot.parquet"
     bridge_summary: dict[str, Any] = {"available": False, "denominators_authorized": False}
-    qualitative_summary: dict[str, Any] = {"available": False, "classification_authorized": False}
+    segmentation_summary: dict[str, Any] = {
+        "available": False,
+        "awaiting_batch": True,
+        "method": config.raw["interjection_segmentation"]["method"],
+        "offset_unit": "python_unicode_codepoint",
+        "classification_authorized": False,
+    }
     if snapshot_path.exists() and "source" in interjections:
         snapshot = pd.read_parquet(snapshot_path)
         camara_interjections = interjections.loc[interjections["source"].eq("camara")]
@@ -264,32 +317,79 @@ def run_interjection_analysis(*, data_root: str | Path, run_id: str, config_path
 
         camara_segments = extract_interaction_turns(camara_interjections, camara_speeches, bridge)
         senate_segments = extract_interaction_turns(senate_interjections, senate_speeches, senate_bridge)
-        interactions = pd.concat([camara_segments, senate_segments], ignore_index=True, sort=False)
-        interactions_path = write_dataframe_atomic(interactions, root / "03_apartes" / "interacoes_segmentadas.parquet")
-        outputs.append(artifact_record(interactions_path, rows=len(interactions)))
-        review_sample = qualitative_review_sample(interactions, size=200, seed=config.seed)
-        review_sample["segmentacao_aparte_correta"] = ""
-        review_sample["segmentacao_resposta_correta"] = ""
-        review_sample["revisor"] = ""
-        review_sample["observacao_revisao"] = ""
-        review_path = write_dataframe_atomic(review_sample, root / "03_apartes" / "revisao_segmentacao.csv")
-        outputs.append(artifact_record(review_path, rows=len(review_sample)))
-        manual_template = manual_coding_template(review_sample, config)
-        manual_path = write_dataframe_atomic(manual_template, root / "03_apartes" / "piloto_atos_fala.csv")
-        outputs.append(artifact_record(manual_path, rows=len(manual_template)))
-        codebook = qualitative_codebook_template(config)
-        codebook_path = write_dataframe_atomic(codebook, root / "03_apartes" / "codebook_atos_fala.csv")
-        outputs.append(artifact_record(codebook_path, rows=len(codebook)))
-        qualitative_summary = {"available": True, **segmentation_quality(interactions)}
-        segmentation_path = write_json_atomic(root / "03_apartes" / "segmentacao_qualidade.json", qualitative_summary)
+        rule_interactions = pd.concat([camara_segments, senate_segments], ignore_index=True, sort=False)
+        rule_path = write_dataframe_atomic(
+            rule_interactions,
+            root / "03_apartes" / "interacoes_segmentadas_regra_diagnostico.parquet",
+        )
+        outputs.append(artifact_record(rule_path, rows=len(rule_interactions)))
+
+        bridge_frames = [frame for frame in [bridge, senate_bridge] if not frame.empty]
+        all_bridge = (
+            pd.concat(bridge_frames, ignore_index=True, sort=False)
+            if bridge_frames
+            else pd.DataFrame(columns=["aparte_id", "texto_id", "ponte_status", "ponte_score"])
+        )
+        candidates = build_segmentation_candidates(interjections, all_bridge)
+        candidate_speeches = snapshot.loc[snapshot["arena"].isin(["camara", "senado"])]
+        sources = build_segmentation_sources(
+            candidates,
+            candidate_speeches,
+            block_max_chars=int(config.raw["interjection_segmentation"]["block_max_chars"]),
+        )
+        sources_path = write_dataframe_atomic(
+            sources,
+            root / "03_apartes" / "fontes_segmentacao_ia.parquet",
+        )
+        outputs.append(artifact_record(sources_path, rows=len(sources)))
+        source_text_ids = set(sources["texto_id"].astype(str))
+        candidates["elegivel_segmentacao_ia"] = (
+            candidates["ponte_status"].isin(["exato", "provavel_unico"])
+            & candidates["texto_id"].fillna("").astype(str).isin(source_text_ids)
+        )
+        candidate_path = write_dataframe_atomic(
+            candidates,
+            root / "03_apartes" / "candidatos_segmentacao_ia.parquet",
+        )
+        outputs.append(artifact_record(candidate_path, rows=len(candidates)))
+        universe = (
+            candidates.groupby(["arena", "ponte_status", "elegivel_segmentacao_ia"], dropna=False)
+            .size()
+            .rename("apartes")
+            .reset_index()
+        )
+        universe_path = write_dataframe_atomic(universe, root / "03_apartes" / "universo_segmentacao.csv")
+        outputs.append(artifact_record(universe_path, rows=len(universe)))
+        segmentation_summary.update(
+            {
+                "candidate_interjections": len(candidates),
+                "linked_interjections_with_text": int(candidates["elegivel_segmentacao_ia"].sum()),
+                "source_transcripts": len(sources),
+                "rule_diagnostic_segmented": int(
+                    rule_interactions["segmentacao_status"].isin(
+                        ["segmentado_com_resposta", "segmentado_sem_resposta_explicita"]
+                    ).sum()
+                ),
+            }
+        )
+        segmentation_path = write_json_atomic(root / "03_apartes" / "segmentacao_qualidade.json", segmentation_summary)
         outputs.append(artifact_record(segmentation_path))
+    codebook_path = root / "03_apartes" / "codebook_atos_fala.csv"
+    codebook = ensure_qualitative_codebook(codebook_path, config)
+    outputs.append(artifact_record(codebook_path, rows=len(codebook)))
     manifest = base_manifest(
         config=config,
         run_id=run_id,
         stage="03_apartes",
-        inputs=[artifact_record(path, rows=len(interjections))],
+        inputs=[artifact_record(path, rows=len(raw_interjections))],
         outputs=outputs,
-        counts={"interjections": len(interjections), "camara_bridge": bridge_summary, "qualitative_interactions": qualitative_summary},
+        counts={
+            "interjections_input": len(raw_interjections),
+            "interjections_in_date_cut": len(interjections),
+            "date_cut": cut_audit.to_dict("records"),
+            "camara_bridge": bridge_summary,
+            "segmentation": segmentation_summary,
+        },
     )
     manifest_path = write_json_atomic(root / "03_apartes" / "manifest.json", manifest)
     return {**manifest, "manifest_path": str(manifest_path)}
@@ -340,6 +440,26 @@ def _bridge_row(
 
 def _same_nonempty(left: Any, right: Any) -> bool:
     return bool(str(left or "").strip()) and str(left).strip() == str(right or "").strip()
+
+
+def _conflicting_nonempty(left: Any, right: Any) -> bool:
+    left_value = str(left or "").strip()
+    right_value = str(right or "").strip()
+    return bool(left_value and right_value and left_value != right_value)
+
+
+def _analysis_calendar_date(value: Any) -> pd.Timestamp | pd.NaT:
+    if value is None:
+        return pd.NaT
+    try:
+        timestamp = pd.Timestamp(value)
+    except (TypeError, ValueError):
+        return pd.NaT
+    if pd.isna(timestamp):
+        return pd.NaT
+    if timestamp.tzinfo is not None:
+        timestamp = timestamp.tz_convert("America/Sao_Paulo").tz_localize(None)
+    return timestamp.normalize()
 
 
 def _normalize(value: Any) -> str:

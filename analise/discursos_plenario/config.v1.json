@@ -73,9 +73,18 @@
     "figures_default_model": "gpt-5.6-sol",
     "figures_candidate_models": ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
     "interjection_default_model": "gpt-5.6-sol",
+    "interjection_segmentation_model": "gpt-5.6-sol",
     "interjection_candidate_models": ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
     "gender_prompt_version": "genero-publico-v1",
     "figures_prompt_version": "figuras-linguagem-v1"
+  },
+  "interjection_segmentation": {
+    "method": "ia_blocos_offsets_v1",
+    "prompt_version": "apartes-segmentacao-blocos-v1",
+    "block_max_chars": 240,
+    "review_sample_size": 200,
+    "min_reviewed": 100,
+    "min_precision": 0.95
   },
   "rhetorical_figures": [
     "aliteracao",
