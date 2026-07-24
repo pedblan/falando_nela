@@ -81,6 +81,28 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   normalização não for discutido e aprovado.
 - Nenhum Parquet, snapshot ou artefato analítico v1 deve ser promovido para a
   próxima linha científica.
+- A nova linha será especificada em `specs/pipeline_dados_v3/`, começando pelo
+  inventário completo dos metadados raw.
+- Python normalizará apenas metadados preenchidos por regras aprovadas.
+- Marcadores e estrutura textual serão descritos pelo GPT-5.6 em planos JSON
+  declarativos; um único motor Python limitar-se-á a validar evidências
+  literais e executar ações previamente aprovadas.
+- Não será gerado nem executado código Python específico por discurso.
+
+### Acompanhamento da linha v3
+
+- [ ] Verificar que o arquivamento deixou somente `data/raw/` na raiz ativa.
+- [x] Aprovar o contrato geral da linha v3.
+- [x] Aprovar as specs de `01_inventario_metadados_raw`.
+- [x] Implementar e validar localmente o inventário somente leitura.
+- [ ] Executar e revisar o smoke do inventário no Colab.
+- [ ] Executar o inventário completo e revisar G01.
+- [ ] Especificar e aprovar o schema normalizado v3.
+- [ ] Implementar adaptadores determinísticos para metadados preenchidos.
+- [ ] Pilotar os planos JSON do GPT-5.6 e aprovar qualidade e custo.
+- [ ] Produzir e aprovar a camada normalizada v3.
+- [ ] Definir e gerar o snapshot científico.
+- [ ] Especificar a análise sobre o snapshot aprovado.
 
 ## Fase 4: cadernos analiticos por artigo constitucional
 
