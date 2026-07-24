@@ -12,18 +12,16 @@ Convencoes:
   isso for mais claro no Colab.
 - Estes notebooks nao sao cadernos analiticos de artigo; eles existem para
   consolidar e validar dados processados.
-- Os cadernos comparativos ficam em `notebooks/analise/` e consomem estes
-  produtos em modo somente leitura. Pontes de apartes, turnos, atos de fala e
-  genero pesquisado permanecem na arvore `analises/` e nao mudam os Parquets
-  canonicos.
+- A suíte comparativa v1 foi arquivada. Novos cadernos analíticos só serão
+  criados depois do inventário e do snapshot v2, sempre consumindo estes
+  produtos em modo somente leitura.
 
 Arquivos atuais:
 
-- 07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb: depois da
-  reauditoria completa do caderno 08 de coleta, reconstrói os derivados
-  current a partir de todo o raw, gera Parquets, cria o snapshot pós-backfill
-  e valida cobertura de Senado e Congresso em 2015 e 2016. Não depende dos
-  manifests da recuperação histórica anterior.
+O antigo caderno
+`07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb` foi
+arquivado com o snapshot v1 em
+`notebooks/arquivo/analise_plenario_v1_abortada_20260723/`.
 
 - `06_processamento_validacao_atualizacao_colab.ipynb`: bloqueia derivados ate
   todas as faixas obrigatorias do ciclo `20260713` estarem completas ou

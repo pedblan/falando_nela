@@ -9,6 +9,14 @@ gates. O ciclo `20260713` e orquestrado por
 `notebooks/processamento/06_processamento_validacao_atualizacao_colab.ipynb` e
 passa a exigir sete Parquets textuais, incluindo Congresso.
 
+## Inventário controlado do Drive
+
+O inventário anterior ao snapshot v2 está implementado em
+[`inventario_drive.py`](inventario_drive.py) e é orquestrado pelo
+[`notebook de dados`](../notebooks/dados/00_inventario_drive_colab.ipynb). Ele
+lê somente a raiz aprovada, grava fora do Drive e mantém a execução real
+desligada por padrão.
+
 ## Normalizacao
 
 ```bash
@@ -209,8 +217,7 @@ processed, Parquet e snapshot. `--strict` bloqueia perdas entre camadas e
 grava a decisão em `operations/atualizacao/ciclos/{cycle_id}/summary.json`.
 
 `parlamentares/v1` e `apartes_parlamentares/v1` continuam canonicos e baseados
-em fontes oficiais. A suite `analise.discursos_plenario` pode criar, sob
-`analises/discursos_plenario/v1/{run_id}`, uma camada revisada de genero, pontes
-para discursos, segmentos de turnos e classificacoes de atos de fala. Esses
-artefatos nunca regravam os Parquets de processamento: genero pesquisado exige
-evidencia textual e aprovacao humana; atos de fala exigem segmentacao validada.
+em fontes oficiais. A suíte `analise.discursos_plenario` foi arquivada em
+2026-07-23 sem promover seus resultados científicos. Qualquer nova camada
+analítica dependerá das specs de reinício, do inventário do Drive e de um
+snapshot v2 aprovado; nunca regravará os Parquets de processamento.

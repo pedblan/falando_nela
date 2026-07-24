@@ -14,10 +14,10 @@
 
 Depois de uma auditoria por CodigoParlamentar desde 2010 concluir sem IDs
 ausentes, a reconstrução também deve ler todo o raw cumulativo e substituir
-somente processed current e Parquets current. O caderno
-07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb valida a
-auditoria, cria um snapshot separado e confirma cobertura em 2015 e 2016 sem
-reutilizar o ciclo histórico de coleta.
+somente processed current e Parquets current. O antigo caderno 07, que também
+criava um snapshot v1, foi arquivado. A reconstrução canônica e o futuro
+snapshot v2 passam a ser operações separadas; o snapshot depende do inventário
+do Drive e de spec aprovada.
 
 ## Promoção revisada de transcrições legadas
 

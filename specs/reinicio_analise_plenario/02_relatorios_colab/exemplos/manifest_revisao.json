@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "module": "drive_inventory",
+  "operation_id": "drive-inventory-20260723-example",
+  "analysis_run_id": null,
+  "snapshot_id": null,
+  "spec_ref": "specs/reinicio_analise_plenario/03_inventario_dados_drive/requirements.md",
+  "spec_version": "approved-example-20260723",
+  "code_commit": "64b313cfad8561a199a48b9c54b284f1409bc1cf",
+  "execution_status": "succeeded",
+  "scientific_gate": "needs_review",
+  "started_at": "2026-07-23T09:00:00-03:00",
+  "finished_at": "2026-07-23T09:08:12-03:00",
+  "inputs": [
+    {
+      "name": "approved_roots",
+      "role": "raízes autorizadas para inventário",
+      "uri": "config/approved_drive_roots.json",
+      "format": "json",
+      "size_bytes": 845,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": 3
+    }
+  ],
+  "outputs": [
+    {
+      "name": "catalog",
+      "role": "catálogo completo dos itens observados",
+      "uri": "artifacts/catalogo.parquet",
+      "format": "parquet",
+      "size_bytes": 184320,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "rows": 1297
+    },
+    {
+      "name": "inconsistencies",
+      "role": "referências que exigem revisão humana",
+      "uri": "artifacts/inconsistencias.csv",
+      "format": "csv",
+      "size_bytes": 2410,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "rows": 7
+    }
+  ],
+  "config_ref": "config/approved_drive_roots.json",
+  "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "counts": {
+    "approved_roots": 3,
+    "items_cataloged": 1297,
+    "apparent_executions": 18,
+    "references_checked": 164,
+    "references_valid": 157,
+    "references_missing": 7,
+    "relations_inferred": 23
+  },
+  "report_ref": "relatorio.md",
+  "log_ref": "logs/execution.jsonl",
+  "warnings_ref": "artifacts/inconsistencias.csv",
+  "errors_ref": null
+}
