@@ -71,30 +71,16 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
   acompanhamento arquivados. O gate aceito nunca deve ser confundido com a
   conclusao estrita do ciclo.
 
-## Fase 3: normalizacao e armazenamento
+## Fase 3: normalização e armazenamento
 
-- Consolidar dados brutos em camada `raw`.
-- Recuperar, antes de qualquer novo ASR, as transcrições audiovisuais já
-  existentes para o Senado em `DiscursosTodos.parquet`. Para a Câmara, que não
-  está no legado, produzir primeiro uma fila auditável de mídia e dimensionar
-  download/transcrição em etapa própria. Manter tudo em `operations/` até
-  revisão e promoção raw versionada.
-- Criar camada `processed` com campos normalizados entre Senado, Congresso e Camara.
-- Criar `apartes_parlamentares/v1` como tabela relacional independente de
-  `textos_parlamentares/v1`, voltada a contagens anuais de relacoes
-  `aparteante -> discurso/pronunciamento` e cruzamento com
-  `parlamentares/v1`, com JSONL, Parquet, manifest e auditorias gerados por
-  `processamento.apartes_parlamentares`.
-- Inventariar separadores no corpus completo antes de cortar texto integral,
-  usando os Parquets completos do Drive como fonte principal de auditoria.
-- Diagnosticar separadores especificamente nos discursos historicos anteriores a
-  2010, comparando por fonte, dataset e ano antes de promover qualquer regra de
-  corte automatico.
-- Criar modulo de processamento do texto integral para separar, de forma
-  auditavel, o corpo analitico de discursos e notas de anexos, artigos citados,
-  expedientes e outros blocos editoriais agregados pela fonte oficial.
-- Produzir dicionario de dados.
-- Definir estrategia de versionamento dos datasets gerados.
+- A implementação v1 e seus contratos foram encerrados em `2026-07-24` e
+  preservados em
+  `arquivo/pipeline_pos_coleta_v1_abortado_20260724/`.
+- Os dados brutos e sua proveniência permanecem preservados.
+- Não existe camada processada canônica ativa enquanto um novo contrato de
+  normalização não for discutido e aprovado.
+- Nenhum Parquet, snapshot ou artefato analítico v1 deve ser promovido para a
+  próxima linha científica.
 
 ## Fase 4: cadernos analiticos por artigo constitucional
 
@@ -103,19 +89,14 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Produzir tabelas e visualizacoes com Altair.
 - Separar hipoteses substantivas, metodos e resultados em cada caderno.
 
-## Fase 4.1: reinício controlado da análise de plenário
+## Fase 4.1: primeiro reinício da análise de plenário — encerrado
 
-- Preservar a suíte comparativa v1 como arquivo histórico, sem promover seus
-  resultados científicos.
-- Inventariar bases, snapshots, execuções, relatórios, manifests e logs no
-  Drive antes de definir o novo universo.
-- Separar relatório humano, manifest técnico e log de diagnóstico.
-- Construir um snapshot v2 somente após aprovação de fontes, unidade, corte e
-  deduplicação.
-- Definir perguntas, unidades e métodos científicos uma etapa por vez, com
-  piloto e checkpoint humano.
-- Manter código e notebooks novos sincronizados com
-  `specs/reinicio_analise_plenario/`.
+- A tentativa foi útil como diagnóstico, mas foi interrompida antes de
+  produzir resultado científico.
+- Suas specs, inventário, censo e smoke estão preservados em
+  `arquivo/pipeline_pos_coleta_v1_abortado_20260724/`.
+- A próxima tentativa começará pela normalização dos dados brutos e avançará
+  somente por pilotos pequenos e gates humanos.
 
 ## Fase 5: validacao e publicacao
 
