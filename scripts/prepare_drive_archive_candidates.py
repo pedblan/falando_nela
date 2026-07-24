@@ -18,10 +18,6 @@ OUTPUT_FIELDS = (
     "size_bytes",
 )
 
-ANALYSIS_PARTS = {"analise", "analises", "analysis"}
-OPERATIONAL_PARTS = {"operations", "logs", "manifests", "checkpoints", "locks"}
-
-
 def classify_catalog_row(row: Mapping[str, str]) -> tuple[str, str]:
     relative_path = str(row.get("relative_path") or "").strip().strip("/")
     parts = {part.casefold() for part in Path(relative_path).parts}
@@ -29,17 +25,7 @@ def classify_catalog_row(row: Mapping[str, str]) -> tuple[str, str]:
 
     if "raw" in parts or layer == "raw":
         return "preserve", "dado bruto protegido"
-    if "reference" in parts:
-        return "preserve", "referencia preservada ate revisao especifica"
-    if "processed" in parts or layer == "processed":
-        return "archive_candidate", "derivado da normalizacao v1"
-    if ANALYSIS_PARTS & parts or layer == "analysis":
-        return "archive_candidate", "saida de analise encerrada"
-    if layer == "snapshot" or "snapshot" in relative_path.casefold():
-        return "archive_candidate", "snapshot ou artefato de snapshot encerrado"
-    if OPERATIONAL_PARTS & parts or layer == "operational":
-        return "manual_review", "pode conter proveniencia de coleta ou derivado"
-    return "manual_review", "classificacao insuficiente para movimentacao segura"
+    return "archive_candidate", "item fora da camada raw"
 
 
 def build_candidates(

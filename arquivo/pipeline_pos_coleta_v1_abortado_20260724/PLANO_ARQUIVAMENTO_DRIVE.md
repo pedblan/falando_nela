@@ -1,6 +1,8 @@
 # Gate de arquivamento do Drive
 
-Nenhum item no Google Drive foi movido por este commit.
+Nenhum item preexistente no Google Drive foi movido pelo conector. A pasta de
+destino foi criada, mas o conector não recebeu permissão de escrita sobre os
+itens antigos; a operação deverá ser executada pelo Drive montado no Colab.
 
 Raiz protegida:
 
@@ -8,53 +10,43 @@ Raiz protegida:
 /content/drive/MyDrive/falando_nela/data
 ```
 
-## Exclusões obrigatórias
+Destino:
 
-Estes itens não podem entrar em uma operação de arquivamento pós-coleta:
+```text
+/content/drive/MyDrive/falando_nela/arquivo/data_pos_coleta_v1_arquivado_20260724
+```
 
-- `raw/**`;
-- arquivos de referência indispensáveis para interpretar o raw;
-- manifests, logs e checkpoints que sejam a única proveniência de uma coleta;
-- código ou configuração necessários para decodificar o payload oficial.
+## Regra aprovada
+
+- preservar integralmente `data/raw/**`;
+- mover todos os demais filhos diretos de `data/`;
+- não apagar nenhum item;
+- preservar nomes e estrutura interna no destino;
+- registrar fingerprint estrutural de `raw/` antes e depois.
 
 ## Classificação inicial
 
-| Família | Decisão inicial |
+| Filho direto observado | Decisão |
 |---|---|
-| `raw/**` | preservar |
-| `processed/**` | candidato a arquivamento |
-| `analise/**`, `analises/**`, `analysis/**` | candidato a arquivamento |
-| caminhos contendo `snapshot` | candidato a arquivamento |
-| `operations/**` | revisão manual, pois mistura coleta e derivados |
-| `logs/**`, `manifests/**`, `checkpoints/**`, `locks/**` | revisão manual por proveniência |
-| `reference/**` | preservar até revisão específica |
-| itens não classificados | revisão manual |
+| `raw/` | preservar |
+| `reference/` | arquivar |
+| `locks/` | arquivar |
+| `analises/` | arquivar |
+| `operations/` | arquivar |
+| `Untitled0.ipynb` | arquivar |
+| `processed/` | arquivar |
+| `manifests/` | arquivar |
+| `logs/` | arquivar |
+| `checkpoints/` | arquivar |
 
 ## Próximo gate
 
-O arquivo `artifacts/catalogo_dados.csv` produzido pelo inventário
-`drive-inventory-20260724t020749z` deve ser fornecido ao script
-`scripts/prepare_drive_archive_candidates.py`.
+Use `notebooks/manutencao/00_arquivar_pos_coleta_v1_colab.ipynb`. O caderno:
 
-O script é somente leitura em relação ao Drive. Ele gera uma tabela com uma
-linha por arquivo e uma destas decisões:
-
-- `preserve`;
-- `archive_candidate`;
-- `manual_review`.
-
-No mesmo runtime Colab usado no inventário, o comando esperado é:
-
-```bash
-python scripts/prepare_drive_archive_candidates.py \
-  /content/falando_nela_inventory/drive-inventory-20260724t020749z/artifacts/catalogo_dados.csv \
-  /content/falando_nela_drive_archive_plan/drive-archive-plan-20260724/candidatos.csv
-```
-
-Se o runtime anterior tiver sido encerrado, o inventário deverá ser refeito em
-modo somente leitura ou o `catalogo_dados.csv` deverá ser restaurado antes
-deste comando.
-
-Somente depois da revisão e aprovação explícita dessa tabela poderá existir
-uma operação de movimentação no Drive. A movimentação deverá ter destino
-versionado, manifest antes/depois e rollback documentado.
+1. monta o Drive;
+2. mede `raw/` e gera o plano sem movimentar;
+3. exibe os filhos não-raw;
+4. exige confirmação literal do `operation_id`;
+5. move os nove itens;
+6. verifica que apenas `raw/` permaneceu em `data/`;
+7. grava o manifest no destino.

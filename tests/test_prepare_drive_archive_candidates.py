@@ -12,16 +12,16 @@ from scripts.prepare_drive_archive_candidates import (
 )
 
 
-def test_classification_protects_raw_and_reference() -> None:
+def test_classification_protects_only_raw() -> None:
     assert classify_catalog_row(
         {"relative_path": "raw/senado/texto.json", "layer": "raw"}
     ) == ("preserve", "dado bruto protegido")
     assert classify_catalog_row(
         {"relative_path": "reference/tabela.csv", "layer": "unknown"}
-    ) == ("preserve", "referencia preservada ate revisao especifica")
+    ) == ("archive_candidate", "item fora da camada raw")
 
 
-def test_classification_separates_derivatives_and_ambiguous_operations() -> None:
+def test_classification_archives_every_non_raw_item() -> None:
     assert classify_catalog_row(
         {"relative_path": "processed/textos/v1/base.parquet", "layer": "processed"}
     )[0] == "archive_candidate"
@@ -30,7 +30,7 @@ def test_classification_separates_derivatives_and_ambiguous_operations() -> None
     )[0] == "archive_candidate"
     assert classify_catalog_row(
         {"relative_path": "operations/ciclo/manifest.json", "layer": "operational"}
-    )[0] == "manual_review"
+    )[0] == "archive_candidate"
 
 
 def test_build_candidates_uses_only_files_and_writes_outside_drive(
