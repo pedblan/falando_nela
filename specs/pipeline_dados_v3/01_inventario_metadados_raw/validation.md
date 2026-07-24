@@ -2,7 +2,7 @@
 
 ## Estado
 
-Contrato aprovado. Testes locais implementados; smoke Colab pendente.
+Contrato cumprido. Execução integral revisada e G01 aprovado em 2026-07-24.
 
 ## Pré-condições
 

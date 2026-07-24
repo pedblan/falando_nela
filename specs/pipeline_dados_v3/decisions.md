@@ -53,3 +53,13 @@ saída, superfície de erro e dificuldade de auditoria.
 As specs do primeiro submódulo foram aprovadas e sua implementação foi
 autorizada. Os submódulos seguintes continuam bloqueados até seus próprios
 contratos e gates.
+
+## D08 — aprovação de G01
+
+**Estado:** aprovada em 2026-07-24.
+
+O inventário integral
+`raw-metadata-full-20260724t184418z` foi aceito como mapa estrutural do raw. As
+rejeições, arquivos vazios, itens acidentais e conflitos de tipos permanecem
+documentados e serão tratados como entradas do próximo contrato, sem correção
+do raw.

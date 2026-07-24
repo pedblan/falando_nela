@@ -5,8 +5,8 @@
 Contrato geral aprovado. Apenas o submódulo
 `01_inventario_metadados_raw` possui specs e implementação nesta etapa.
 
-A implementação e o smoke do passo 01 estão autorizados. Nenhum outro
-submódulo, batch da OpenAI ou dado derivado v3 está autorizado.
+O passo 01 foi concluído e G01 foi aprovado. As specs do passo 02 podem ser
+iniciadas; nenhum batch da OpenAI ou dado normalizado v3 está autorizado.
 
 ## Objetivo
 
@@ -27,7 +27,7 @@ raw imutável
 
 | Submódulo | Estado | Finalidade |
 |---|---|---|
-| `01_inventario_metadados_raw` | implementado; aguardando smoke Colab | observar campos e valores recebidos |
+| `01_inventario_metadados_raw` | concluído; G01 aprovado | observar campos e valores recebidos |
 | `02_schema_normalizado` | reservado | definir categorias e schema v3 |
 | `03_adaptadores_fontes` | reservado | mapear metadados preenchidos por fonte |
 | `04_oradores_turnos` | reservado | identificar marcadores textuais com GPT-5.6 |

@@ -2,8 +2,7 @@
 
 ## Estado
 
-Specs aprovadas e implementação local validada. A execução no Drive ainda não
-foi iniciada.
+Etapa concluída. G01 aprovado em 2026-07-24.
 
 ## Sequência futura
 
@@ -11,14 +10,14 @@ foi iniciada.
 - [x] Criar o notebook Colab com gates separados.
 - [x] Fazer smoke local com fixtures sintéticas.
 - [x] Validar que conteúdo textual longo não é copiado para as saídas locais.
-- [ ] Confirmar G00 e a raiz exata no Drive montado.
-- [ ] Fazer smoke Colab em uma pequena amostra por fonte e formato.
-- [ ] Revisar os campos do smoke e confirmar que nenhum texto longo foi copiado.
-- [ ] Executar o inventário completo em modo somente leitura.
-- [ ] Reconciliar arquivos, registros e presença de campos.
-- [ ] Gerar os sete artefatos obrigatórios fora do Drive.
-- [ ] Revisar humanamente o relatório e as tabelas.
-- [ ] Registrar aprovação ou rejeição de G01.
+- [x] Confirmar G00 e a raiz exata no Drive montado.
+- [x] Fazer smoke Colab em uma pequena amostra por fonte e formato.
+- [x] Revisar os campos do smoke e confirmar que nenhum texto longo foi copiado.
+- [x] Executar o inventário completo em modo somente leitura.
+- [x] Reconciliar arquivos, registros e presença de campos.
+- [x] Gerar os sete artefatos obrigatórios fora do Drive.
+- [x] Revisar humanamente o relatório e as tabelas.
+- [x] Registrar aprovação de G01.
 - [ ] Somente depois iniciar as specs de `02_schema_normalizado`.
 
 ## Gates internos
@@ -40,10 +39,13 @@ Esta etapa já entrega:
 - notebook Colab com gates separados para smoke e execução completa;
 - testes com fixtures sintéticas.
 
+Também entrega:
+
+- execução somente leitura sobre o Drive;
+- catálogo do universo real;
+- aprovação G01 documentada;
+
 Ainda não entrega:
 
-- execução no Drive;
-- catálogo do universo real;
-- aprovação G01;
 - schema normalizado;
 - chamada GPT.
