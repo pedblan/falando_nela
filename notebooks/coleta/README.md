@@ -23,8 +23,8 @@ Arquivos atuais:
 - 08_backfill_discursos_senadores_por_codigo_2010_colab.ipynb: recuperação
   exclusiva da população apontada pelo caderno 07. Baixa cada texto pelo
   CodigoPronunciamento, preserva o CodigoParlamentar como proveniência e exige
-  reauditoria completa antes de derivados. Depois do gate aprovado, usar o
-  caderno de processamento 07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb.
+  reauditoria completa antes de derivados. Depois do gate aprovado, preservar
+  o resumo e aguardar o snapshot v2; o antigo caderno 07 foi arquivado.
 
 - 09_recuperacao_discursos_plenario_2010_colab.ipynb: fecha a recuperação de
   2010 antes dos derivados. Para CN, transforma códigos que existam no raw mas
@@ -53,12 +53,6 @@ Arquivos atuais:
   conservadoramente cabeçalhos e rodapés dos 83 textos recuperados do Diário,
   sem alterar o raw. As mutações começam desligadas e o caderno valida drift
   por fingerprints antes/depois.
-
-- `06_backfill_discursos_senado_congresso_2015_2016_colab.ipynb`: ciclo
-  histórico dedicado que audita a lacuna, executa as duas coletas com
-  `historical-official`, regenera os derivados cumulativos e fecha a
-  reconciliação por identificador. Todas as mutações ficam desativadas por
-  default.
 
 - `00_auditoria_configuracao_atualizacao_colab.ipynb`: audita o Drive e grava,
   sob confirmacao explicita, o controle do ciclo `20260713`.
@@ -153,12 +147,11 @@ python scripts/generate_update_colab_notebooks.py
 O gerador valida o schema do notebook antes de gravar cada `.ipynb`; a suite
 local tambem compila individualmente todas as celulas de codigo.
 
-O caderno isolado da recuperação 2015–2016 tem gerador próprio:
-
-```bash
-python scripts/generate_backfill_2015_2016_colab_notebook.py
-python scripts/generate_backfill_2015_2016_colab_notebook.py --check
-```
+O antigo caderno isolado da recuperação 2015–2016 e seu gerador foram
+arquivados em
+`notebooks/arquivo/analise_plenario_v1_abortada_20260723/`. Seus dados
+produzidos permanecem nas camadas canônicas e serão conferidos pelo inventário
+do Drive.
 
 O caderno de recuperação das transcrições legadas também tem gerador próprio:
 

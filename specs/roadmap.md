@@ -103,25 +103,19 @@ Este roadmap organiza o projeto em fases pequenas, com specs orientando as decis
 - Produzir tabelas e visualizacoes com Altair.
 - Separar hipoteses substantivas, metodos e resultados em cada caderno.
 
-## Fase 4.1: suite comparativa dos discursos em plenario
+## Fase 4.1: reinício controlado da análise de plenário
 
-- Construir snapshot imutavel de Camara, Senado e Congresso entre
-  `2010-02-02` e `2026-07-13`, mantendo arena e Casa de origem separadas.
-- Tratar 2010–2025 como series anuais completas e 2026 apenas como YTD.
-- Auditar duplicacoes Senado × Congresso, aplicar exclusivamente regras de
-  limpeza aprovadas e fazer juncao temporal com `parlamentares_periodos`.
-- Criar camada derivada e humanamente revisada para genero oficial desconhecido,
-  sem alterar `parlamentares/v1`.
-- Produzir descritivas, apartes relacionais, episódios multiturno v2
-  reconstruídos localmente, atos de fala após gate humano, possível
-  descortesia, NLP, inferência temporal, clusterização, BERTopic, figuras de
-  linguagem com GPT-5.6 e síntese comparativa.
-- Exigir piloto humano e evidencias textuais nas classificacoes; usar Batch API
-  e Structured Outputs somente por celula de comando explicita.
-- Manter cadernos Jupyter/Colab em portugues como primeira entrega, com logica
-  reutilizavel em `analise.discursos_plenario`.
-- Suportar futuramente conversao revisada para Marimo e variantes inglesas que
-  substituem apenas Markdown e preservam codigo, manifests e resultados.
+- Preservar a suíte comparativa v1 como arquivo histórico, sem promover seus
+  resultados científicos.
+- Inventariar bases, snapshots, execuções, relatórios, manifests e logs no
+  Drive antes de definir o novo universo.
+- Separar relatório humano, manifest técnico e log de diagnóstico.
+- Construir um snapshot v2 somente após aprovação de fontes, unidade, corte e
+  deduplicação.
+- Definir perguntas, unidades e métodos científicos uma etapa por vez, com
+  piloto e checkpoint humano.
+- Manter código e notebooks novos sincronizados com
+  `specs/reinicio_analise_plenario/`.
 
 ## Fase 5: validacao e publicacao
 

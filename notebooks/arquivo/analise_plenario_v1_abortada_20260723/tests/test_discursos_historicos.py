@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 import pandas as pd
 import pytest
 
+from analise.discursos_plenario.snapshot import validate_annual_coverage
 from coleta.common.http import HttpResult
 from coleta.senado import discursos
 from coleta.senado.auditoria_discursos_historicos import extract_pronunciamento_codes
@@ -276,6 +277,33 @@ def test_shared_collector_archives_historical_discovery_and_marks_source_anomaly
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
     assert corpus["source_id"] == "SF:pronunciamento:414849"
     assert corpus["payload"]["texto"] == "Texto oficial recuperado"
+
+
+def test_annual_coverage_gate_rejects_senate_2015_and_accepts_complete_matrix() -> None:
+    complete = pd.DataFrame(
+        [
+            {"arena": arena, "ano": year}
+            for arena in ("camara", "senado", "congresso")
+            for year in (2015, 2016)
+        ]
+    )
+    coverage, missing = validate_annual_coverage(
+        complete,
+        arenas=["camara", "senado", "congresso"],
+        year_start=2015,
+        year_end=2016,
+    )
+    assert missing.empty
+    assert coverage.loc[coverage["ano"].eq(2015), "senado"].item() == 1
+
+    incomplete = complete.loc[~(complete["arena"].eq("senado") & complete["ano"].eq(2015))]
+    with pytest.raises(ValueError, match="senado/2015"):
+        validate_annual_coverage(
+            incomplete,
+            arenas=["camara", "senado", "congresso"],
+            year_start=2015,
+            year_end=2016,
+        )
 
 
 def test_reconciliation_classifies_each_loss_and_requires_sentinels() -> None:

@@ -155,11 +155,12 @@ Nao geram linhas, mas entram no manifest:
 
 ## Ponte E Segmentacao Analiticas
 
-O caderno `notebooks/analise/03_apartes_relacionais_colab.ipynb` pode cruzar
-este Parquet, em modo somente leitura, com um snapshot de
-`textos_parlamentares/v1`. Ponte, turnos segmentados, atos de fala e possivel
-descortesia sao artefatos derivados em `analises/`; nao acrescentam `texto` ou
-qualquer campo ao schema canonico.
+O antigo caderno `03_apartes_relacionais_colab.ipynb` foi arquivado sem
+validação científica. Uma análise futura poderá cruzar este Parquet, em modo
+somente leitura, com um snapshot aprovado de `textos_parlamentares/v1`.
+Pontes, turnos, atos de fala e possível descortesia continuarão sendo
+artefatos derivados; não acrescentarão `texto` ou qualquer campo ao schema
+canônico.
 
 A classificacao qualitativa exige o turno validado do aparte e, separadamente,
 a resposta do orador principal. Metadado relacional, URL e discurso inteiro

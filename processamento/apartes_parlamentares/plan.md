@@ -118,8 +118,8 @@ python -m processamento.apartes_parlamentares \
 - Nao alterar o schema de `textos_parlamentares/v1`.
 - Nao usar regex sobre discurso integral para descobrir apartes nesta etapa.
 
-Essas restricoes pertencem ao processamento canonico. A suite analitica
-`analise.discursos_plenario` pode, em outra arvore de saida, construir pontes
-para o corpus, segmentar turnos explicitamente marcados e classificar atos de
-fala depois de validacao humana. Nada desse material e incorporado a
+Essas restricoes pertencem ao processamento canonico. A suíte analítica v1 que
+construía pontes e segmentava turnos foi arquivada sem validação científica.
+Uma futura análise poderá consumir esta tabela somente depois de spec própria
+e snapshot v2 aprovado. Nada desse material será incorporado a
 `apartes_parlamentares/v1`.

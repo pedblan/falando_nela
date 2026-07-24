@@ -41,8 +41,9 @@ def build_notebook() -> nbformat.NotebookNode:
             trecho no Diário do Congresso Nacional oficial indicado pela própria
             publicação do pronunciamento.
 
-            Não rode o caderno 07 até este caderno terminar seus dois gates. O
-            caderno 07 atualizado exigirá 2010 no Parquet e no snapshot.
+            O antigo caderno 07 de derivados foi arquivado com o snapshot v1.
+            Depois dos dois gates, preserve o resumo e aguarde o novo caderno
+            de snapshot v2 definido pelas specs de reinício da análise.
             """
         ),
         code(
@@ -512,12 +513,12 @@ def build_notebook() -> nbformat.NotebookNode:
         ),
         markdown(
             """
-            ## Gate antes dos derivados
+            ## Gate antes do novo snapshot
 
-            Quando ambos os relatórios estiverem aprovados, abra a versão
-            atualizada do caderno 07. Ela reconstruirá processed/Parquet e só
-            aceitará o snapshot se Câmara, Senado e Congresso tiverem cobertura
-            em 2010, 2015 e 2016.
+            Quando ambos os relatórios estiverem aprovados, preserve o resumo.
+            A reconstrução canônica e o snapshot v2 serão operações separadas,
+            especificadas depois do inventário do Drive. Não execute o caderno
+            07 arquivado nem o snapshot v1.
             """
         ),
         code(
@@ -538,7 +539,7 @@ def build_notebook() -> nbformat.NotebookNode:
                     "congresso_2010": congress,
                     "congresso_2010_diario": congresso_diario,
                     "camara_2010": camara,
-                    "next_notebook": "notebooks/processamento/07_derivados_backfill_discursos_senadores_por_codigo_colab.ipynb",
+                    "next_step": "aguardar_snapshot_v2_apos_inventario_do_drive",
                 })
                 display({"congresso_2010": congress, "congresso_2010_diario": congresso_diario, "camara_2010": camara})
                 print("Gate aprovado:", summary_path)
