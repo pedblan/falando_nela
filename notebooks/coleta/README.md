@@ -2,6 +2,12 @@
 
 Esta pasta guarda notebooks operacionais para execucao de coletores, especialmente no Google Colab com Drive montado.
 
+> **Estado em 2026-07-24:** somente a coleta raw e sua proveniência permanecem
+> ativas. A normalização v1 e todos os derivados foram arquivados em
+> `arquivo/pipeline_pos_coleta_v1_abortado_20260724/`. Células antigas que
+> chamem `processamento.*`, gerem Parquets, snapshots ou análises não estão
+> aprovadas para execução.
+
 Convencoes:
 
 - A primeira celula executavel deve montar o Google Drive quando o notebook depender de `FALANDO_NELA_DATA_ROOT`.
@@ -75,7 +81,9 @@ Arquivos atuais:
   separadamente do manifest incremental.
 
 - `coleta_template.ipynb`: template geral para rodar todos os coletores, incluindo pareceres de PEC.
-- `coleta_backfill_historico_colab.ipynb`: orquestrador Colab para backfill historico longo de todas as bases, com `run_id`s fixos, `--resume`, validacao curta, auditoria de layout raw, processamento, Parquets e samples.
+- `coleta_backfill_historico_colab.ipynb`: orquestrador histórico do backfill.
+  As etapas de coleta raw continuam documentadas; as células de processamento,
+  Parquets e samples pertencem ao pipeline v1 arquivado.
 - `coleta_senado_plenario.ipynb`: fluxo especifico para validar e rodar a coleta do Plenario do Senado.
 - `coleta_senado_ccj.ipynb`: fluxo especifico para validar e rodar a coleta de notas da CCJ do Senado.
 - `coleta_senado_ccj_complemento.ipynb`: fluxo especifico para complementar lacunas de notas da CCJ do Senado ate 2024.
@@ -111,10 +119,9 @@ Ela tambem usa `--skip-detail-endpoints` para gerar rapidamente o plano de
 mandatos por legislatura. Depois, rode a coleta completa de parlamentares sem
 essa flag quando precisar dos metadados enriquecidos de genero/detalhe.
 
-Depois da coleta raw de apartes, a geracao da tabela e do Parquet deve ser feita
-em `notebooks/processamento/geracao_apartes_parlamentares_colab.ipynb`. Esse
-processamento ignora os probes anuais/trimestrais para as linhas analiticas e
-usa `parlamentares/v1` como fonte de genero, partido e UF por data.
+Depois da coleta raw de apartes, não execute a antiga geração da tabela ou do
+Parquet. Essa etapa foi arquivada e será redesenhada no novo contrato de
+normalização.
 
 No backfill textual, consultas anuais ou trimestrais podem existir apenas como
 preflight em `metadata/`. O corpus textual em `ano=YYYY/mes=MM/` deve ser
@@ -138,14 +145,14 @@ execucoes simultaneas do mesmo dataset. Todas as celulas longas ficam
 desativadas por default, usam datas e `run_id`s do controle ativo, imprimem
 saida continuamente e retomam com `--resume`.
 
-Os sete cadernos do ciclo sao gerados de forma reproduzivel com `nbformat`:
+O gerador histórico dos sete cadernos do ciclo foi arquivado com o pipeline
+v1:
 
 ```bash
-python scripts/generate_update_colab_notebooks.py
+arquivo/pipeline_pos_coleta_v1_abortado_20260724/scripts/generate_update_colab_notebooks.py
 ```
 
-O gerador valida o schema do notebook antes de gravar cada `.ipynb`; a suite
-local tambem compila individualmente todas as celulas de codigo.
+Não o execute para recriar a antiga etapa de processamento.
 
 O antigo caderno isolado da recuperação 2015–2016 e seu gerador foram
 arquivados em
