@@ -1,6 +1,6 @@
 # Requisitos — snapshot de discursos v2
 
-Status: **D03–D05 aprovadas em 2026-07-23 — schema em revisão**.
+Status: **schema aprovado — smoke implementado; execução real pendente**.
 
 ## Objetivo
 
@@ -17,8 +17,12 @@ O pesquisador aprovou:
 - **D04:** período inclusivo de `2010-01-01` a `2026-07-13`;
 - **D05:** preservar todos os IDs, sem deduplicação entre fontes.
 
-O próximo gate é o schema em
+O schema aprovado está em
 [`proposta_schema_snapshot_v2.md`](proposta_schema_snapshot_v2.md).
+
+Essa aprovação permite um smoke determinístico, com até 20 registros elegíveis
+e 20 excluídos por base, gravado fora do Drive. Ela não permite executar ou
+promover o snapshot integral.
 
 ## Censo de entrada autorizado
 

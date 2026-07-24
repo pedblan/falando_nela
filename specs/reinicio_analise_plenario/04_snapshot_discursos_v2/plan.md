@@ -1,6 +1,6 @@
 # Plano — snapshot de discursos v2
 
-Status: **D03–D05 aprovadas — proposta de schema aguardando revisão**.
+Status: **schema aprovado — smoke implementado; execução real pendente**.
 
 1. Registrar o baseline exploratório e identificar diretamente as bases
    processadas candidatas a canônicas.
@@ -35,8 +35,10 @@ Status: **D03–D05 aprovadas — proposta de schema aguardando revisão**.
 - [x] Operação `snapshot-census-20260724t024812z` executada no Colab.
 - [x] Cobertura revisada: 428.372 registros e IDs distintos.
 - [x] D03–D05 aprovadas.
-- [ ] Aprovar o schema do snapshot v2.
-- [ ] Implementar transformação e notebook de smoke.
+- [x] Aprovar o schema do snapshot v2.
+- [x] Implementar transformação e notebook de smoke.
+- [ ] Executar o smoke no Colab e revisar a amostra.
+- [ ] Autorizar separadamente a implementação e execução integral.
 
 ## Ponto de parada
 

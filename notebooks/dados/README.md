@@ -51,3 +51,21 @@ Controles:
 
 Contrato:
 [`../../specs/reinicio_analise_plenario/04_snapshot_discursos_v2/`](../../specs/reinicio_analise_plenario/04_snapshot_discursos_v2/).
+
+## Smoke do snapshot de discursos v2
+
+[`02_snapshot_discursos_v2_smoke_colab.ipynb`](02_snapshot_discursos_v2_smoke_colab.ipynb)
+aplica o schema aprovado a uma amostra determinística:
+
+- até 20 registros elegíveis e 20 excluídos por base;
+- período inclusivo de `2010-01-01` a `2026-07-13`;
+- preservação de autoria ausente;
+- nenhuma deduplicação;
+- parada diante de ID, texto ou proveniência inválidos;
+- saída em `/content/falando_nela_snapshot_v2_smoke/<operation_id>/`;
+- montagem e execução desligadas por padrão;
+- nenhuma escrita no Drive e nenhuma chamada à OpenAI.
+
+O relatório, as contagens por base e uma prévia curta são suficientes para a
+revisão normal. Manifest e log ficam reservados ao diagnóstico. A execução
+integral continua condicionada a um gate posterior.

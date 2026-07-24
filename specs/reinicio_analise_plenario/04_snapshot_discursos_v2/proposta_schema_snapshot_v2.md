@@ -1,6 +1,6 @@
 # Proposta de schema — snapshot de discursos v2
 
-Status: **proposta para aprovação humana**.
+Status: **aprovada pelo pesquisador em 2026-07-23**.
 
 ## Decisões já incorporadas
 
@@ -170,5 +170,5 @@ As flags descrevem a linha; não determinam elegibilidade analítica.
 
 ## Gate
 
-A aprovação deste documento autoriza implementar testes, transformação e
+A aprovação deste documento autorizou implementar testes, transformação e
 notebook de smoke. Não autoriza a execução completa nem a promoção do snapshot.
