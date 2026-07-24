@@ -1,6 +1,6 @@
 # Validação — snapshot de discursos v2
 
-Status: **contrato aprovado em 2026-07-23 — validação ainda não executada**.
+Status: **censo real validado — schema proposto; snapshot não implementado**.
 
 ## Gate de entrada
 
@@ -37,6 +37,37 @@ As fixtures devem demonstrar:
 - duplicatas internas e sobreposições exatas entre bases;
 - pacote D06 com `snapshot_id=null` e `scientific_gate=needs_review`;
 - execução local do notebook com os gates fechados.
+
+## Evidência real do censo
+
+A operação `snapshot-census-20260724t024812z` terminou com `succeeded` e
+`needs_review`:
+
+- 428.372 registros em três Parquets;
+- 428.372 `texto_id` distintos;
+- 0 IDs ausentes;
+- 0 duplicatas internas;
+- 0 IDs compartilhados entre bases;
+- 428.372 textos disponíveis;
+- 420.368 autores disponíveis;
+- 0 achados estruturais agregados;
+- período observado de `1900-01-01` a `2026-07-08`.
+
+D04 exclui do snapshot, de forma auditável, datas anteriores a `2010-01-01` e
+posteriores a `2026-07-13`. Nenhum registro é removido das fontes processadas.
+
+## Validação do schema proposto
+
+O schema
+[`schema/snapshot_discursos_v2.record.schema.json`](schema/snapshot_discursos_v2.record.schema.json)
+deve:
+
+- validar como JSON Schema Draft 2020-12;
+- aceitar registros das três bases aprovadas;
+- rejeitar datas fora de D04;
+- rejeitar texto ou `texto_id` vazio;
+- rejeitar arquivos de entrada fora de D03;
+- exigir ao menos um ponteiro de proveniência.
 
 ## Validações estruturais
 

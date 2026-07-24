@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://falando-nela.local/schemas/snapshot_discursos_v2.record.schema.json",
+  "title": "Registro do snapshot de discursos v2",
+  "description": "Intervenção textual oficial de plenário no período aprovado.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_id",
+    "texto_id",
+    "dataset_version",
+    "input_parquet",
+    "source",
+    "dataset",
+    "casa",
+    "ambito",
+    "orgao_sigla",
+    "orgao_nome",
+    "documento_tipo",
+    "unidade_analitica",
+    "unidade_snapshot",
+    "data",
+    "data_hora",
+    "ano",
+    "mes",
+    "titulo",
+    "resumo",
+    "indexacao",
+    "tipo_discurso",
+    "tipo_uso_palavra",
+    "fase_evento",
+    "parlamentar_id",
+    "parlamentar_nome",
+    "parlamentar_partido",
+    "parlamentar_uf",
+    "parlamentar_cargo",
+    "autor_disponivel",
+    "pronunciamento_id",
+    "sessao_id",
+    "evento_id",
+    "texto",
+    "texto_tamanho",
+    "texto_status",
+    "forma",
+    "metodo_obtencao",
+    "url_texto",
+    "url_audio",
+    "url_video",
+    "url_origem",
+    "raw_run_id",
+    "raw_record_type",
+    "raw_source_id",
+    "raw_partition",
+    "raw_collected_at",
+    "raw_checksum",
+    "raw_path",
+    "raw_response_url",
+    "qualidade_flags"
+  ],
+  "properties": {
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "texto_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "const": "v1"
+    },
+    "input_parquet": {
+      "enum": [
+        "camara__plenario_discursos.parquet",
+        "senado__plenario_discursos.parquet",
+        "senado__congresso_discursos.parquet"
+      ]
+    },
+    "source": {
+      "enum": [
+        "camara",
+        "senado"
+      ]
+    },
+    "dataset": {
+      "enum": [
+        "plenario_discursos",
+        "congresso_discursos"
+      ]
+    },
+    "casa": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambito": {
+      "enum": [
+        "plenario",
+        "congresso"
+      ]
+    },
+    "orgao_sigla": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "orgao_nome": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "documento_tipo": {
+      "const": "discurso"
+    },
+    "unidade_analitica": {
+      "enum": [
+        "discurso",
+        "pronunciamento"
+      ]
+    },
+    "unidade_snapshot": {
+      "const": "intervencao_textual_oficial"
+    },
+    "data": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^(?:(?:201[0-9]|202[0-5])-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])|2026-(?:0[1-6]-(?:0[1-9]|[12][0-9]|3[01])|07-(?:0[1-9]|1[0-3])))$"
+    },
+    "data_hora": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ano": {
+      "type": "integer",
+      "minimum": 2010,
+      "maximum": 2026
+    },
+    "mes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12
+    },
+    "titulo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "resumo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "indexacao": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tipo_discurso": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tipo_uso_palavra": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fase_evento": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parlamentar_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parlamentar_nome": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parlamentar_partido": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parlamentar_uf": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parlamentar_cargo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "autor_disponivel": {
+      "type": "boolean"
+    },
+    "pronunciamento_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sessao_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evento_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "texto": {
+      "type": "string",
+      "minLength": 1
+    },
+    "texto_tamanho": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "texto_status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "forma": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "metodo_obtencao": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "url_texto": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "url_audio": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "url_video": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "url_origem": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_record_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_source_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_partition": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_collected_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_checksum": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_response_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "qualidade_flags": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "autor_ausente",
+          "partido_ausente",
+          "uf_ausente",
+          "data_hora_ausente",
+          "sessao_id_ausente",
+          "evento_id_ausente",
+          "pronunciamento_id_ausente"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "properties": {
+            "raw_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "raw_source_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -66,9 +66,9 @@ exceções e escolhas próprias, sem repetir o stack global.
 |---|---|---|---|
 | D01 | Caminho final do arquivo local | `notebooks/arquivo/analise_plenario_v1_abortada_20260723/` | **executada em 2026-07-23** |
 | D02 | Marcar a execução antiga no Drive | adicionar marcador, sem mover dados | **executada em 2026-07-23** |
-| D03 | Universo do snapshot v2 | todas as bases textuais canônicas aprovadas, sem filtros analíticos ocultos | pendente |
-| D04 | Data de corte do snapshot v2 | parâmetro explícito aprovado antes da execução | pendente |
-| D05 | Tratamento de duplicatas Senado/Congresso | preservar ambiguidades e remover apenas equivalências comprovadas | pendente |
+| D03 | Universo do snapshot v2 | três bases de discursos; intervenção textual oficial | **aprovada em 2026-07-23** |
+| D04 | Data de corte do snapshot v2 | `2010-01-01` a `2026-07-13`, inclusive | **aprovada em 2026-07-23** |
+| D05 | Tratamento de duplicatas Senado/Congresso | preservar todos os IDs; não deduplicar entre fontes | **aprovada em 2026-07-23** |
 | D06 | Campos mínimos do manifest técnico | [contrato da fase 2](02_relatorios_colab/proposta_d06.md) | **aprovada em 2026-07-23** |
 | D07 | Perguntas e unidades da nova análise | definir somente após o snapshot v2 | pendente |
 
@@ -78,8 +78,9 @@ As fases 1 e 2 foram concluídas. A fase 3 foi executada em modo somente leitura
 e encerrada como baseline exploratório: 7.859 itens foram reconciliados, sem
 escritas no Drive. O saneamento de referências, órfãos e duplicidades legadas
 foi adiado. O próximo ato é identificar diretamente as bases processadas
-candidatas ao snapshot v2. O censo read-only dos três Parquets foi autorizado
-e implementado localmente; sua publicação e execução real precedem D03–D05.
+candidatas ao snapshot v2. O censo read-only foi executado e D03–D05 foram
+aprovadas. O próximo gate é o schema do snapshot v2; nenhuma transformação foi
+implementada.
 
 ## Gates progressivos de implementação
 

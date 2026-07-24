@@ -1,6 +1,6 @@
 # Requisitos — snapshot de discursos v2
 
-Status: **contrato aprovado em 2026-07-23 — D03–D05 pendentes**.
+Status: **D03–D05 aprovadas em 2026-07-23 — schema em revisão**.
 
 ## Objetivo
 
@@ -11,11 +11,14 @@ abortada.
 
 ## Decisões prévias
 
-Antes da implementação, o pesquisador deve aprovar:
+O pesquisador aprovou:
 
-- **D03:** fontes e universo do snapshot;
-- **D04:** data de corte e regra para registros posteriores;
-- **D05:** regra de equivalência entre Senado, Congresso e demais fontes.
+- **D03:** três bases e a unidade comum de intervenção textual oficial;
+- **D04:** período inclusivo de `2010-01-01` a `2026-07-13`;
+- **D05:** preservar todos os IDs, sem deduplicação entre fontes.
+
+O próximo gate é o schema em
+[`proposta_schema_snapshot_v2.md`](proposta_schema_snapshot_v2.md).
 
 ## Censo de entrada autorizado
 
@@ -27,9 +30,9 @@ autoriza medir, sem criar snapshot:
 - `senado__plenario_discursos.parquet`;
 - `senado__congresso_discursos.parquet`.
 
-O censo deve ler somente metadados e colunas de controle, gravar fora do Drive
-e deixar D03–D05 pendentes. CCJ, CCJC, pareceres, apartes relacionais, amostras
-e a análise v1 não são entradas.
+O censo leu somente metadados e colunas de controle, gravou fora do Drive e foi
+revisado antes da aprovação de D03–D05. CCJ, CCJC, pareceres, apartes
+relacionais, amostras e a análise v1 não são entradas.
 
 ## Contrato funcional
 
