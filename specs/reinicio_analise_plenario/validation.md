@@ -64,7 +64,7 @@ Quando notebooks forem implementados:
 
 A nova análise só pode receber sua primeira spec substantiva quando:
 
-- o inventário estiver aprovado;
+- o baseline exploratório estiver registrado;
 - o relatório de cobertura do snapshot estiver aprovado;
 - o snapshot selecionado estiver congelado;
 - o catálogo de dados explicar todos os inputs disponíveis;

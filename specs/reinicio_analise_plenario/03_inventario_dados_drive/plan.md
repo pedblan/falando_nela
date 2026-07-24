@@ -1,6 +1,6 @@
 # Plano — inventário dos dados no Drive
 
-Status: **piloto implementado e testado localmente — execução real não iniciada**.
+Status: **encerrado como baseline exploratório em 2026-07-23 — saneamento adiado**.
 
 1. Revisar e aprovar
    [`proposta_gate_inicial.md`](proposta_gate_inicial.md), com a raiz do Drive
@@ -23,16 +23,27 @@ Status: **piloto implementado e testado localmente — execução real não inic
 - [x] Módulo de inventário implementado.
 - [x] Notebook Colab protegido implementado.
 - [x] Fixture local somente leitura e saídas D06 validadas.
-- [ ] Publicar a revisão do código que contém o piloto.
-- [ ] Executar a célula real no Colab com novo `operation_id`.
-- [ ] Revisar conjuntamente relatório, mapa, universos e inconsistências.
+- [x] Revisão do código publicada na `main`.
+- [x] Operação real `drive-inventory-20260724t020749z` executada no Colab.
+- [x] Relatório, mapa e inconsistências revisados conjuntamente.
+
+## Resultado do piloto
+
+- 7.859 itens reconciliados, incluindo 4.987 arquivos e 2.872 diretórios;
+- nenhuma escrita na raiz examinada;
+- 1.688 referências relativas classificadas incorretamente porque o resolvedor
+  não considerou raízes declaradas nos manifests;
+- correção dos manifests, duplicidades, órfãos e caminhos legados adiada;
+- baseline aceito para orientação arquivística, sem aprovação para migração.
 
 ## Checkpoint obrigatório
 
-Após o passo 8, nenhuma ação de reorganização começa até que o pesquisador
-aprove:
+Nenhuma ação de reorganização ou limpeza começa até que o pesquisador aprove:
 
 - os universos e denominadores;
 - as bases candidatas a canônicas;
 - as inconsistências;
 - cada ação proposta no plano de migração.
+
+Esse checkpoint não bloqueia a fase 4 de identificar e validar diretamente as
+bases processadas candidatas ao snapshot v2.

@@ -6,10 +6,37 @@ Status: **contrato aprovado em 2026-07-23 — validação ainda não executada**
 
 A validação não começa sem:
 
-1. inventário do Drive aprovado;
+1. baseline exploratório do Drive registrado, sem exigir saneamento dos
+   manifests legados;
 2. fontes canônicas identificadas;
 3. D03, D04 e D05 aprovadas;
 4. schema e definição de “discurso” aprovados.
+
+O censo anterior a esse gate pode ser executado para produzir a evidência das
+etapas 2–4. Ele não cria `snapshot_id` e deve permanecer em
+`scientific_gate=needs_review`.
+
+## Evidência local do censo
+
+- módulo:
+  [`../../../processamento/censo_snapshot_v2.py`](../../../processamento/censo_snapshot_v2.py);
+- notebook:
+  [`../../../notebooks/dados/01_censo_bases_snapshot_v2_colab.ipynb`](../../../notebooks/dados/01_censo_bases_snapshot_v2_colab.ipynb);
+- testes do módulo:
+  [`../../../tests/test_censo_snapshot_v2.py`](../../../tests/test_censo_snapshot_v2.py);
+- testes do notebook:
+  [`../../../tests/test_snapshot_census_colab_notebook.py`](../../../tests/test_snapshot_census_colab_notebook.py).
+
+As fixtures devem demonstrar:
+
+- leitura exclusiva dos três nomes aprovados;
+- entradas inalteradas antes e depois;
+- recusa de saída dentro da raiz lida;
+- recusa de candidato ausente e de `operation_id` reutilizado;
+- contagens anuais, cobertura, schema e categorias;
+- duplicatas internas e sobreposições exatas entre bases;
+- pacote D06 com `snapshot_id=null` e `scientific_gate=needs_review`;
+- execução local do notebook com os gates fechados.
 
 ## Validações estruturais
 

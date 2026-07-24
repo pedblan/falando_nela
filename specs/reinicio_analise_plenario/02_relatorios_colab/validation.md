@@ -14,7 +14,8 @@ Status: **D06 aprovado e biblioteca validada localmente em 2026-07-23**.
   o [JSON Schema proposto](schema/manifest.schema.json);
 - a aprovação humana foi registrada em 2026-07-23;
 - o notebook piloto foi implementado e testado com os gates desligados;
-- a validação contra o Drive real continua pendente da execução da fase 3.
+- o relatório real da operação `drive-inventory-20260724t020749z` foi
+  compreendido sem abertura do manifest ou do log.
 
 ## Validação local da biblioteca
 
@@ -71,7 +72,7 @@ reprova.
 | REL-R08, REL-R09, REL-R10 | manifests válidos, identificáveis e rastreáveis |
 | REL-R11, REL-R12, REL-R13 | configuração referenciada e JSON Schema |
 | REL-R14 | log JSONL separado em teste local |
-| REL-R15, REL-R16 | notebook piloto validado localmente; execução real pendente |
+| REL-R15, REL-R16 | notebook piloto validado localmente e relatório real revisado |
 | REL-R17 | catálogo de artefatos aprovado |
 | REL-R18 | testes de rejeição de segredos |
 | REL-R19 | teste de falha simulada com registro mínimo recuperável |

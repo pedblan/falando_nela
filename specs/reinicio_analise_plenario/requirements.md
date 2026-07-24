@@ -77,7 +77,8 @@ os dados e resultados anteriores como arquivo auditável e separando:
 
 ## Novo snapshot
 
-- A criação do snapshot v2 depende de spec aprovada e inventário concluído.
+- A criação do snapshot v2 depende de spec aprovada e baseline exploratório
+  concluído; o saneamento dos manifests legados não é pré-condição.
 - O snapshot deve partir somente de bases processadas canônicas aprovadas.
 - Filtros, deduplicações e cortes temporais devem aparecer como regras
   explícitas e produzir contagens antes/depois.

@@ -1,6 +1,6 @@
 # Validação — inventário dos dados no Drive
 
-Status: **implementação local validada — evidência real do Drive pendente**.
+Status: **piloto real revisado em 2026-07-23 — aceito somente como baseline exploratório**.
 
 ## Evidência local
 
@@ -23,6 +23,26 @@ As fixtures locais demonstram:
 - pacote D06 com `succeeded` e `needs_review`;
 - notebook integralmente executável com os gates desligados.
 
+## Evidência real
+
+A operação `drive-inventory-20260724t020749z` registrou:
+
+- `execution_status=succeeded` e `scientific_gate=needs_review`;
+- 7.859 itens catalogados e reconciliados;
+- 4.987 arquivos e 2.872 diretórios;
+- 91 manifests estruturados reconhecidos;
+- 0 escritas na raiz aprovada;
+- 1.871 inconsistências sinalizadas, sem correção automática.
+
+O diagnóstico agregado mostrou que 1.688 das 1.692 referências ausentes eram
+relativas. Destas, 1.682 pertenciam a duas cópias do mesmo manifest de
+amostras, e 6 ao inventário de separadores. O código produtor declara essas
+referências relativamente a `input_root` ou `parquet_root`, enquanto o piloto
+tentou resolvê-las contra a pasta do manifest ou a raiz geral.
+
+Essa limitação invalida o uso do piloto para saneamento ou migração, mas não a
+contagem de itens nem a comprovação de leitura somente leitura.
+
 ## Evidências obrigatórias
 
 | Requisito | Evidência de aprovação |
@@ -37,7 +57,7 @@ As fixtures locais demonstram:
 | INV-R12 | plano de migração separado, sem alterações aplicadas |
 | INV-R13 | soma dos grupos de universo igual ao total do catálogo |
 
-## Testes de aceitação
+## Testes de aceitação para eventual migração
 
 O pesquisador deve conseguir responder, usando apenas `mapa_dados.md`:
 
@@ -49,6 +69,10 @@ O pesquisador deve conseguir responder, usando apenas `mapa_dados.md`:
 6. quais artefatos estão órfãos, duplicados ou sem finalidade conhecida;
 7. se todos os itens foram reconciliados e quais unidades ainda não têm
    fonte, camada ou finalidade suficientemente identificadas.
+
+Esses testes permanecem pendentes e só voltam a bloquear o trabalho se uma
+migração, reorganização ou limpeza do Drive for proposta. A fase 4 deve validar
+suas próprias entradas diretamente.
 
 ## Controles quantitativos
 

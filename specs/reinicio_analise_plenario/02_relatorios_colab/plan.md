@@ -36,4 +36,4 @@ modelo de relatório deve ser corrigido antes de avançar para outro notebook.
 - [x] Biblioteca reutilizável implementada.
 - [x] Sucesso, alerta, falha e reexecução simulados em testes locais.
 - [x] Padrão incorporado ao notebook piloto do inventário do Drive.
-- [ ] Validar o relatório contra o Drive real, sob o gate da fase 3.
+- [x] Relatório real validado na operação `drive-inventory-20260724t020749z`.
