@@ -77,10 +77,10 @@ exceções e escolhas próprias, sem repetir o stack global.
 As fases 1 e 2 foram concluídas. A fase 3 foi executada em modo somente leitura
 e encerrada como baseline exploratório: 7.859 itens foram reconciliados, sem
 escritas no Drive. O saneamento de referências, órfãos e duplicidades legadas
-foi adiado. O próximo ato é identificar diretamente as bases processadas
-candidatas ao snapshot v2. O censo read-only foi executado e D03–D05 foram
-aprovadas. O próximo gate é o schema do snapshot v2; nenhuma transformação foi
-implementada.
+foi adiado. O censo read-only foi executado, D03–D05 e o schema foram
+aprovados. A transformação de smoke está implementada com saída temporária e
+gates fechados. O próximo ato é executar e revisar essa amostra no Colab; a
+execução integral permanece bloqueada.
 
 ## Gates progressivos de implementação
 

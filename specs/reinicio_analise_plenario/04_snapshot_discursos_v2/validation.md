@@ -1,6 +1,6 @@
 # Validação — snapshot de discursos v2
 
-Status: **censo real validado — schema proposto; snapshot não implementado**.
+Status: **schema aprovado — smoke validado localmente; execução real pendente**.
 
 ## Gate de entrada
 
@@ -68,6 +68,33 @@ deve:
 - rejeitar texto ou `texto_id` vazio;
 - rejeitar arquivos de entrada fora de D03;
 - exigir ao menos um ponteiro de proveniência.
+
+## Evidência local do smoke
+
+- módulo:
+  [`../../../processamento/snapshot_discursos_v2.py`](../../../processamento/snapshot_discursos_v2.py);
+- notebook:
+  [`../../../notebooks/dados/02_snapshot_discursos_v2_smoke_colab.ipynb`](../../../notebooks/dados/02_snapshot_discursos_v2_smoke_colab.ipynb);
+- testes do módulo:
+  [`../../../tests/test_snapshot_discursos_v2.py`](../../../tests/test_snapshot_discursos_v2.py);
+- testes do notebook:
+  [`../../../tests/test_snapshot_v2_smoke_colab_notebook.py`](../../../tests/test_snapshot_v2_smoke_colab_notebook.py).
+
+O smoke deve demonstrar:
+
+- leitura exclusiva dos três Parquets aprovados;
+- entradas inalteradas antes e depois;
+- amostra determinística de até 20 elegíveis e 20 excluídos por base;
+- corte inclusivo de `2010-01-01` a `2026-07-13`;
+- preservação e sinalização de autoria ausente;
+- parada por ID duplicado, ID vazio, texto vazio ou proveniência ausente;
+- `data` como `date32`, todos os campos do schema e flags ordenadas;
+- reconciliação integral das datas por base;
+- saídas somente em `/content`, com `scientific_gate=needs_review`;
+- notebook executável localmente com montagem e smoke fechados.
+
+Os hashes integrais dos três Parquets não são calculados no smoke. Eles
+permanecem obrigatórios antes de uma execução integral promotível.
 
 ## Validações estruturais
 

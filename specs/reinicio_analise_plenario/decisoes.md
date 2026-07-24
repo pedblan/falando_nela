@@ -126,6 +126,17 @@ Uma decisão aprovada não comprova que a ação correspondente já foi executad
 | Similaridade futura | sinalizar para revisão; nunca remover automaticamente |
 | Falha de unicidade futura | interromper a criação em vez de escolher implicitamente |
 
+## Gate do schema do snapshot v2
+
+| Campo | Valor |
+|---|---|
+| Estado | **aprovado** |
+| Data | 2026-07-23 (`America/Sao_Paulo`) |
+| Proposta | [`04_snapshot_discursos_v2/proposta_schema_snapshot_v2.md`](04_snapshot_discursos_v2/proposta_schema_snapshot_v2.md) |
+| Efeito | autorizar implementação, testes e execução controlada de um smoke determinístico |
+| Limite do smoke | até 20 registros elegíveis e 20 excluídos por base, com saída somente em `/content` |
+| Fora do efeito | não autoriza execução integral, escrita no Drive, promoção ou aprovação científica do snapshot |
+
 ## Decisões ainda pendentes
 
 - D07 — perguntas e unidades da nova análise.
