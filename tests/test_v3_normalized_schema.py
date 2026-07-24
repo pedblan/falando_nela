@@ -10,6 +10,7 @@ from pipeline_dados_v3.inventario_metadados_raw import (
     run_inventory,
 )
 from pipeline_dados_v3.schema_normalizado import (
+    APPROVED_INVENTORY_MANIFEST_SHA256,
     AliasMetrics,
     LinkRule,
     RawRecord,
@@ -26,6 +27,13 @@ from pipeline_dados_v3.schema_normalizado import (
 
 
 COMMIT = "b" * 40
+
+
+def test_approved_g01_manifest_hash_is_pinned() -> None:
+    assert (
+        APPROVED_INVENTORY_MANIFEST_SHA256
+        == "b54b1c7c686859b5d95e0e2a65aca6cc74e5f2504b0e3b6ae778af414292f3c9"
+    )
 
 
 def test_alias_metrics_distinguish_presence_type_and_zero_denominators() -> None:

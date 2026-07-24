@@ -20,7 +20,8 @@ O caminho da cópia aprovada de
 `raw-metadata-full-20260724t184418z` deverá ser fornecido explicitamente. A
 ferramenta falhará se o diretório, o `operation_id` ou os hashes não
 corresponderem a G01. O SHA-256 aprovado do próprio `manifest.json` será uma
-entrada separada, pois um manifest não pode autenticar o próprio hash.
+âncora externa fixada no contrato e na implementação, pois um manifest não
+pode autenticar o próprio hash.
 
 ## Entradas
 

@@ -11,7 +11,7 @@ revisão humana permanecem pendentes.
 - G01 está aprovado para `raw-metadata-full-20260724t184418z`.
 - O diretório dos artefatos aprovados é fornecido explicitamente.
 - Os hashes das seis saídas conferem com o `manifest.json`; o hash do próprio
-  manifest confere com o SHA-256 aprovado fornecido separadamente.
+  manifest confere com o SHA-256 aprovado fixado em G01 e na implementação.
 - O fingerprint estrutural do `raw/` continua igual ao registrado em G01.
 - Nenhum coletor está escrevendo na raiz durante a auditoria recorde a recorde.
 - Estas quatro specs foram aprovadas pelo pesquisador responsável.

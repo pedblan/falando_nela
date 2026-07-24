@@ -9,6 +9,8 @@ o piloto ou iniciar os submódulos seguintes.
 
 O único inventário aceito como evidência estrutural é
 `raw-metadata-full-20260724t184418z`, aprovado em G01 em 2026-07-24.
+Seu `manifest.json` deverá corresponder ao SHA-256 aprovado
+`b54b1c7c686859b5d95e0e2a65aca6cc74e5f2504b0e3b6ae778af414292f3c9`.
 
 ## Objetivo
 
@@ -47,7 +49,7 @@ ao universo de entrada e deverão permanecer localizadas e reconciliadas.
 
 - Os sete artefatos da operação aprovada: seis saídas com hashes conferidos
   contra o `manifest.json` e o próprio manifest conferido contra seu SHA-256
-  aprovado, fornecido separadamente.
+  aprovado, fixado externamente no contrato.
 - Os 1.148.740 registros legíveis do `raw/`, somente para confirmar presença,
   tipo, igualdade e proveniência recorde a recorde.
 - A nomenclatura, as categorias e as definições publicadas pelas APIs oficiais

@@ -31,7 +31,13 @@ def test_notebook_is_valid_gated_and_code_cells_compile() -> None:
     assert 'CONFIRMAR_INVENTORY_OPERATION_ID = ""' in combined
     assert 'CONFIRMAR_SCHEMA_OPERATION_ID = ""' in combined
     assert 'CONFIRMAR_PILOTO_OPERATION_ID = ""' in combined
-    assert 'EXPECTED_INVENTORY_MANIFEST_SHA256 = ""' in combined
+    assert "APPROVED_INVENTORY_MANIFEST_SHA256" in combined
+    assert '"auditoria/pipeline_dados_v3/g01"' in combined
+    assert (
+        "EXPECTED_INVENTORY_MANIFEST_SHA256 = (\n"
+        "    APPROVED_INVENTORY_MANIFEST_SHA256\n"
+        ")"
+    ) in combined
     assert "prepare_schema_evidence" in combined
     assert 'model="gpt-5.6"' in combined
     assert 'reasoning_effort="medium"' in combined

@@ -31,6 +31,9 @@ from pipeline_dados_v3.inventario_metadados_raw import (
 
 
 APPROVED_INVENTORY_OPERATION_ID = "raw-metadata-full-20260724t184418z"
+APPROVED_INVENTORY_MANIFEST_SHA256 = (
+    "b54b1c7c686859b5d95e0e2a65aca6cc74e5f2504b0e3b6ae778af414292f3c9"
+)
 DEFAULT_RAW_ROOT = Path("/content/drive/MyDrive/falando_nela/data/raw")
 DEFAULT_OUTPUT_BASE = Path("/content/falando_nela_v3_schema")
 SCHEMA_VERSION = "normalized-schema-evidence-v3.1"
@@ -209,7 +212,9 @@ class SchemaConfig:
     operation_id: str
     code_commit: str
     expected_inventory_operation_id: str = APPROVED_INVENTORY_OPERATION_ID
-    expected_inventory_manifest_sha256: str | None = None
+    expected_inventory_manifest_sha256: str | None = (
+        APPROVED_INVENTORY_MANIFEST_SHA256
+    )
     enforce_approved_counts: bool = True
     metadata_value_limit: int = DEFAULT_METADATA_VALUE_LIMIT
     preview_limit: int = DEFAULT_PREVIEW_LIMIT
@@ -2914,7 +2919,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-inventory-operation-id",
         default=APPROVED_INVENTORY_OPERATION_ID,
     )
-    prepare.add_argument("--expected-inventory-manifest-sha256")
+    prepare.add_argument(
+        "--expected-inventory-manifest-sha256",
+        default=APPROVED_INVENTORY_MANIFEST_SHA256,
+    )
     prepare.add_argument("--field-review", type=Path)
     prepare.add_argument("--manual-aliases", type=Path)
     prepare.add_argument("--api-categories", type=Path)

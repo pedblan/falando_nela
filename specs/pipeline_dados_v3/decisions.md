@@ -63,7 +63,8 @@ O inventário integral
 `raw-metadata-full-20260724t184418z` foi aceito como mapa estrutural do raw. As
 rejeições, arquivos vazios, itens acidentais e conflitos de tipos permanecem
 documentados e serão tratados como entradas do próximo contrato, sem correção
-do raw.
+do raw. O manifest aprovado está ancorado externamente pelo SHA-256
+`b54b1c7c686859b5d95e0e2a65aca6cc74e5f2504b0e3b6ae778af414292f3c9`.
 
 ## D09 — piloto de categorias e samples em G02
 

@@ -165,14 +165,15 @@ def build_notebook() -> nbformat.NotebookNode:
             Informe a localização explícita dos sete artefatos de G01. A saída
             de G02 fica em `/content`, fora do Drive. Arquivos opcionais de
             revisão também devem ser declarativos: nenhum papel semântico é
-            inferido pelo código. Preencha também o SHA-256 aprovado do
-            `manifest.json`; ele autentica o sétimo artefato, enquanto o
-            próprio manifest autentica os outros seis.
+            inferido pelo código. O SHA-256 aprovado do `manifest.json` já está
+            fixado na implementação; ele autentica o sétimo artefato, enquanto
+            o próprio manifest autentica os outros seis.
             """
         ),
         code(
             """
             from pipeline_dados_v3.schema_normalizado import (
+                APPROVED_INVENTORY_MANIFEST_SHA256,
                 APPROVED_INVENTORY_OPERATION_ID,
                 DEFAULT_OUTPUT_BASE,
                 DEFAULT_RAW_ROOT,
@@ -185,11 +186,14 @@ def build_notebook() -> nbformat.NotebookNode:
 
             RAW_ROOT = Path("/content/drive/MyDrive/falando_nela/data/raw")
             INVENTORY_ROOT = Path(
-                "/content/falando_nela_v3_inventory"
+                "/content/drive/MyDrive/falando_nela/"
+                "auditoria/pipeline_dados_v3/g01"
             ) / APPROVED_INVENTORY_OPERATION_ID
             OUTPUT_BASE = Path("/content/falando_nela_v3_schema")
             OPERATION_ID = "schema-evidence-pilot-20260724"
-            EXPECTED_INVENTORY_MANIFEST_SHA256 = ""
+            EXPECTED_INVENTORY_MANIFEST_SHA256 = (
+                APPROVED_INVENTORY_MANIFEST_SHA256
+            )
 
             FIELD_REVIEW_PATH = Path("/content/revisao_campos_g02.csv")
             MANUAL_ALIASES_PATH = None
