@@ -9,7 +9,10 @@ Este documento especializa
 
 - Notebook Colab em `notebooks/dados/` como interface operacional futura.
 - Funções Python testáveis fora do notebook.
-- `pandas` ou `polars` para transformação; `pyarrow` para Parquet e schema.
+- `duckdb` para agregações read-only do censo e `pyarrow` para metadados,
+  Parquet e schema.
+- `pandas` ou `polars` somente quando a transformação do snapshot for
+  implementada.
 - `hashlib` para identidade e integridade.
 - JSON Schema para o manifest; Markdown, CSV e Parquet para evidências.
 - Testes unitários para IDs, regras de fonte, corte e deduplicação.
@@ -29,3 +32,5 @@ Este documento especializa
 - Não incluir lógica científica apenas em células do notebook.
 - Não depender da ordem de listagem do Drive.
 - Não usar CSV como formato principal quando ele perder tipos ou estrutura.
+- No censo, não carregar o campo `texto`; usar `texto_tamanho` e
+  `texto_status` para medir cobertura.

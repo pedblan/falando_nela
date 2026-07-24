@@ -17,10 +17,26 @@ Antes da implementação, o pesquisador deve aprovar:
 - **D04:** data de corte e regra para registros posteriores;
 - **D05:** regra de equivalência entre Senado, Congresso e demais fontes.
 
+## Censo de entrada autorizado
+
+O gate
+[`proposta_gate_censo.md`](proposta_gate_censo.md)
+autoriza medir, sem criar snapshot:
+
+- `camara__plenario_discursos.parquet`;
+- `senado__plenario_discursos.parquet`;
+- `senado__congresso_discursos.parquet`.
+
+O censo deve ler somente metadados e colunas de controle, gravar fora do Drive
+e deixar D03–D05 pendentes. CCJ, CCJC, pareceres, apartes relacionais, amostras
+e a análise v1 não são entradas.
+
 ## Contrato funcional
 
-- **SNP-R01 — fontes aprovadas:** somente bases processadas reconhecidas como
-  canônicas no inventário podem alimentar o snapshot.
+- **SNP-R01 — fontes aprovadas:** somente bases processadas inspecionadas
+  diretamente na fase 4 e aprovadas pelo pesquisador podem alimentar o
+  snapshot. O inventário exploratório orienta a busca, mas não decide
+  canonicidade.
 - **SNP-R02 — independência:** manifests, segmentações, revisões e
   classificações da análise v1 não podem ser entradas.
 - **SNP-R03 — preservação:** o snapshot anterior permanece imutável e

@@ -62,7 +62,34 @@ Uma decisão aprovada não comprova que a ação correspondente já foi executad
 | Saída | `/content/falando_nela_inventory/<operation_id>/` |
 | Efeito | autorizar construção e teste local do notebook piloto |
 | Fora do efeito | não autoriza a varredura real, escrita no Drive, migração ou snapshot |
-| Execução | módulo e notebook implementados; Drive não varrido |
+| Execução | módulo e notebook implementados; a varredura real foi autorizada separadamente |
+
+## Encerramento simplificado da fase 3
+
+| Campo | Valor |
+|---|---|
+| Estado | **aprovado para orientação arquivística** |
+| Data | 2026-07-23 (`America/Sao_Paulo`) |
+| Operação | `drive-inventory-20260724t020749z` |
+| Resultado técnico | `succeeded`; 7.859 itens reconciliados; 0 escritas no Drive |
+| Limitação conhecida | 1.688 referências relativas foram resolvidas sem considerar `input_root` ou `parquet_root` declarados nos manifests |
+| Decisão | não transformar o piloto em projeto de saneamento do Drive |
+| Efeito | encerrar a fase 3 como baseline exploratório e autorizar a identificação controlada das entradas do snapshot v2 |
+| Fora do efeito | não aprovar migração, exclusão, deduplicação, base canônica ou os manifests antigos |
+| Trabalho adiado | correção do resolvedor, investigação de órfãos e duplicidades e eventual reorganização do Drive |
+
+## Gate de entrada da fase 4 — censo das bases candidatas
+
+| Campo | Valor |
+|---|---|
+| Estado | **aprovado** |
+| Data | 2026-07-23 (`America/Sao_Paulo`) |
+| Proposta | [`04_snapshot_discursos_v2/proposta_gate_censo.md`](04_snapshot_discursos_v2/proposta_gate_censo.md) |
+| Entradas | três Parquets de discursos de Câmara, Senado e Congresso |
+| Leitura | metadados e colunas de controle; sem carregar texto integral |
+| Saída | `/content/falando_nela_snapshot_census/<operation_id>/` |
+| Efeito | autorizar implementação, publicação e execução controlada do censo |
+| Fora do efeito | não aprova D03–D05, não cria snapshot e não autoriza escrita no Drive |
 
 ## Decisões ainda pendentes
 

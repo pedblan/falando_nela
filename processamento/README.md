@@ -210,6 +210,17 @@ exemplo.
 
 ## Camadas analiticas derivadas
 
+Antes de decidir o universo do snapshot v2, o censo read-only em
+`processamento.censo_snapshot_v2` mede exclusivamente os três Parquets de
+discursos autorizados. O notebook operacional é:
+
+```text
+notebooks/dados/01_censo_bases_snapshot_v2_colab.ipynb
+```
+
+Ele grava apenas em `/content/falando_nela_snapshot_census/`, não carrega o
+texto integral, não cria snapshot e não altera os Parquets.
+
 Para auditar a recuperação 2015–2016 de Senado e Congresso, use
 `python -m processamento.reconciliacao_discursos`. O comando gera cobertura
 `pre/post` e, na fase final, reconcilia por `texto_id` descoberta, raw,

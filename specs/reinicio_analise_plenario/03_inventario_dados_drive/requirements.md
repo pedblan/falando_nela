@@ -1,14 +1,15 @@
 # Requisitos — inventário dos dados no Drive
 
-Status: **D06, raiz e taxonomia aprovados — execução real pendente**.
+Status: **baseline exploratório encerrado em 2026-07-23 — migração não aprovada**.
 
 ## Objetivo
 
-Construir um mapa confiável e legível das bases, snapshots, execuções,
-manifests, relatórios e logs existentes no Drive antes de qualquer migração ou
-nova análise. O inventário deve explicar o universo de cada contagem, inclusive
-permitir distinguir qualquer subconjunto operacional do conjunto total
-disponível na raiz.
+Construir um mapa exploratório e legível das bases, snapshots, execuções,
+manifests, relatórios e logs existentes no Drive antes de qualquer migração. O
+inventário deve explicar o universo de cada contagem, inclusive permitir
+distinguir qualquer subconjunto operacional do conjunto total disponível na
+raiz. A escolha das entradas do snapshot será validada diretamente na fase 4,
+sem exigir o saneamento prévio de todos os artefatos legados.
 
 ## Contrato funcional
 
@@ -61,7 +62,11 @@ disponível na raiz.
 
 O contrato D06, a raiz do Drive e a taxonomia inicial de
 [`proposta_gate_inicial.md`](proposta_gate_inicial.md) foram aprovados em
-2026-07-23. A execução real ainda exige que o pesquisador arme a célula
-explícita do notebook e confirme seu `operation_id`. O inventário não depende
-das decisões D03–D05. Depois, o pesquisador aprova o mapa e a interpretação
-dos universos antes de qualquer migração ou snapshot.
+2026-07-23. A operação `drive-inventory-20260724t020749z` foi executada em modo
+somente leitura e reconciliou os 7.859 itens observados. O pesquisador aceitou
+o resultado apenas como orientação arquivística, com a limitação conhecida de
+1.688 referências relativas resolvidas sem suas raízes declaradas.
+
+O inventário não aprova migração nem declara bases canônicas. A correção dessa
+limitação será retomada somente se houver necessidade de sanear o Drive. Ela
+não bloqueia a inspeção direta e controlada das bases processadas na fase 4.

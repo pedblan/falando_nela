@@ -28,3 +28,26 @@ até a revisão conjunta de `relatorio.md`, `mapa_dados.md`,
 
 Contrato:
 [`../../specs/reinicio_analise_plenario/03_inventario_dados_drive/`](../../specs/reinicio_analise_plenario/03_inventario_dados_drive/).
+
+## Censo das bases candidatas ao snapshot v2
+
+[`01_censo_bases_snapshot_v2_colab.ipynb`](01_censo_bases_snapshot_v2_colab.ipynb)
+mede somente:
+
+```text
+processed/textos_parlamentares/v1/parquet/
+├── camara__plenario_discursos.parquet
+├── senado__plenario_discursos.parquet
+└── senado__congresso_discursos.parquet
+```
+
+Controles:
+
+- montagem do Drive e execução desligadas por padrão;
+- confirmação literal de um novo `operation_id`;
+- leitura de metadados e colunas de controle, sem carregar `texto`;
+- saída em `/content/falando_nela_snapshot_census/<operation_id>/`;
+- nenhum `snapshot_id`, escrita no Drive ou chamada à OpenAI.
+
+Contrato:
+[`../../specs/reinicio_analise_plenario/04_snapshot_discursos_v2/`](../../specs/reinicio_analise_plenario/04_snapshot_discursos_v2/).

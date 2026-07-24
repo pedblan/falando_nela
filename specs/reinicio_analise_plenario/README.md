@@ -26,7 +26,8 @@ Cada submódulo repete essa estrutura apenas para seu próprio escopo:
 4. `04_snapshot_discursos_v2`.
 
 Specs de análise substantiva só podem ser criadas depois da aprovação do
-inventário e do contrato do snapshot.
+snapshot. O inventário exploratório orienta o reinício, mas seu saneamento não
+é pré-condição para identificar diretamente as entradas do snapshot.
 
 ## Para não se perder
 
@@ -73,11 +74,12 @@ exceções e escolhas próprias, sem repetir o stack global.
 
 ## Ponto de controle atual
 
-As fases 1 e 2 chegaram aos seus gates. Na fase 3, a raiz e a taxonomia foram
-aprovadas; o notebook piloto foi implementado e testado localmente com a
-execução desligada. O próximo ato é publicar uma revisão identificável do
-código e, depois, o pesquisador armar a célula real do Colab. Nenhuma varredura
-do Drive foi executada durante a implementação.
+As fases 1 e 2 foram concluídas. A fase 3 foi executada em modo somente leitura
+e encerrada como baseline exploratório: 7.859 itens foram reconciliados, sem
+escritas no Drive. O saneamento de referências, órfãos e duplicidades legadas
+foi adiado. O próximo ato é identificar diretamente as bases processadas
+candidatas ao snapshot v2. O censo read-only dos três Parquets foi autorizado
+e implementado localmente; sua publicação e execução real precedem D03–D05.
 
 ## Gates progressivos de implementação
 
@@ -88,7 +90,8 @@ documentos próprios não estiverem aprovados. Além disso:
 - relatórios: exige D06 antes de o padrão ser incorporado aos notebooks;
 - inventário: exige aprovação das raízes, da taxonomia e do contrato D06, mas
   não depende de D03–D05;
-- snapshot v2: exige o inventário aprovado e as decisões D03–D05;
+- snapshot v2: exige o baseline exploratório registrado, validação direta das
+  bases de entrada e as decisões D03–D05;
 - nova análise científica: exige snapshot aprovado e D07.
 
 Esse encadeamento evita exigir uma decisão antes de produzir a evidência
