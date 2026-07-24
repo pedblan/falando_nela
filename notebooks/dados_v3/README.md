@@ -17,3 +17,21 @@ Estes cadernos reconstruirão a linha pós-coleta usando somente
 Não use `Run all` para autorizar uma operação. As flags de smoke e execução
 completa nascem desligadas e cada gate exige a cópia literal do respectivo
 `operation_id`.
+
+## Passo 02 — evidências para o schema normalizado
+
+`02_schema_normalizado_colab.ipynb`:
+
+- confere a operação G01 aprovada e o fingerprint atual do `raw/`;
+- relê os registros estruturados em modo somente leitura;
+- produz livro de campos, conflitos, rejeições, aliases, samples e pacotes de
+  proposta;
+- separa amostras estruturais `evidence` de previews `context_only`;
+- mantém a preparação, a aprovação de previews, o piloto GPT-5.6 e a avaliação
+  A/B em gates independentes, desligados por padrão;
+- não materializa dados normalizados nem aplica propostas do modelo.
+
+O piloto reutiliza `OPENAI_API_KEY` apenas do cofre de secrets do Colab. A
+chave não é exibida nem escrita em artefatos. Uma tabela JSON de preços,
+versionada pelo pesquisador, é obrigatória para registrar o custo calculado.
+G02 continua pendente mesmo quando todas as células técnicas terminam.

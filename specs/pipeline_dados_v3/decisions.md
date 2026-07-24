@@ -48,11 +48,12 @@ saída, superfície de erro e dificuldade de auditoria.
 
 ## D07 — implementação
 
-**Estado:** aprovada parcialmente em 2026-07-24.
+**Estado:** aprovada parcialmente e ampliada em 2026-07-24.
 
-As specs do primeiro submódulo foram aprovadas e sua implementação foi
-autorizada. Os submódulos seguintes continuam bloqueados até seus próprios
-contratos e gates.
+As specs e a implementação do primeiro submódulo foram aprovadas. A ferramenta
+de evidências de `02_schema_normalizado` também foi autorizada depois da
+aprovação de suas quatro specs. A autorização não inclui aplicar o schema,
+materializar dados normalizados ou iniciar adaptadores.
 
 ## D08 — aprovação de G01
 
@@ -63,3 +64,15 @@ O inventário integral
 rejeições, arquivos vazios, itens acidentais e conflitos de tipos permanecem
 documentados e serão tratados como entradas do próximo contrato, sem correção
 do raw.
+
+## D09 — piloto de categorias e samples em G02
+
+**Estado:** aprovada em 2026-07-24.
+
+GPT-5.6 poderá propor categorias, colunas e possíveis aliases a partir de
+evidências estruturais dos metadados observados e categorias oficiais das
+APIs. Samples estruturais poderão mostrar o banco na prática com strings não
+classificadas redigidas. Previews textuais limitados a 500 caracteres serão
+`context_only`, dependerão de aprovação humana individual e serão avaliados em
+condições A/B pareadas. Nenhuma proposta do modelo será aplicada
+automaticamente e G02 continuará dependente de revisão humana.
