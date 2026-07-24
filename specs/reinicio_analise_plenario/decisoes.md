@@ -91,9 +91,41 @@ Uma decisão aprovada não comprova que a ação correspondente já foi executad
 | Efeito | autorizar implementação, publicação e execução controlada do censo |
 | Fora do efeito | não aprova D03–D05, não cria snapshot e não autoriza escrita no Drive |
 
+## D03 — universo do snapshot v2
+
+| Campo | Valor |
+|---|---|
+| Estado | **aprovada** |
+| Data | 2026-07-23 (`America/Sao_Paulo`) |
+| Evidência | operação `snapshot-census-20260724t024812z` |
+| Bases | Câmara/Plenário, Senado/Plenário e Senado/Congresso |
+| Unidade comum | intervenção textual oficial de plenário |
+| Unidade preservada | `discurso` na Câmara; `pronunciamento` no Senado e Congresso |
+| Autoria ausente | preservar e sinalizar; não excluir |
+| Fora do universo | CCJ, CCJC, pareceres, apartes relacionais, amostras e análise v1 |
+
+## D04 — período do snapshot v2
+
+| Campo | Valor |
+|---|---|
+| Estado | **aprovada** |
+| Data | 2026-07-23 (`America/Sao_Paulo`) |
+| Início inclusivo | `2010-01-01` |
+| Fim inclusivo | `2026-07-13` |
+| Registros fora do período | excluir apenas do snapshot e listar com motivo |
+| Preservação | Parquets processados de origem permanecem intactos |
+
+## D05 — duplicidade entre fontes
+
+| Campo | Valor |
+|---|---|
+| Estado | **aprovada** |
+| Data | 2026-07-23 (`America/Sao_Paulo`) |
+| Evidência | 428.372 IDs distintos; 0 duplicatas internas; 0 IDs compartilhados |
+| Regra | não deduplicar entre fontes |
+| Similaridade futura | sinalizar para revisão; nunca remover automaticamente |
+| Falha de unicidade futura | interromper a criação em vez de escolher implicitamente |
+
 ## Decisões ainda pendentes
 
-- D03 — universo do snapshot v2;
-- D04 — data de corte do snapshot v2;
-- D05 — tratamento de duplicatas entre fontes;
 - D07 — perguntas e unidades da nova análise.

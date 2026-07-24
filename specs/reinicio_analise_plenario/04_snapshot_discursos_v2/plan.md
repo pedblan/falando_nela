@@ -1,6 +1,6 @@
 # Plano — snapshot de discursos v2
 
-Status: **censo de entrada implementado localmente — execução real pendente**.
+Status: **D03–D05 aprovadas — proposta de schema aguardando revisão**.
 
 1. Registrar o baseline exploratório e identificar diretamente as bases
    processadas candidatas a canônicas.
@@ -31,9 +31,12 @@ Status: **censo de entrada implementado localmente — execução real pendente*
 - [x] Módulo do censo somente leitura implementado.
 - [x] Notebook fino com dois gates desligados por padrão implementado.
 - [x] Fixtures locais e pacote D06 validados.
-- [ ] Publicar a revisão identificável do censo.
-- [ ] Executar no Colab com novo `operation_id`.
-- [ ] Revisar cobertura e decidir D03–D05.
+- [x] Revisão identificável do censo publicada na `main`.
+- [x] Operação `snapshot-census-20260724t024812z` executada no Colab.
+- [x] Cobertura revisada: 428.372 registros e IDs distintos.
+- [x] D03–D05 aprovadas.
+- [ ] Aprovar o schema do snapshot v2.
+- [ ] Implementar transformação e notebook de smoke.
 
 ## Ponto de parada
 
