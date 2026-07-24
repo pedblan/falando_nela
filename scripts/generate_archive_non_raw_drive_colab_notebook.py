@@ -43,7 +43,7 @@ from pathlib import Path
 
 REPO_DIR = Path("/content/falando_nela")
 REPO_URL = "https://github.com/pedblan/falando_nela.git"
-REPO_REF = "codex/arquivar-pipeline-pos-coleta-v1"
+REPO_REF = "main"
 
 if not (REPO_DIR / ".git").exists():
     subprocess.run(
