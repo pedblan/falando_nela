@@ -363,8 +363,8 @@ repetidas no TXT.
 - [x] V02-81 — Testar reconstrução exata de todos os caminhos compactados em fixture.
 - [x] V02-82 — Testar reutilização de saída idêntica sem sobrescrita divergente.
 - [x] V02-83 — Testar o perfil `schema_core` e a ausência de strings longas literais.
-- [ ] V02-84 — Confirmar 23.786 linhas de campo na execução integral.
-- [ ] V02-85 — Reconciliar 14 rejeições, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
+- [x] V02-84 — Confirmar 23.786 linhas de campo na execução integral.
+- [x] V02-85 — Reconciliar 14 rejeições, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
 - [ ] V02-86 — Conferir os hashes do catálogo, crosswalk e trilha de amostras.
 - [ ] V02-87 — Reconstituir todos os caminhos da execução integral e comparar ao inventário.
 
@@ -374,8 +374,8 @@ arquivo textual nessa chamada. A contagem será feita pelo endpoint oficial
 com exatamente o mesmo `file_id`, prompt, modelo e estrutura de entrada que a
 geração usará.
 
-- [ ] V02-88 — Registrar o `file_id`, o SHA-256 e a contagem exata do payload.
-- [ ] V02-89 — Confirmar que o payload `schema_core` completo não excede 922.000 tokens.
+- [x] V02-88 — Registrar o `file_id`, o SHA-256 e a contagem exata de arquivo + prompt.
+- [x] V02-89 — Confirmar que arquivo + prompt `schema_core`, com 691.302 tokens, não excedem 922.000.
 - [ ] V02-90 — Rejeitar geração com truncamento automático ou catálogo parcial.
 - [ ] V02-91 — Confirmar que a chamada global recebeu todos os 23.786 caminhos.
 - [ ] V02-92 — Validar e preservar a resposta global sem aplicá-la.
@@ -388,3 +388,6 @@ congelada do schema e mapear IDs existentes no crosswalk.
 - [ ] V02-94 — Confirmar que todo request Batch usa o mesmo schema congelado.
 - [ ] V02-95 — Reconciliar uma disposição proposta para cada um dos 23.786 IDs.
 - [ ] V02-96 — Confirmar zero descarte, fusão, prioridade ou preenchimento automático.
+- [x] V02-97 — Testar contrato fechado, referências `field_id` e custo de contexto longo.
+- [x] V02-98 — Implementar recibo idempotente e preservação imediata no Drive.
+- [ ] V02-99 — Recontar a requisição com o JSON Schema exato antes da geração.

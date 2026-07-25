@@ -5,9 +5,11 @@
 Contrato geral aprovado. `01_inventario_metadados_raw` foi concluído e a
 ferramenta de evidências de `02_schema_normalizado` está implementada.
 
-O passo 01 foi concluído e G01 foi aprovado. A execução integral de G02, o
-catálogo global e qualquer dado normalizado v3 continuam condicionados aos
-gates explícitos do passo 02. Pilotos exploratórios foram executados, mas não
+O passo 01 foi concluído e G01 foi aprovado. O catálogo global `schema_core`
+foi executado e medido em 691.302 tokens para arquivo + prompt. A chamada
+global foi autorizada e seu fluxo retomável está implementado, mas a resposta,
+G02 e qualquer dado normalizado v3 continuam condicionados aos gates
+explícitos do passo 02. Pilotos exploratórios foram executados, mas não
 substituem a avaliação e a aprovação formal de G02.
 
 ## Objetivo

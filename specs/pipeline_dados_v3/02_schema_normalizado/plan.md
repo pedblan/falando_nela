@@ -5,9 +5,11 @@
 Specs aprovadas e ferramenta de evidências implementada em 2026-07-24. G01 foi
 revalidado no runtime do pesquisador, e dois pilotos exploratórios de 150 e
 300 caminhos foram executados para orientar a ampliação. Eles não substituem
-a avaliação A/B formal. O catálogo global está implementado, mas sua execução
-integral, a chamada global e G02 permanecem pendentes. Adaptadores e
-materialização de registros normalizados continuam bloqueados.
+a avaliação A/B formal. O catálogo global `schema_core` foi executado e medido
+em 691.302 tokens para arquivo + prompt. A chamada global foi autorizada pelo
+pesquisador e seu fluxo retomável está pronto, mas a resposta e G02 permanecem
+pendentes. Adaptadores e materialização de registros normalizados continuam
+bloqueados.
 
 ## Regra de avanço
 
@@ -43,9 +45,12 @@ próprios.
 - [x] Gerar e contar uma primeira versão integral do catálogo no runtime atual.
 - [x] Confirmar 23.786 caminhos, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
 - [x] Reduzir as amostras `context_only` para 150 sem alterar os caminhos.
-- [ ] Gerar o catálogo integral com o perfil `schema_core`.
-- [ ] Fazer upload do TXT e contar exatamente o payload global.
-- [ ] Confirmar que o payload não excede 922.000 tokens sem truncamento.
+- [x] Gerar o catálogo integral com o perfil `schema_core`.
+- [x] Fazer upload do TXT e contar arquivo + prompt do payload global.
+- [x] Confirmar 691.302 tokens, abaixo de 922.000, sem truncamento.
+- [x] Autorizar humanamente uma chamada global com teto estimado de US$ 10,10.
+- [x] Implementar submissão única em background e retomada pelo `response_id`.
+- [ ] Recontar a requisição exata com o JSON Schema de saída.
 - [ ] Executar uma única chamada para propor o vocabulário global.
 - [ ] Revisar e congelar humanamente o vocabulário global.
 - [ ] Preparar Batch somente para mapear `field_id` com o vocabulário congelado.

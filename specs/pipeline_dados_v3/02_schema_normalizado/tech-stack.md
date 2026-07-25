@@ -244,6 +244,22 @@ vocabulário canônico for congelado. Cada linha Batch será tratada como
 requisição independente e receberá a mesma versão do schema; Batch aplicará o
 vocabulário aos `field_id`, mas nunca será usado para descobri-lo.
 
+A chamada global autorizada usará background mode, `reasoning=medium`,
+`max_output_tokens=32000`, Structured Outputs estrito, `store=true` e
+`truncation=disabled`. A contagem imediatamente anterior incluirá a mesma
+entrada e o mesmo JSON Schema da geração. O catálogo e seus crosswalks serão
+copiados para o Drive antes da submissão; o `response_id` será gravado assim
+que a API aceitar a requisição. Consulta e submissão permanecerão em células
+separadas.
+
+Nos preços standard vigentes em 2026-07-24, requisições GPT-5.6 acima de
+272.000 tokens usam efetivamente US$ 10/M para entrada não armazenada em
+cache, US$ 1/M para entrada em cache, US$ 12,50/M para gravação em cache e
+US$ 45/M para saída. Para a medição inicial de 691.302 tokens e o teto de
+32.000 tokens de saída, o intervalo conservador é US$ 8,353020 a
+US$ 10,081275. A execução registrará as classes de tokens efetivamente
+reportadas e recalculará o custo real.
+
 As condições A e B serão executadas como pares com o mesmo modelo resolvido,
 parâmetros, prompt, JSON Schema e evidências. A condição B acrescentará somente
 os previews `context_only`. Ordem do par e identificador de pareamento serão
@@ -327,10 +343,13 @@ resolvido, parâmetros, prompt, JSON Schema, hashes da entrada e resposta bruta.
 - [x] T02-22 — Implementar reutilização idempotente dos artefatos globais.
 - [x] T02-23 — Integrar upload `user_data` e contagem exata de tokens ao caderno.
 - [x] T02-24 — Implementar perfil `schema_core` sem remover caminhos ou métricas do crosswalk.
-- [ ] T02-25 — Executar a contagem exata com o catálogo `schema_core` integral.
-- [ ] T02-26 — Confirmar que a entrada global cabe no máximo de 922.000 tokens.
+- [x] T02-25 — Executar a contagem exata de arquivo + prompt com o catálogo `schema_core` integral.
+- [x] T02-26 — Confirmar 691.302 tokens, abaixo do máximo conservador de 922.000.
 - [ ] T02-27 — Executar e preservar a proposta global sem aplicação automática.
 - [ ] T02-28 — Fixar o schema revisado antes de preparar Batch por `field_id`.
+- [x] T02-29 — Implementar JSON Schema global fechado e validação de `field_id`.
+- [x] T02-30 — Implementar submissão única em background, recibo no Drive e consulta separada.
+- [x] T02-31 — Implementar cálculo de custo GPT-5.6 para contexto longo.
 
 ## Dependências proibidas nesta etapa
 

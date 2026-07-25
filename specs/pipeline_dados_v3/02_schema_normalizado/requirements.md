@@ -412,6 +412,20 @@ de contagem exata de tokens. A geração permanecerá bloqueada se exceder o
 máximo de entrada do modelo ou se qualquer reconciliação falhar. Truncamento
 automático será proibido.
 
+Em 2026-07-24, a execução integral do perfil `schema_core` produziu 23.786
+caminhos, 543 conflitos, 20.523 caminhos de `senado/ccj_notas`, 65 amostras
+`context_only` e 691.302 tokens para arquivo + prompt. O pesquisador autorizou
+uma única chamada global depois de revisar a estimativa de custo. A submissão
+deverá:
+
+- recontar a entrada com o JSON Schema exato da geração;
+- usar `gpt-5.6`, raciocínio `medium`, no máximo 32.000 tokens de saída,
+  truncamento desabilitado e execução em background;
+- preservar no Drive os artefatos do catálogo e o `response_id` imediatamente;
+- reutilizar um recibo de submissão compatível em vez de criar nova chamada;
+- registrar uso e custo, com teto operacional estimado em aproximadamente
+  US$ 10,10 segundo os preços standard de contexto longo em 2026-07-24.
+
 A resposta global proporá apenas:
 
 - schema canônico e definições de colunas;
@@ -490,6 +504,11 @@ A ferramenta implementada prepara ou reserva ao menos:
 | `catalogo_global_amostras.csv` | trilha das amostras `context_only` efetivamente incluídas |
 | `catalogo_global_manifest.json` | hashes, contagens e política do catálogo global |
 | `upload_token_count.json` | `file_id`, hash e contagem exata do payload global |
+| `submission_receipt.json` | fingerprint da requisição e `response_id` reutilizável |
+| `status_latest.json` | último estado observado da chamada em background |
+| `response_raw.json` | resposta integral preservada sem aplicação |
+| `proposta_schema_global.json` | proposta global validada para revisão humana |
+| `execution.json` | uso, custo, modelo resolvido e gate científico |
 | `propostas_gpt.jsonl` | propostas declarativas, evidências e estados |
 | `execucao_gpt.jsonl` | modelo, prompt, tokens, custo, erros e recusas |
 | `avaliacao_contexto_ab.csv` | comparação pareada com e sem previews |
@@ -529,12 +548,14 @@ responsabilidades poderá ser eliminada.
 - [x] R02-24 — Implementar representação global reversível dos 23.786 caminhos.
 - [x] R02-25 — Preservar o caminho integral e as métricas no crosswalk do catálogo.
 - [x] R02-26 — Implementar amostragem segura `context_only` sem inferência semântica.
-- [ ] R02-27 — Executar o catálogo global sobre o inventário integral aprovado.
-- [ ] R02-28 — Contar exatamente o payload com arquivo e prompt antes da geração.
+- [x] R02-27 — Executar o catálogo global sobre o inventário integral aprovado.
+- [x] R02-28 — Contar exatamente arquivo e prompt do catálogo global antes da geração.
 - [ ] R02-29 — Obter e revisar a proposta global de vocabulário canônico.
 - [ ] R02-30 — Congelar humanamente o vocabulário antes de qualquer Batch integral.
 - [ ] R02-31 — Mapear os 23.786 IDs sem descarte ou fusão automática.
 - [x] R02-32 — Compactar estatísticas no TXT sem removê-las do crosswalk.
+- [x] R02-33 — Implementar submissão global idempotente e retomável por `response_id`.
+- [ ] R02-34 — Registrar a contagem exata incluindo o JSON Schema da geração.
 
 ## Não objetivos
 

@@ -35,11 +35,17 @@ completa nascem desligadas e cada gate exige a cópia literal do respectivo
   necessárias ao desenho global, preservando todas as métricas no crosswalk;
 - separa o upload `user_data` e a contagem exata de tokens da futura chamada
   global, permitindo interromper antes de qualquer geração;
+- submete, quando explicitamente confirmado, uma única chamada global em
+  background e grava imediatamente catálogo e `response_id` no Drive;
+- consulta a chamada em célula separada, valida a proposta contra o crosswalk
+  e registra uso e custo sem aplicar o resultado;
 - não materializa dados normalizados nem aplica propostas do modelo.
 
 O piloto reutiliza `OPENAI_API_KEY` apenas do cofre de secrets do Colab. A
 chave não é exibida nem escrita em artefatos. Uma tabela JSON de preços,
 versionada pelo pesquisador, é obrigatória para registrar o custo calculado.
-O catálogo global é enviado como TXT, não CSV, e Batch só poderá ser usado
-depois da revisão do vocabulário global. G02 continua pendente mesmo quando
-todas as células técnicas terminam.
+O catálogo global é enviado como TXT, não CSV. A execução `schema_core` medida
+em 2026-07-24 teve 691.302 tokens para arquivo + prompt; a célula de submissão
+reconta incluindo o JSON Schema. Batch só poderá ser usado depois da revisão
+do vocabulário global. G02 continua pendente mesmo quando todas as células
+técnicas terminam.

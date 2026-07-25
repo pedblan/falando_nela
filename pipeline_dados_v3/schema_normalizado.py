@@ -47,10 +47,17 @@ DEFAULT_METADATA_VALUE_LIMIT = 200
 DEFAULT_PREVIEW_LIMIT = 500
 GLOBAL_CATALOG_VERSION = "gpt56-global-field-catalog-v2"
 GLOBAL_CATALOG_PROMPT_VERSION = "gpt56-global-schema-prompt-v1"
+GLOBAL_PROPOSAL_SCHEMA_VERSION = "gpt56-global-schema-proposal-v1"
+GLOBAL_PROPOSAL_OPERATION_ID = "schema-global-gpt56-20260724"
 GLOBAL_CATALOG_STANDARD_SAMPLE_FIELDS = 16
 GLOBAL_CATALOG_CCJ_SAMPLE_FIELDS = 96
 GLOBAL_CATALOG_SAMPLES_PER_FIELD = 2
 GPT56_MAX_INPUT_TOKENS = 922_000
+GPT56_GLOBAL_MAX_OUTPUT_TOKENS = 32_000
+GPT56_LONG_INPUT_PER_MILLION = Decimal("10")
+GPT56_LONG_CACHED_INPUT_PER_MILLION = Decimal("1")
+GPT56_LONG_CACHE_WRITE_PER_MILLION = Decimal("12.5")
+GPT56_LONG_OUTPUT_PER_MILLION = Decimal("45")
 
 APPROVED_COUNTS = {
     "records_observed": 1_148_754,
@@ -1134,8 +1141,337 @@ def global_schema_prompt() -> str:
         "senado/ccj_notas e reconheça as 14 linhas rejeitadas. Nesta resposta, "
         "defina o schema canônico, famílias de campos, critérios de mapeamento e "
         "casos que exigem revisão; não tente emitir uma decisão detalhada para cada "
-        "um dos 23.786 campos. Toda proposta permanece sujeita à revisão humana."
+        "um dos 23.786 campos. Cite somente field_id existentes no catálogo. "
+        "Uma hipótese de alias deve permanecer candidate_only e exigir auditoria "
+        "record_by_record_exact_typed. Toda proposta permanece sujeita à revisão "
+        "humana e não autoriza alteração dos dados ou do schema."
     )
+
+
+def global_proposal_json_schema() -> dict[str, Any]:
+    """Closed response contract for the one-shot global vocabulary proposal."""
+
+    string_array = {"type": "array", "items": {"type": "string"}}
+    field_id_array = {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string", "minLength": 1},
+    }
+    canonical_column = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "canonical_name",
+            "label_pt",
+            "definition",
+            "research_role",
+            "logical_type",
+            "cardinality",
+            "nullable",
+            "representative_field_ids",
+            "mapping_operations",
+            "api_alignment",
+            "caveats",
+            "needs_human_review",
+        ],
+        "properties": {
+            "canonical_name": {"type": "string", "minLength": 1},
+            "label_pt": {"type": "string", "minLength": 1},
+            "definition": {"type": "string", "minLength": 1},
+            "research_role": {
+                "type": "string",
+                "enum": [
+                    "provenance",
+                    "temporal",
+                    "arena",
+                    "event",
+                    "document",
+                    "proposition",
+                    "person",
+                    "party",
+                    "geography",
+                    "demographic_source_reported",
+                    "text_transport",
+                    "technical_control",
+                    "other",
+                ],
+            },
+            "logical_type": {
+                "type": "string",
+                "enum": [
+                    "string",
+                    "integer",
+                    "number",
+                    "boolean",
+                    "date",
+                    "datetime",
+                    "object",
+                    "array",
+                    "typed_union",
+                    "unknown",
+                ],
+            },
+            "cardinality": {
+                "type": "string",
+                "enum": ["scalar", "repeated", "either", "unknown"],
+            },
+            "nullable": {"type": "boolean"},
+            "representative_field_ids": field_id_array,
+            "mapping_operations": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": [
+                        "direct_copy",
+                        "rename",
+                        "lossless_cast",
+                        "closed_map",
+                        "preserve_unmapped",
+                        "needs_human_rule",
+                    ],
+                },
+            },
+            "api_alignment": string_array,
+            "caveats": string_array,
+            "needs_human_review": {"type": "boolean"},
+        },
+    }
+    field_family = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "family_id",
+            "description",
+            "canonical_candidates",
+            "representative_field_ids",
+            "scope_groups",
+            "selection_criteria",
+            "unmapped_policy",
+        ],
+        "properties": {
+            "family_id": {"type": "string", "minLength": 1},
+            "description": {"type": "string", "minLength": 1},
+            "canonical_candidates": string_array,
+            "representative_field_ids": field_id_array,
+            "scope_groups": string_array,
+            "selection_criteria": string_array,
+            "unmapped_policy": {
+                "type": "string",
+                "enum": [
+                    "preserve_unmapped",
+                    "defer",
+                    "conflict_open",
+                ],
+            },
+        },
+    }
+    alias_hypothesis = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "hypothesis_id",
+            "field_ids",
+            "rationale",
+            "required_audit",
+            "status",
+        ],
+        "properties": {
+            "hypothesis_id": {"type": "string", "minLength": 1},
+            "field_ids": {
+                "type": "array",
+                "minItems": 2,
+                "items": {"type": "string", "minLength": 1},
+            },
+            "rationale": {"type": "string", "minLength": 1},
+            "required_audit": {
+                "type": "string",
+                "enum": ["record_by_record_exact_typed"],
+            },
+            "status": {"type": "string", "enum": ["candidate_only"]},
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "proposal_version",
+            "status",
+            "summary",
+            "canonical_columns",
+            "field_families",
+            "alias_hypotheses",
+            "type_conflict_policy",
+            "rejected_records_policy",
+            "batch_mapping_contract",
+            "unresolved_questions",
+            "insufficiency_reasons",
+        ],
+        "properties": {
+            "proposal_version": {
+                "type": "string",
+                "enum": [GLOBAL_PROPOSAL_SCHEMA_VERSION],
+            },
+            "status": {
+                "type": "string",
+                "enum": ["proposal", "insufficient_evidence"],
+            },
+            "summary": {"type": "string"},
+            "canonical_columns": {
+                "type": "array",
+                "items": canonical_column,
+            },
+            "field_families": {
+                "type": "array",
+                "items": field_family,
+            },
+            "alias_hypotheses": {
+                "type": "array",
+                "items": alias_hypothesis,
+            },
+            "type_conflict_policy": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "general_policy",
+                    "ccj_notas_policy",
+                    "representative_field_ids",
+                ],
+                "properties": {
+                    "general_policy": string_array,
+                    "ccj_notas_policy": string_array,
+                    "representative_field_ids": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                },
+            },
+            "rejected_records_policy": string_array,
+            "batch_mapping_contract": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "schema_version",
+                    "allowed_decisions",
+                    "required_output_per_field",
+                    "prohibitions",
+                ],
+                "properties": {
+                    "schema_version": {"type": "string", "minLength": 1},
+                    "allowed_decisions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "map",
+                                "preserve_unmapped",
+                                "type_conflict_open",
+                                "alias_candidate",
+                                "needs_human_review",
+                            ],
+                        },
+                    },
+                    "required_output_per_field": string_array,
+                    "prohibitions": string_array,
+                },
+            },
+            "unresolved_questions": string_array,
+            "insufficiency_reasons": string_array,
+        },
+    }
+
+
+def validate_global_proposal(
+    proposal: Mapping[str, Any],
+    field_rows: Sequence[Mapping[str, Any]],
+) -> None:
+    """Validate catalog references without applying any proposed decision."""
+
+    if proposal.get("status") not in {"proposal", "insufficient_evidence"}:
+        raise ValueError("status da proposta global inválido.")
+    if proposal.get("proposal_version") != GLOBAL_PROPOSAL_SCHEMA_VERSION:
+        raise ValueError("proposal_version global inválida.")
+    canonical_columns = proposal.get("canonical_columns")
+    field_families = proposal.get("field_families")
+    alias_hypotheses = proposal.get("alias_hypotheses")
+    conflict_policy = proposal.get("type_conflict_policy")
+    if not isinstance(canonical_columns, list):
+        raise ValueError("canonical_columns deve ser lista.")
+    if not isinstance(field_families, list):
+        raise ValueError("field_families deve ser lista.")
+    if not isinstance(alias_hypotheses, list):
+        raise ValueError("alias_hypotheses deve ser lista.")
+    if not isinstance(conflict_policy, Mapping):
+        raise ValueError("type_conflict_policy deve ser objeto.")
+    reasons = proposal.get("insufficiency_reasons")
+    if not isinstance(reasons, list):
+        raise ValueError("insufficiency_reasons deve ser lista.")
+    if proposal["status"] == "proposal" and not canonical_columns:
+        raise ValueError("status proposal exige ao menos uma coluna canônica.")
+    if proposal["status"] == "insufficient_evidence":
+        if canonical_columns or field_families or alias_hypotheses or not reasons:
+            raise ValueError(
+                "insufficient_evidence exige proposta vazia e justificativa."
+            )
+
+    known_ids = {str(row.get("field_id", "")) for row in field_rows}
+    if "" in known_ids or len(known_ids) != len(field_rows):
+        raise ValueError("Crosswalk contém field_id vazio ou duplicado.")
+    cited_ids: list[str] = []
+    canonical_names: list[str] = []
+    for item in canonical_columns:
+        canonical_names.append(str(item.get("canonical_name", "")))
+        cited_ids.extend(item.get("representative_field_ids") or [])
+    for item in field_families:
+        cited_ids.extend(item.get("representative_field_ids") or [])
+    for alias in alias_hypotheses:
+        alias_ids = list(alias.get("field_ids") or [])
+        if len(set(alias_ids)) < 2:
+            raise ValueError("Hipótese de alias exige ao menos dois field_id distintos.")
+        if alias.get("required_audit") != "record_by_record_exact_typed":
+            raise ValueError("Alias exige auditoria exata e tipada recorde a recorde.")
+        if alias.get("status") != "candidate_only":
+            raise ValueError("Alias global deve permanecer candidate_only.")
+        cited_ids.extend(alias_ids)
+    cited_ids.extend(conflict_policy.get("representative_field_ids") or [])
+    unknown = sorted(set(cited_ids).difference(known_ids))
+    if unknown:
+        raise ValueError(f"Proposta global cita field_id inexistentes: {unknown[:10]}")
+    if any(not name for name in canonical_names):
+        raise ValueError("canonical_name vazio.")
+    if len(set(canonical_names)) != len(canonical_names):
+        raise ValueError("canonical_name duplicado na proposta global.")
+
+
+def estimate_gpt56_global_cost(
+    *,
+    input_tokens: int,
+    output_tokens: int,
+    cached_input_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> Decimal:
+    """Estimate long-context GPT-5.6 standard cost from reported token classes."""
+
+    if min(
+        input_tokens,
+        output_tokens,
+        cached_input_tokens,
+        cache_write_tokens,
+    ) < 0:
+        raise ValueError("Contagens de tokens não podem ser negativas.")
+    if cached_input_tokens + cache_write_tokens > input_tokens:
+        raise ValueError("Tokens cached + cache_write excedem input_tokens.")
+    ordinary_input_tokens = (
+        input_tokens - cached_input_tokens - cache_write_tokens
+    )
+    total = (
+        Decimal(ordinary_input_tokens) * GPT56_LONG_INPUT_PER_MILLION
+        + Decimal(cached_input_tokens)
+        * GPT56_LONG_CACHED_INPUT_PER_MILLION
+        + Decimal(cache_write_tokens)
+        * GPT56_LONG_CACHE_WRITE_PER_MILLION
+        + Decimal(output_tokens) * GPT56_LONG_OUTPUT_PER_MILLION
+    )
+    return total / Decimal(1_000_000)
 
 
 def _global_catalog_type_codes(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -17,12 +18,16 @@ from pipeline_dados_v3.schema_normalizado import (
     SchemaConfig,
     audit_linked_records,
     build_compact_global_catalog,
+    estimate_gpt56_global_cost,
     evaluate_context_ab,
+    GLOBAL_PROPOSAL_SCHEMA_VERSION,
+    global_proposal_json_schema,
     global_schema_prompt,
     initialize_field_review,
     prepare_schema_evidence,
     read_jsonl,
     run_gpt_pilot,
+    validate_global_proposal,
     validate_proposal,
     write_jsonl,
 )
@@ -289,6 +294,91 @@ def test_compact_global_catalog_covers_every_path_and_is_reusable(
         assert "não será sobrescrito" in str(exc)
     else:
         raise AssertionError("Catálogo divergente não deveria ser sobrescrito.")
+
+
+def test_global_proposal_is_closed_and_references_only_crosswalk_ids() -> None:
+    schema = global_proposal_json_schema()
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["canonical_columns"]["items"][
+        "additionalProperties"
+    ] is False
+    field_rows = [{"field_id": "f1"}, {"field_id": "f2"}]
+    proposal = {
+        "proposal_version": GLOBAL_PROPOSAL_SCHEMA_VERSION,
+        "status": "proposal",
+        "summary": "fixture",
+        "canonical_columns": [
+            {
+                "canonical_name": "event_id",
+                "label_pt": "Evento",
+                "definition": "Identificador do evento segundo a fonte.",
+                "research_role": "event",
+                "logical_type": "string",
+                "cardinality": "scalar",
+                "nullable": True,
+                "representative_field_ids": ["f1"],
+                "mapping_operations": ["direct_copy"],
+                "api_alignment": [],
+                "caveats": [],
+                "needs_human_review": True,
+            }
+        ],
+        "field_families": [
+            {
+                "family_id": "event",
+                "description": "Eventos observados.",
+                "canonical_candidates": ["event_id"],
+                "representative_field_ids": ["f1"],
+                "scope_groups": ["G1"],
+                "selection_criteria": ["metadado preenchido"],
+                "unmapped_policy": "preserve_unmapped",
+            }
+        ],
+        "alias_hypotheses": [
+            {
+                "hypothesis_id": "alias-1",
+                "field_ids": ["f1", "f2"],
+                "rationale": "nomes próximos; não confirmado",
+                "required_audit": "record_by_record_exact_typed",
+                "status": "candidate_only",
+            }
+        ],
+        "type_conflict_policy": {
+            "general_policy": ["preservar conflito"],
+            "ccj_notas_policy": ["trilha própria"],
+            "representative_field_ids": ["f2"],
+        },
+        "rejected_records_policy": ["preservar 14 rejeições"],
+        "batch_mapping_contract": {
+            "schema_version": "fixture-v1",
+            "allowed_decisions": ["map", "preserve_unmapped"],
+            "required_output_per_field": ["field_id", "decision"],
+            "prohibitions": ["não aplicar"],
+        },
+        "unresolved_questions": [],
+        "insufficiency_reasons": [],
+    }
+    validate_global_proposal(proposal, field_rows)
+
+    proposal["canonical_columns"][0]["representative_field_ids"] = ["missing"]
+    try:
+        validate_global_proposal(proposal, field_rows)
+    except ValueError as exc:
+        assert "field_id inexistentes" in str(exc)
+    else:
+        raise AssertionError("field_id inexistente deveria invalidar a proposta.")
+
+
+def test_gpt56_global_cost_uses_long_context_rates() -> None:
+    assert estimate_gpt56_global_cost(
+        input_tokens=691_302,
+        output_tokens=32_000,
+    ) == Decimal("8.353020")
+    assert estimate_gpt56_global_cost(
+        input_tokens=691_302,
+        output_tokens=32_000,
+        cache_write_tokens=691_302,
+    ) == Decimal("10.0812750")
 
 
 def test_gpt_pilot_is_paired_a_b_and_never_applies_proposals(
