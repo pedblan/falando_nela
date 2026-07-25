@@ -49,3 +49,9 @@ em 2026-07-24 teve 691.302 tokens para arquivo + prompt; a célula de submissão
 reconta incluindo o JSON Schema. Batch só poderá ser usado depois da revisão
 do vocabulário global. G02 continua pendente mesmo quando todas as células
 técnicas terminam.
+
+Um `git pull` atualiza o arquivo `.ipynb` no clone, mas não acrescenta células
+à interface de um caderno que já está aberto. Nesse caso, mantenha o runtime e
+use `python -m pipeline_dados_v3.schema_normalizado global-submit` e
+`global-status` em uma célula curta. Os subcomandos usam os mesmos caminhos,
+gates, recibos, validações e regra de não aplicação das células 12 e 13.

@@ -252,6 +252,11 @@ copiados para o Drive antes da submissão; o `response_id` será gravado assim
 que a API aceitar a requisição. Consulta e submissão permanecerão em células
 separadas.
 
+Os subcomandos `global-submit` e `global-status` exporão o mesmo contrato para
+um caderno já aberto. Eles executarão em subprocesso Python depois do `git
+pull`, evitando o cache de módulos do kernel e a falsa expectativa de que o
+Colab atualize visualmente as células do `.ipynb`.
+
 Nos preços standard vigentes em 2026-07-24, requisições GPT-5.6 acima de
 272.000 tokens usam efetivamente US$ 10/M para entrada não armazenada em
 cache, US$ 1/M para entrada em cache, US$ 12,50/M para gravação em cache e
@@ -350,6 +355,7 @@ resolvido, parâmetros, prompt, JSON Schema, hashes da entrada e resposta bruta.
 - [x] T02-29 — Implementar JSON Schema global fechado e validação de `field_id`.
 - [x] T02-30 — Implementar submissão única em background, recibo no Drive e consulta separada.
 - [x] T02-31 — Implementar cálculo de custo GPT-5.6 para contexto longo.
+- [x] T02-32 — Expor submissão e consulta como subcomandos retomáveis.
 
 ## Dependências proibidas nesta etapa
 

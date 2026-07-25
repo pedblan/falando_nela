@@ -50,6 +50,7 @@ próprios.
 - [x] Confirmar 691.302 tokens, abaixo de 922.000, sem truncamento.
 - [x] Autorizar humanamente uma chamada global com teto estimado de US$ 10,10.
 - [x] Implementar submissão única em background e retomada pelo `response_id`.
+- [x] Implementar continuação por CLI para o runtime Colab já aberto.
 - [ ] Recontar a requisição exata com o JSON Schema de saída.
 - [ ] Executar uma única chamada para propor o vocabulário global.
 - [ ] Revisar e congelar humanamente o vocabulário global.

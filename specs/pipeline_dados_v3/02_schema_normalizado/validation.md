@@ -391,3 +391,4 @@ congelada do schema e mapear IDs existentes no crosswalk.
 - [x] V02-97 — Testar contrato fechado, referências `field_id` e custo de contexto longo.
 - [x] V02-98 — Implementar recibo idempotente e preservação imediata no Drive.
 - [ ] V02-99 — Recontar a requisição com o JSON Schema exato antes da geração.
+- [x] V02-100 — Testar submissão idempotente e preservação pela continuação CLI.

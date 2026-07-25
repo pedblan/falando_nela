@@ -8,6 +8,7 @@ import itertools
 import json
 import os
 import platform
+import shutil
 import sys
 import time
 from collections import Counter, defaultdict
@@ -37,6 +38,11 @@ APPROVED_INVENTORY_MANIFEST_SHA256 = (
 )
 DEFAULT_RAW_ROOT = Path("/content/drive/MyDrive/falando_nela/data/raw")
 DEFAULT_OUTPUT_BASE = Path("/content/falando_nela_v3_schema")
+DEFAULT_GLOBAL_RUNTIME_DIR = Path("/content/falando_nela_g02_global_core")
+DEFAULT_GLOBAL_DRIVE_DIR = Path(
+    "/content/drive/MyDrive/falando_nela/auditoria/"
+    "pipeline_dados_v3/g02/schema-global-gpt56-20260724"
+)
 SCHEMA_VERSION = "normalized-schema-evidence-v3.1"
 SPEC_REF = "specs/pipeline_dados_v3/02_schema_normalizado/requirements.md"
 PROMPT_VERSION = "schema-proposal-gpt56-v1"
@@ -58,6 +64,13 @@ GPT56_LONG_INPUT_PER_MILLION = Decimal("10")
 GPT56_LONG_CACHED_INPUT_PER_MILLION = Decimal("1")
 GPT56_LONG_CACHE_WRITE_PER_MILLION = Decimal("12.5")
 GPT56_LONG_OUTPUT_PER_MILLION = Decimal("45")
+GLOBAL_ARCHIVE_ARTIFACTS = (
+    "catalogo_global_gpt56.txt",
+    "catalogo_global_crosswalk.csv",
+    "catalogo_global_amostras.csv",
+    "catalogo_global_manifest.json",
+    "upload_token_count.json",
+)
 
 APPROVED_COUNTS = {
     "records_observed": 1_148_754,
@@ -1472,6 +1485,299 @@ def estimate_gpt56_global_cost(
         + Decimal(output_tokens) * GPT56_LONG_OUTPUT_PER_MILLION
     )
     return total / Decimal(1_000_000)
+
+
+def submit_global_proposal(
+    runtime_dir: Path = DEFAULT_GLOBAL_RUNTIME_DIR,
+    drive_dir: Path = DEFAULT_GLOBAL_DRIVE_DIR,
+    *,
+    confirm_operation_id: str,
+    execute_gpt: bool,
+    client: Any | None = None,
+) -> dict[str, Any]:
+    """Archive the approved catalog and submit at most one global response."""
+
+    if not execute_gpt:
+        raise PermissionError("Chamada global bloqueada: use execute_gpt=True.")
+    if confirm_operation_id != GLOBAL_PROPOSAL_OPERATION_ID:
+        raise PermissionError("Confirmação literal da chamada global não confere.")
+    runtime_dir = Path(runtime_dir)
+    drive_dir = Path(drive_dir)
+    for artifact_name in GLOBAL_ARCHIVE_ARTIFACTS:
+        source = runtime_dir / artifact_name
+        destination = drive_dir / artifact_name
+        if not source.is_file():
+            raise FileNotFoundError(f"Artefato global ausente: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            if sha256_file(source) != sha256_file(destination):
+                raise FileExistsError(
+                    f"Destino divergente; nada foi sobrescrito: {destination}"
+                )
+        else:
+            shutil.copy2(source, destination)
+
+    catalog_path = runtime_dir / "catalogo_global_gpt56.txt"
+    catalog_manifest = json.loads(
+        (runtime_dir / "catalogo_global_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    counts = catalog_manifest.get("counts") or {}
+    if catalog_manifest.get("catalog_profile") != "schema_core":
+        raise ValueError("A chamada global exige catálogo schema_core.")
+    expected_counts = {
+        "field_paths": APPROVED_COUNTS["field_paths"],
+        "records_rejected": APPROVED_COUNTS["records_rejected"],
+        "type_conflicts": sum(APPROVED_TYPE_CONFLICTS.values()),
+        "ccj_notas_field_paths": APPROVED_CCJ_PATHS,
+    }
+    observed_counts = {
+        name: int(counts.get(name, -1)) for name in expected_counts
+    }
+    if observed_counts != expected_counts:
+        raise ValueError(
+            "Contagens do catálogo global divergem de G01: "
+            f"{observed_counts} != {expected_counts}"
+        )
+    upload_receipt = json.loads(
+        (runtime_dir / "upload_token_count.json").read_text(encoding="utf-8")
+    )
+    if upload_receipt.get("model") != REQUESTED_MODEL:
+        raise ValueError("Recibo global exige gpt-5.6.")
+    if upload_receipt.get("fits") is not True:
+        raise ValueError("O recibo global não confirma que a entrada cabe.")
+    if upload_receipt.get("catalog_sha256") != sha256_file(catalog_path):
+        raise ValueError("SHA-256 do catálogo diverge do recibo de upload.")
+    file_id = str(upload_receipt.get("file_id") or "")
+    if not file_id:
+        raise ValueError("Recibo global não contém file_id.")
+
+    client = _openai_client(client)
+    model_input = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_file", "file_id": file_id},
+                {"type": "input_text", "text": global_schema_prompt()},
+            ],
+        }
+    ]
+    response_text_config = {
+        "format": {
+            "type": "json_schema",
+            "name": "falando_nela_global_schema_proposal",
+            "strict": True,
+            "schema": global_proposal_json_schema(),
+        },
+        "verbosity": "low",
+    }
+    exact_count = client.responses.input_tokens.count(
+        model=REQUESTED_MODEL,
+        input=model_input,
+        reasoning={"effort": DEFAULT_REASONING_EFFORT},
+        text=response_text_config,
+    )
+    generation_input_tokens = int(exact_count.input_tokens)
+    if generation_input_tokens > GPT56_MAX_INPUT_TOKENS:
+        raise ValueError(
+            "A geração excede o limite conservador de entrada: "
+            f"{generation_input_tokens} > {GPT56_MAX_INPUT_TOKENS}."
+        )
+    cost_low = estimate_gpt56_global_cost(
+        input_tokens=generation_input_tokens,
+        output_tokens=GPT56_GLOBAL_MAX_OUTPUT_TOKENS,
+    )
+    cost_high = estimate_gpt56_global_cost(
+        input_tokens=generation_input_tokens,
+        output_tokens=GPT56_GLOBAL_MAX_OUTPUT_TOKENS,
+        cache_write_tokens=generation_input_tokens,
+    )
+    request_fingerprint = {
+        "operation_id": GLOBAL_PROPOSAL_OPERATION_ID,
+        "model": REQUESTED_MODEL,
+        "file_id": file_id,
+        "catalog_sha256": upload_receipt["catalog_sha256"],
+        "prompt_sha256": sha256_text(global_schema_prompt()),
+        "schema_version": GLOBAL_PROPOSAL_SCHEMA_VERSION,
+        "schema_sha256": sha256_json(global_proposal_json_schema()),
+        "input_tokens": generation_input_tokens,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
+        "max_output_tokens": GPT56_GLOBAL_MAX_OUTPUT_TOKENS,
+        "truncation": "disabled",
+    }
+    request_sha256 = sha256_json(request_fingerprint)
+    submission_path = drive_dir / "submission_receipt.json"
+    if submission_path.exists():
+        submission = json.loads(submission_path.read_text(encoding="utf-8"))
+        if submission.get("request_sha256") != request_sha256:
+            raise FileExistsError(
+                "Já existe submissão global divergente; "
+                "nenhuma nova chamada foi feita."
+            )
+        submission["reused"] = True
+        return submission
+
+    response = client.responses.create(
+        model=REQUESTED_MODEL,
+        input=model_input,
+        reasoning={"effort": DEFAULT_REASONING_EFFORT},
+        text=response_text_config,
+        max_output_tokens=GPT56_GLOBAL_MAX_OUTPUT_TOKENS,
+        truncation="disabled",
+        background=True,
+        store=True,
+        metadata={"operation_id": GLOBAL_PROPOSAL_OPERATION_ID},
+    )
+    submission = {
+        **request_fingerprint,
+        "request_sha256": request_sha256,
+        "response_id": str(response.id),
+        "initial_status": str(response.status),
+        "estimated_cost_usd_low": str(cost_low),
+        "estimated_cost_usd_high": str(cost_high),
+    }
+    _write_reusable_text(
+        submission_path,
+        json.dumps(
+            submission,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+    )
+    return {**submission, "reused": False}
+
+
+def retrieve_global_proposal(
+    drive_dir: Path = DEFAULT_GLOBAL_DRIVE_DIR,
+    *,
+    client: Any | None = None,
+    expected_field_paths: int = APPROVED_COUNTS["field_paths"],
+) -> dict[str, Any]:
+    """Poll once and preserve a completed proposal without applying it."""
+
+    drive_dir = Path(drive_dir)
+    submission_path = drive_dir / "submission_receipt.json"
+    if not submission_path.is_file():
+        raise FileNotFoundError("Submeta a chamada global primeiro.")
+    submission = json.loads(submission_path.read_text(encoding="utf-8"))
+    client = _openai_client(client)
+    response = client.responses.retrieve(submission["response_id"])
+    response_dict = model_dump(response)
+    response_id = str(getattr(response, "id", submission["response_id"]))
+    response_status = str(
+        getattr(response, "status", response_dict.get("status", ""))
+    )
+    status_snapshot = {
+        "operation_id": GLOBAL_PROPOSAL_OPERATION_ID,
+        "response_id": response_id,
+        "status": response_status,
+        "error": response_dict.get("error"),
+        "incomplete_details": response_dict.get("incomplete_details"),
+    }
+    (drive_dir / "status_latest.json").write_text(
+        json.dumps(
+            status_snapshot,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result: dict[str, Any] = dict(status_snapshot)
+    if response_status != "completed":
+        return result
+
+    raw_text = (
+        json.dumps(
+            response_dict,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n"
+    )
+    _write_reusable_text(drive_dir / "response_raw.json", raw_text)
+    refusal = extract_refusal(response_dict)
+    if refusal:
+        raise RuntimeError(f"Resposta global recusada: {refusal}")
+    output_text = extract_output_text(response, response_dict)
+    proposal = json.loads(output_text)
+    with (drive_dir / "catalogo_global_crosswalk.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        crosswalk_rows = list(csv.DictReader(handle))
+    if len(crosswalk_rows) != expected_field_paths:
+        raise ValueError(
+            "Crosswalk global possui quantidade inesperada de caminhos: "
+            f"{len(crosswalk_rows)} != {expected_field_paths}."
+        )
+    validate_global_proposal(proposal, crosswalk_rows)
+    _write_reusable_text(
+        drive_dir / "proposta_schema_global.json",
+        json.dumps(
+            proposal,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+    )
+    usage = flatten_usage(response_dict.get("usage") or {})
+    actual_cost = estimate_gpt56_global_cost(
+        input_tokens=usage["input_tokens"],
+        cached_input_tokens=usage["cached_input_tokens"],
+        cache_write_tokens=usage["cache_write_tokens"],
+        output_tokens=usage["output_tokens"],
+    )
+    execution = {
+        "operation_id": GLOBAL_PROPOSAL_OPERATION_ID,
+        "scientific_gate": "needs_human_review",
+        "proposal_applied": False,
+        "response_id": response_id,
+        "requested_model": REQUESTED_MODEL,
+        "resolved_model": response_dict.get("model", ""),
+        "response_sha256": sha256_text(output_text),
+        **usage,
+        "actual_cost_usd": str(actual_cost),
+        "pricing_as_of": "2026-07-24",
+    }
+    _write_reusable_text(
+        drive_dir / "execution.json",
+        json.dumps(
+            execution,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+    )
+    result.update(
+        {
+            "proposal_path": str(drive_dir / "proposta_schema_global.json"),
+            "scientific_gate": "needs_human_review",
+            "proposal_applied": False,
+            "usage": usage,
+            "actual_cost_usd": str(actual_cost),
+        }
+    )
+    return result
+
+
+def _openai_client(client: Any | None) -> Any:
+    if client is not None:
+        return client
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY não está disponível no ambiente.")
+    try:
+        from openai import OpenAI
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("Instale o SDK oficial openai.") from exc
+    return OpenAI()
 
 
 def _global_catalog_type_codes(
@@ -4011,6 +4317,27 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--operation-root", type=Path, required=True)
     evaluate.add_argument("--review-csv", type=Path, required=True)
     evaluate.add_argument("--human-preview-decision", default="")
+
+    global_submit = subparsers.add_parser("global-submit")
+    global_submit.add_argument(
+        "--runtime-dir",
+        type=Path,
+        default=DEFAULT_GLOBAL_RUNTIME_DIR,
+    )
+    global_submit.add_argument(
+        "--drive-dir",
+        type=Path,
+        default=DEFAULT_GLOBAL_DRIVE_DIR,
+    )
+    global_submit.add_argument("--confirm-operation-id", required=True)
+    global_submit.add_argument("--execute-gpt", action="store_true")
+
+    global_status = subparsers.add_parser("global-status")
+    global_status.add_argument(
+        "--drive-dir",
+        type=Path,
+        default=DEFAULT_GLOBAL_DRIVE_DIR,
+    )
     return parser
 
 
@@ -4058,12 +4385,46 @@ def main(argv: Sequence[str] | None = None) -> int:
             len(result["execution_rows"]),
         )
         return 0
-    rows = evaluate_context_ab(
-        args.operation_root,
-        review_path=args.review_csv,
-        human_preview_decision=args.human_preview_decision,
-    )
-    print(args.operation_root / "avaliacao_contexto_ab.csv", "| rows:", len(rows))
+    if args.command == "evaluate-ab":
+        rows = evaluate_context_ab(
+            args.operation_root,
+            review_path=args.review_csv,
+            human_preview_decision=args.human_preview_decision,
+        )
+        print(
+            args.operation_root / "avaliacao_contexto_ab.csv",
+            "| rows:",
+            len(rows),
+        )
+        return 0
+    if args.command == "global-submit":
+        submission = submit_global_proposal(
+            args.runtime_dir,
+            args.drive_dir,
+            confirm_operation_id=args.confirm_operation_id,
+            execute_gpt=args.execute_gpt,
+        )
+        print("response_id:", submission["response_id"])
+        print("status inicial:", submission["initial_status"])
+        print("tokens exatos:", submission["input_tokens"])
+        print(
+            "teto estimado (US$):",
+            submission["estimated_cost_usd_high"],
+        )
+        print("reutilizada:", submission["reused"])
+        print("recibo:", args.drive_dir / "submission_receipt.json")
+        return 0
+    status = retrieve_global_proposal(args.drive_dir)
+    print("response_id:", status["response_id"])
+    print("status:", status["status"])
+    if status["status"] in {"queued", "in_progress"}:
+        print("Ainda processando; execute global-status mais tarde.")
+    elif status["status"] == "completed":
+        print("proposta:", status["proposal_path"])
+        print("custo estimado real (US$):", status["actual_cost_usd"])
+        print("gate científico:", status["scientific_gate"])
+    else:
+        print("Veja:", args.drive_dir / "status_latest.json")
     return 0
 
 

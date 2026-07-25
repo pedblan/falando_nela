@@ -4,6 +4,7 @@ import csv
 import json
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from pipeline_dados_v3.inventario_metadados_raw import (
@@ -26,7 +27,9 @@ from pipeline_dados_v3.schema_normalizado import (
     initialize_field_review,
     prepare_schema_evidence,
     read_jsonl,
+    retrieve_global_proposal,
     run_gpt_pilot,
+    submit_global_proposal,
     validate_global_proposal,
     validate_proposal,
     write_jsonl,
@@ -381,6 +384,98 @@ def test_gpt56_global_cost_uses_long_context_rates() -> None:
     ) == Decimal("10.0812750")
 
 
+def test_global_submission_is_reusable_and_completion_is_not_applied(
+    tmp_path: Path,
+) -> None:
+    runtime_dir = tmp_path / "runtime"
+    drive_dir = tmp_path / "drive"
+    runtime_dir.mkdir()
+    catalog = runtime_dir / "catalogo_global_gpt56.txt"
+    catalog.write_text("fixture\n", encoding="utf-8")
+    catalog_sha256 = sha256_bytes(catalog.read_bytes())
+    (runtime_dir / "catalogo_global_crosswalk.csv").write_text(
+        "field_id\nf1\nf2\n",
+        encoding="utf-8",
+    )
+    (runtime_dir / "catalogo_global_amostras.csv").write_text(
+        "field_id\n",
+        encoding="utf-8",
+    )
+    (runtime_dir / "catalogo_global_manifest.json").write_text(
+        json.dumps(
+            {
+                "catalog_profile": "schema_core",
+                "counts": {
+                    "field_paths": 23_786,
+                    "records_rejected": 14,
+                    "type_conflicts": 543,
+                    "ccj_notas_field_paths": 20_523,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (runtime_dir / "upload_token_count.json").write_text(
+        json.dumps(
+            {
+                "model": "gpt-5.6",
+                "file_id": "file-fixture",
+                "catalog_sha256": catalog_sha256,
+                "fits": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    proposal = global_proposal_fixture()
+    client = FakeGlobalOpenAIClient(proposal)
+
+    first = submit_global_proposal(
+        runtime_dir,
+        drive_dir,
+        confirm_operation_id="schema-global-gpt56-20260724",
+        execute_gpt=True,
+        client=client,
+    )
+    second = submit_global_proposal(
+        runtime_dir,
+        drive_dir,
+        confirm_operation_id="schema-global-gpt56-20260724",
+        execute_gpt=True,
+        client=client,
+    )
+
+    assert first["reused"] is False
+    assert second["reused"] is True
+    assert first["response_id"] == second["response_id"] == "resp-global-fixture"
+    assert client.responses.create_calls == 1
+    assert {
+        path.name for path in drive_dir.iterdir()
+    }.issuperset(
+        {
+            "catalogo_global_gpt56.txt",
+            "catalogo_global_crosswalk.csv",
+            "catalogo_global_amostras.csv",
+            "catalogo_global_manifest.json",
+            "upload_token_count.json",
+            "submission_receipt.json",
+        }
+    )
+
+    result = retrieve_global_proposal(
+        drive_dir,
+        client=client,
+        expected_field_paths=2,
+    )
+    assert result["status"] == "completed"
+    assert result["scientific_gate"] == "needs_human_review"
+    assert result["proposal_applied"] is False
+    assert (drive_dir / "response_raw.json").is_file()
+    assert (drive_dir / "proposta_schema_global.json").is_file()
+    assert json.loads(
+        (drive_dir / "execution.json").read_text(encoding="utf-8")
+    )["proposal_applied"] is False
+
+
 def test_gpt_pilot_is_paired_a_b_and_never_applies_proposals(
     tmp_path: Path,
 ) -> None:
@@ -730,6 +825,128 @@ def sha256_bytes(value: bytes) -> str:
     import hashlib
 
     return hashlib.sha256(value).hexdigest()
+
+
+def global_proposal_fixture() -> dict[str, Any]:
+    return {
+        "proposal_version": GLOBAL_PROPOSAL_SCHEMA_VERSION,
+        "status": "proposal",
+        "summary": "fixture",
+        "canonical_columns": [
+            {
+                "canonical_name": "event_id",
+                "label_pt": "Evento",
+                "definition": "Identificador do evento segundo a fonte.",
+                "research_role": "event",
+                "logical_type": "string",
+                "cardinality": "scalar",
+                "nullable": True,
+                "representative_field_ids": ["f1"],
+                "mapping_operations": ["direct_copy"],
+                "api_alignment": [],
+                "caveats": [],
+                "needs_human_review": True,
+            }
+        ],
+        "field_families": [
+            {
+                "family_id": "event",
+                "description": "Eventos observados.",
+                "canonical_candidates": ["event_id"],
+                "representative_field_ids": ["f1"],
+                "scope_groups": ["G1"],
+                "selection_criteria": ["metadado preenchido"],
+                "unmapped_policy": "preserve_unmapped",
+            }
+        ],
+        "alias_hypotheses": [
+            {
+                "hypothesis_id": "alias-1",
+                "field_ids": ["f1", "f2"],
+                "rationale": "nomes próximos; não confirmado",
+                "required_audit": "record_by_record_exact_typed",
+                "status": "candidate_only",
+            }
+        ],
+        "type_conflict_policy": {
+            "general_policy": ["preservar conflito"],
+            "ccj_notas_policy": ["trilha própria"],
+            "representative_field_ids": ["f2"],
+        },
+        "rejected_records_policy": ["preservar 14 rejeições"],
+        "batch_mapping_contract": {
+            "schema_version": "fixture-v1",
+            "allowed_decisions": ["map", "preserve_unmapped"],
+            "required_output_per_field": ["field_id", "decision"],
+            "prohibitions": ["não aplicar"],
+        },
+        "unresolved_questions": [],
+        "insufficiency_reasons": [],
+    }
+
+
+class FakeGlobalCompletedResponse:
+    def __init__(self, proposal: dict[str, Any]) -> None:
+        self.id = "resp-global-fixture"
+        self.status = "completed"
+        self.output_text = json.dumps(proposal, ensure_ascii=False)
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "status": self.status,
+            "model": "gpt-5.6-sol-2026-07-01",
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        {"type": "output_text", "text": self.output_text}
+                    ],
+                }
+            ],
+            "usage": {
+                "input_tokens": 700_000,
+                "input_tokens_details": {
+                    "cached_tokens": 0,
+                    "cache_write_tokens": 700_000,
+                },
+                "output_tokens": 1_000,
+                "output_tokens_details": {"reasoning_tokens": 250},
+            },
+        }
+
+
+class FakeGlobalInputTokens:
+    def count(self, **kwargs: Any) -> SimpleNamespace:
+        assert kwargs["model"] == "gpt-5.6"
+        assert kwargs["text"]["format"]["strict"] is True
+        return SimpleNamespace(input_tokens=700_000)
+
+
+class FakeGlobalResponses:
+    def __init__(self, proposal: dict[str, Any]) -> None:
+        self.input_tokens = FakeGlobalInputTokens()
+        self.proposal = proposal
+        self.create_calls = 0
+
+    def create(self, **kwargs: Any) -> SimpleNamespace:
+        assert kwargs["background"] is True
+        assert kwargs["store"] is True
+        assert kwargs["truncation"] == "disabled"
+        self.create_calls += 1
+        return SimpleNamespace(
+            id="resp-global-fixture",
+            status="queued",
+        )
+
+    def retrieve(self, response_id: str) -> FakeGlobalCompletedResponse:
+        assert response_id == "resp-global-fixture"
+        return FakeGlobalCompletedResponse(self.proposal)
+
+
+class FakeGlobalOpenAIClient:
+    def __init__(self, proposal: dict[str, Any]) -> None:
+        self.responses = FakeGlobalResponses(proposal)
 
 
 class FakeOpenAIResponse:

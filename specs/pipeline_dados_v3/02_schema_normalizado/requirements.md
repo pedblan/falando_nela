@@ -426,6 +426,11 @@ deverá:
 - registrar uso e custo, com teto operacional estimado em aproximadamente
   US$ 10,10 segundo os preços standard de contexto longo em 2026-07-24.
 
+Como `git pull` não altera as células exibidas por um caderno que já está
+aberto no Colab, a mesma submissão e consulta deverão estar disponíveis por
+CLI. Esse caminho de continuação reutilizará o runtime e os artefatos correntes,
+sem exigir abertura ou reexecução integral do caderno.
+
 A resposta global proporá apenas:
 
 - schema canônico e definições de colunas;
@@ -556,6 +561,7 @@ responsabilidades poderá ser eliminada.
 - [x] R02-32 — Compactar estatísticas no TXT sem removê-las do crosswalk.
 - [x] R02-33 — Implementar submissão global idempotente e retomável por `response_id`.
 - [ ] R02-34 — Registrar a contagem exata incluindo o JSON Schema da geração.
+- [x] R02-35 — Permitir submissão e consulta por célula curta em um Colab já aberto.
 
 ## Não objetivos
 
