@@ -228,6 +228,7 @@ def test_compact_global_catalog_covers_every_path_and_is_reusable(
         "sample_rows": read_jsonl(inventory_root / "amostras_campos.jsonl"),
         "output_dir": tmp_path / "compact-catalog",
         "expected_operation_id": "fixture-g01",
+        "catalog_profile": "schema_core",
         "standard_sample_fields": 50,
         "ccj_sample_fields": 50,
         "samples_per_field": 2,
@@ -265,6 +266,12 @@ def test_compact_global_catalog_covers_every_path_and_is_reusable(
     }
     assert setup["long_text"] not in compact_text
     assert "redacted_long_string" in compact_text
+    field_lines = [
+        line for line in compact_text.splitlines() if line.startswith("F|")
+    ]
+    assert field_lines
+    assert all(len(line.split("|")) == 8 for line in field_lines)
+    assert first["manifest"]["catalog_profile"] == "schema_core"
     assert first["manifest"]["counts"]["records_rejected"] == 1
     assert first["manifest"]["counts"]["type_conflicts"] == 1
     assert first["manifest"]["counts"]["ccj_notas_field_paths"] == setup[

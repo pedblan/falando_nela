@@ -375,8 +375,11 @@ reler o raw. Ele deverá:
   caminho original integral e todas as métricas do inventário;
 - fatorar apenas repetições de proveniência e prefixos de caminho de maneira
   reversível;
-- manter os tipos, estados de presença, cardinalidade, comprimentos, partições
-  e indicador de conflito;
+- manter no TXT os tipos, a razão exata `preenchidos/universo`, a máscara de
+  estados observados, a cardinalidade, o comprimento máximo de string e o
+  indicador de conflito;
+- manter no crosswalk os cinco contadores de presença, `fill_rate`, os três
+  comprimentos, as partições e as demais métricas integrais;
 - reconciliar explicitamente 14 rejeições, 543 conflitos e os 20.523 caminhos
   de `senado/ccj_notas`;
 - incluir amostras seguras de G01 em canal `context_only`, selecionadas por
@@ -396,6 +399,12 @@ O arquivo enviado ao modelo será `.txt`, não `.csv` ou planilha, para que os
 23.786 caminhos integrem o contexto em vez de serem submetidos ao fluxo
 reduzido de leitura de planilhas. `File Search` não será usado para esta
 decisão global, pois recuperação seletiva não comprova leitura integral.
+
+O perfil `schema_core` reduzirá somente redundâncias estatísticas do TXT:
+`ausente`, `nulo`, `vazio` e `preenchido` serão representados por uma máscara,
+e a cobertura será a fração exata `preenchidos/universo`. Mínimo, mediana,
+partições e contadores completos continuarão no crosswalk. Essa redução não
+retirará caminhos, tipos, conflitos ou proveniência do conjunto de evidências.
 
 Antes da chamada de geração, o arquivo será enviado com `purpose=user_data` e
 o payload completo, incluindo o prompt versionado, será submetido ao endpoint
@@ -525,6 +534,7 @@ responsabilidades poderá ser eliminada.
 - [ ] R02-29 — Obter e revisar a proposta global de vocabulário canônico.
 - [ ] R02-30 — Congelar humanamente o vocabulário antes de qualquer Batch integral.
 - [ ] R02-31 — Mapear os 23.786 IDs sem descarte ou fusão automática.
+- [x] R02-32 — Compactar estatísticas no TXT sem removê-las do crosswalk.
 
 ## Não objetivos
 

@@ -31,6 +31,8 @@ completa nascem desligadas e cada gate exige a cópia literal do respectivo
   A/B em gates independentes, desligados por padrão;
 - reutiliza as variáveis já validadas de G01 para gerar, sem reler o raw, um
   catálogo TXT compacto com os 23.786 caminhos e um crosswalk integral;
+- usa o perfil `schema_core` para manter no TXT apenas as estatísticas
+  necessárias ao desenho global, preservando todas as métricas no crosswalk;
 - separa o upload `user_data` e a contagem exata de tokens da futura chamada
   global, permitindo interromper antes de qualquer geração;
 - não materializa dados normalizados nem aplica propostas do modelo.

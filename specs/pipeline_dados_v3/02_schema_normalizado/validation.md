@@ -354,10 +354,15 @@ linha `F` deverá reproduzir byte a byte o caminho original do crosswalk.
 Compactação nunca poderá normalizar, abreviar semanticamente ou retirar
 segmentos do caminho.
 
+No perfil `schema_core`, a fração `preenchidos/universo` e a máscara de
+estados deverão ser recalculáveis a partir do crosswalk. Todas as colunas
+integrais do inventário continuarão no crosswalk mesmo quando não forem
+repetidas no TXT.
+
 - [x] V02-80 — Testar unicidade de IDs e cobertura bidirecional do catálogo em fixture.
 - [x] V02-81 — Testar reconstrução exata de todos os caminhos compactados em fixture.
 - [x] V02-82 — Testar reutilização de saída idêntica sem sobrescrita divergente.
-- [x] V02-83 — Testar que strings longas não aparecem literalmente no catálogo.
+- [x] V02-83 — Testar o perfil `schema_core` e a ausência de strings longas literais.
 - [ ] V02-84 — Confirmar 23.786 linhas de campo na execução integral.
 - [ ] V02-85 — Reconciliar 14 rejeições, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
 - [ ] V02-86 — Conferir os hashes do catálogo, crosswalk e trilha de amostras.
@@ -370,7 +375,7 @@ com exatamente o mesmo `file_id`, prompt, modelo e estrutura de entrada que a
 geração usará.
 
 - [ ] V02-88 — Registrar o `file_id`, o SHA-256 e a contagem exata do payload.
-- [ ] V02-89 — Confirmar que o payload completo não excede 922.000 tokens.
+- [ ] V02-89 — Confirmar que o payload `schema_core` completo não excede 922.000 tokens.
 - [ ] V02-90 — Rejeitar geração com truncamento automático ou catálogo parcial.
 - [ ] V02-91 — Confirmar que a chamada global recebeu todos os 23.786 caminhos.
 - [ ] V02-92 — Validar e preservar a resposta global sem aplicá-la.

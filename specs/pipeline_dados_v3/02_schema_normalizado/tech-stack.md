@@ -228,6 +228,12 @@ O formato line-oriented terá:
 - linhas `S` apenas para amostras seguras marcadas `context_only`;
 - linhas `X` para as inconsistências preservadas de G01.
 
+No perfil `schema_core`, cada linha `F` manterá caminho, tipos, fração
+`preenchidos/universo`, máscara dos estados presentes, cardinalidade,
+comprimento máximo de string e conflito. Contadores completos, `fill_rate`,
+mínimo, mediana, partições e demais métricas permanecerão no crosswalk, que
+não é enviado ao modelo nessa chamada.
+
 O crosswalk separado preservará o caminho original integral e todas as
 métricas, permitindo provar que `P + componente F` reproduz o inventário
 exatamente. A compactação não modifica o raw e não interpreta nomes ou
@@ -320,10 +326,11 @@ resolvido, parâmetros, prompt, JSON Schema, hashes da entrada e resposta bruta.
 - [x] T02-21 — Implementar seleção compacta de amostras `context_only`.
 - [x] T02-22 — Implementar reutilização idempotente dos artefatos globais.
 - [x] T02-23 — Integrar upload `user_data` e contagem exata de tokens ao caderno.
-- [ ] T02-24 — Executar a contagem exata com o catálogo integral aprovado.
-- [ ] T02-25 — Confirmar que a entrada global cabe no máximo de 922.000 tokens.
-- [ ] T02-26 — Executar e preservar a proposta global sem aplicação automática.
-- [ ] T02-27 — Fixar o schema revisado antes de preparar Batch por `field_id`.
+- [x] T02-24 — Implementar perfil `schema_core` sem remover caminhos ou métricas do crosswalk.
+- [ ] T02-25 — Executar a contagem exata com o catálogo `schema_core` integral.
+- [ ] T02-26 — Confirmar que a entrada global cabe no máximo de 922.000 tokens.
+- [ ] T02-27 — Executar e preservar a proposta global sem aplicação automática.
+- [ ] T02-28 — Fixar o schema revisado antes de preparar Batch por `field_id`.
 
 ## Dependências proibidas nesta etapa
 

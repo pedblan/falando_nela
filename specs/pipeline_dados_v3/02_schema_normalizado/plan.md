@@ -38,9 +38,12 @@ próprios.
 - [x] Especificar uma chamada global com arquivo seguida de mapeamento por vocabulário congelado.
 - [x] Implementar catálogo TXT reversível e crosswalk dos caminhos originais.
 - [x] Implementar amostragem segura `context_only` e reforçada para `senado/ccj_notas`.
+- [x] Implementar perfil `schema_core` com estatísticas compactas e crosswalk integral.
 - [x] Integrar ao caderno o upload `user_data` e a contagem exata de tokens.
-- [ ] Gerar o catálogo global no runtime atual a partir dos artefatos G01.
-- [ ] Confirmar no catálogo 23.786 caminhos, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
+- [x] Gerar e contar uma primeira versão integral do catálogo no runtime atual.
+- [x] Confirmar 23.786 caminhos, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
+- [x] Reduzir as amostras `context_only` para 150 sem alterar os caminhos.
+- [ ] Gerar o catálogo integral com o perfil `schema_core`.
 - [ ] Fazer upload do TXT e contar exatamente o payload global.
 - [ ] Confirmar que o payload não excede 922.000 tokens sem truncamento.
 - [ ] Executar uma única chamada para propor o vocabulário global.

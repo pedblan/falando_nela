@@ -45,7 +45,7 @@ REQUESTED_MODEL = "gpt-5.6"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_METADATA_VALUE_LIMIT = 200
 DEFAULT_PREVIEW_LIMIT = 500
-GLOBAL_CATALOG_VERSION = "gpt56-global-field-catalog-v1"
+GLOBAL_CATALOG_VERSION = "gpt56-global-field-catalog-v2"
 GLOBAL_CATALOG_PROMPT_VERSION = "gpt56-global-schema-prompt-v1"
 GLOBAL_CATALOG_STANDARD_SAMPLE_FIELDS = 16
 GLOBAL_CATALOG_CCJ_SAMPLE_FIELDS = 96
@@ -700,6 +700,7 @@ def build_compact_global_catalog(
     sample_rows: Sequence[Mapping[str, Any]],
     output_dir: Path,
     expected_operation_id: str = APPROVED_INVENTORY_OPERATION_ID,
+    catalog_profile: str = "full",
     standard_sample_fields: int = GLOBAL_CATALOG_STANDARD_SAMPLE_FIELDS,
     ccj_sample_fields: int = GLOBAL_CATALOG_CCJ_SAMPLE_FIELDS,
     samples_per_field: int = GLOBAL_CATALOG_SAMPLES_PER_FIELD,
@@ -722,6 +723,8 @@ def build_compact_global_catalog(
         raise ValueError("A quantidade de campos amostrados não pode ser negativa.")
     if samples_per_field < 0:
         raise ValueError("samples_per_field não pode ser negativo.")
+    if catalog_profile not in {"full", "schema_core"}:
+        raise ValueError("catalog_profile deve ser full ou schema_core.")
 
     ordered_fields = sorted(
         (dict(row) for row in field_rows),
@@ -788,6 +791,7 @@ def build_compact_global_catalog(
         f"records_rejected={int(counts['records_rejected'])}",
         f"record_groups={len(observed_groups)}",
         f"field_paths={len(ordered_fields)}",
+        f"catalog_profile={catalog_profile}",
         "identity=source+dataset+record_type+original_field_path",
         "path_rule=inside each G block, original path is P prefix plus F path component",
         "decision_rule=proposal_only;no_automatic_drop_merge_priority_or_fill",
@@ -803,14 +807,24 @@ def build_compact_global_catalog(
             "# FIELD_GRAMMAR",
             "# G|group_id|source|dataset|record_type|fields|conflicts|special",
             "# P|shared_original_path_prefix; empty means F contains full path",
-            (
-                "# F|field_id|path_component|type_codes|"
-                "universe,absent,null,empty,filled|cardinality|"
-                "string_min,median,max|first_partition,last_partition|conflict"
-            ),
-            "# FIELDS",
         ]
     )
+    if catalog_profile == "schema_core":
+        lines.append(
+            "# F|field_id|path_component|type_codes|"
+            "filled/universe:state_mask|cardinality|string_max|conflict"
+        )
+        lines.append(
+            "# state_mask: a=absent,n=null,e=empty,f=filled; "
+            "complete metrics remain in the crosswalk"
+        )
+    else:
+        lines.append(
+            "# F|field_id|path_component|type_codes|"
+            "universe,absent,null,empty,filled|cardinality|"
+            "string_min,median,max|first_partition,last_partition|conflict"
+        )
+    lines.append("# FIELDS")
 
     crosswalk_rows: list[dict[str, Any]] = []
     for group in observed_groups:
@@ -846,28 +860,38 @@ def build_compact_global_catalog(
                     if value
                 ]
                 encoded_types = ",".join(type_codes[value] for value in technical_types)
-                presence = ",".join(
-                    _catalog_cell(row.get(name, ""))
-                    for name in (
-                        "records_universe",
-                        "field_absent",
-                        "present_null",
-                        "present_empty",
-                        "present_filled",
-                    )
-                )
-                lengths = ",".join(
-                    _catalog_cell(row.get(name, ""))
-                    for name in (
-                        "string_length_min",
-                        "string_length_median",
-                        "string_length_max",
-                    )
-                )
-                partitions = ",".join(
-                    _catalog_cell(row.get(name, ""))
-                    for name in ("first_partition", "last_partition")
-                )
+                if catalog_profile == "schema_core":
+                    model_stats = [
+                        _global_catalog_core_presence(row),
+                        _global_catalog_cardinality(row),
+                        _catalog_cell(row.get("string_length_max", "")),
+                    ]
+                else:
+                    model_stats = [
+                        ",".join(
+                            _catalog_cell(row.get(name, ""))
+                            for name in (
+                                "records_universe",
+                                "field_absent",
+                                "present_null",
+                                "present_empty",
+                                "present_filled",
+                            )
+                        ),
+                        _global_catalog_cardinality(row),
+                        ",".join(
+                            _catalog_cell(row.get(name, ""))
+                            for name in (
+                                "string_length_min",
+                                "string_length_median",
+                                "string_length_max",
+                            )
+                        ),
+                        ",".join(
+                            _catalog_cell(row.get(name, ""))
+                            for name in ("first_partition", "last_partition")
+                        ),
+                    ]
                 lines.append(
                     "|".join(
                         [
@@ -875,10 +899,7 @@ def build_compact_global_catalog(
                             field_ids[key],
                             _catalog_json(path_component),
                             encoded_types,
-                            presence,
-                            _global_catalog_cardinality(row),
-                            lengths,
-                            partitions,
+                            *model_stats,
                             "!" if truthy(str(row.get("type_conflict", ""))) else "-",
                         ]
                     )
@@ -1040,6 +1061,7 @@ def build_compact_global_catalog(
     ]
     catalog_manifest = {
         "catalog_version": GLOBAL_CATALOG_VERSION,
+        "catalog_profile": catalog_profile,
         "prompt_version": GLOBAL_CATALOG_PROMPT_VERSION,
         "inventory_operation_id": expected_operation_id,
         "inventory_manifest_sha256": inventory_manifest_sha256,
@@ -1290,6 +1312,24 @@ def _global_catalog_cardinality(row: Mapping[str, Any]) -> str:
     if method == "kmv_scalar_estimate":
         return f"~{value}"
     return value
+
+
+def _global_catalog_core_presence(row: Mapping[str, Any]) -> str:
+    states = "".join(
+        code
+        for name, code in (
+            ("field_absent", "a"),
+            ("present_null", "n"),
+            ("present_empty", "e"),
+            ("present_filled", "f"),
+        )
+        if int(row.get(name, 0) or 0) > 0
+    )
+    return (
+        f"{_catalog_cell(row.get('present_filled', ''))}/"
+        f"{_catalog_cell(row.get('records_universe', ''))}:"
+        f"{states or '-'}"
+    )
 
 
 def _global_catalog_safe_value(value: Any) -> Any:
