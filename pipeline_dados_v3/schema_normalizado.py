@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import itertools
 import json
 import os
@@ -44,6 +45,12 @@ REQUESTED_MODEL = "gpt-5.6"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_METADATA_VALUE_LIMIT = 200
 DEFAULT_PREVIEW_LIMIT = 500
+GLOBAL_CATALOG_VERSION = "gpt56-global-field-catalog-v1"
+GLOBAL_CATALOG_PROMPT_VERSION = "gpt56-global-schema-prompt-v1"
+GLOBAL_CATALOG_STANDARD_SAMPLE_FIELDS = 16
+GLOBAL_CATALOG_CCJ_SAMPLE_FIELDS = 96
+GLOBAL_CATALOG_SAMPLES_PER_FIELD = 2
+GPT56_MAX_INPUT_TOKENS = 922_000
 
 APPROVED_COUNTS = {
     "records_observed": 1_148_754,
@@ -96,6 +103,24 @@ FIELD_BOOK_FIELDS = [
     "decision_rationale",
     "decision_by",
     "decision_at",
+]
+
+GLOBAL_CATALOG_CROSSWALK_FIELDS = [
+    "field_id",
+    "group_id",
+    *FIELD_BOOK_FIELDS[:19],
+]
+
+GLOBAL_CATALOG_SAMPLE_FIELDS = [
+    "field_id",
+    "channel",
+    "source",
+    "dataset",
+    "record_type",
+    "field_path",
+    "sample_hash",
+    "value_type",
+    "value_json",
 ]
 
 ALIAS_FIELDS = [
@@ -664,6 +689,668 @@ def validate_inventory(
         if int(counts["records_observed"]) != int(counts["records_read"]) + rejected:
             raise ValueError("Registros observados não reconciliam lidos + rejeitados.")
     return manifest, fields, issues
+
+
+def build_compact_global_catalog(
+    *,
+    inventory_manifest: Mapping[str, Any],
+    inventory_manifest_sha256: str,
+    field_rows: Sequence[Mapping[str, Any]],
+    issue_rows: Sequence[Mapping[str, Any]],
+    sample_rows: Sequence[Mapping[str, Any]],
+    output_dir: Path,
+    expected_operation_id: str = APPROVED_INVENTORY_OPERATION_ID,
+    standard_sample_fields: int = GLOBAL_CATALOG_STANDARD_SAMPLE_FIELDS,
+    ccj_sample_fields: int = GLOBAL_CATALOG_CCJ_SAMPLE_FIELDS,
+    samples_per_field: int = GLOBAL_CATALOG_SAMPLES_PER_FIELD,
+) -> dict[str, Any]:
+    """Build a lossless, line-oriented catalog for one global model request.
+
+    The model-facing text factors repeated provenance and path prefixes, while
+    the companion crosswalk preserves every original inventory column. Existing
+    identical outputs are reused; divergent files are never overwritten.
+    """
+
+    if inventory_manifest.get("operation_id") != expected_operation_id:
+        raise ValueError("O catálogo global exige o operation_id G01 esperado.")
+    if (
+        len(inventory_manifest_sha256) != 64
+        or any(char not in "0123456789abcdef" for char in inventory_manifest_sha256)
+    ):
+        raise ValueError("SHA-256 do manifest G01 inválido.")
+    if standard_sample_fields < 0 or ccj_sample_fields < 0:
+        raise ValueError("A quantidade de campos amostrados não pode ser negativa.")
+    if samples_per_field < 0:
+        raise ValueError("samples_per_field não pode ser negativo.")
+
+    ordered_fields = sorted(
+        (dict(row) for row in field_rows),
+        key=lambda row: (
+            str(row.get("source", "")),
+            str(row.get("dataset", "")),
+            str(row.get("record_type", "")),
+            str(row.get("field_path", "")),
+        ),
+    )
+    keys = [
+        (
+            str(row.get("source", "")),
+            str(row.get("dataset", "")),
+            str(row.get("record_type", "")),
+            str(row.get("field_path", "")),
+        )
+        for row in ordered_fields
+    ]
+    if len(set(keys)) != len(keys):
+        raise ValueError("O inventário contém chaves de campo duplicadas.")
+
+    counts = dict(inventory_manifest.get("counts") or {})
+    if int(counts.get("field_paths", -1)) != len(ordered_fields):
+        raise ValueError("A contagem de caminhos diverge do manifest G01.")
+    observed_groups = sorted({key[:3] for key in keys})
+    if int(counts.get("record_groups", -1)) != len(observed_groups):
+        raise ValueError("A contagem de grupos diverge do manifest G01.")
+    if int(counts.get("records_observed", -1)) != (
+        int(counts.get("records_read", -1))
+        + int(counts.get("records_rejected", -1))
+    ):
+        raise ValueError("Registros observados não reconciliam lidos + rejeitados.")
+
+    group_ids = {
+        group: f"G{index:03d}"
+        for index, group in enumerate(observed_groups, start=1)
+    }
+    field_ids = {
+        key: f"F{index:05d}"
+        for index, key in enumerate(keys, start=1)
+    }
+    type_codes = _global_catalog_type_codes(ordered_fields)
+
+    fields_by_group: defaultdict[
+        tuple[str, str, str], list[dict[str, Any]]
+    ] = defaultdict(list)
+    for row in ordered_fields:
+        fields_by_group[
+            (
+                str(row.get("source", "")),
+                str(row.get("dataset", "")),
+                str(row.get("record_type", "")),
+            )
+        ].append(row)
+
+    lines = [
+        f"# {GLOBAL_CATALOG_VERSION}",
+        "# CONTRACT",
+        f"operation_id={expected_operation_id}",
+        f"manifest_sha256={inventory_manifest_sha256}",
+        f"records_observed={int(counts['records_observed'])}",
+        f"records_read={int(counts['records_read'])}",
+        f"records_rejected={int(counts['records_rejected'])}",
+        f"record_groups={len(observed_groups)}",
+        f"field_paths={len(ordered_fields)}",
+        "identity=source+dataset+record_type+original_field_path",
+        "path_rule=inside each G block, original path is P prefix plus F path component",
+        "decision_rule=proposal_only;no_automatic_drop_merge_priority_or_fill",
+        "text_rule=no_semantic_inference_from_parliamentary_text",
+        "# TYPE_CODES",
+    ]
+    for technical_type_name, code in sorted(
+        type_codes.items(), key=lambda item: item[1]
+    ):
+        lines.append(f"T|{code}|{_catalog_json(technical_type_name)}")
+    lines.extend(
+        [
+            "# FIELD_GRAMMAR",
+            "# G|group_id|source|dataset|record_type|fields|conflicts|special",
+            "# P|shared_original_path_prefix; empty means F contains full path",
+            (
+                "# F|field_id|path_component|type_codes|"
+                "universe,absent,null,empty,filled|cardinality|"
+                "string_min,median,max|first_partition,last_partition|conflict"
+            ),
+            "# FIELDS",
+        ]
+    )
+
+    crosswalk_rows: list[dict[str, Any]] = []
+    for group in observed_groups:
+        group_rows = fields_by_group[group]
+        conflict_count = sum(
+            truthy(str(row.get("type_conflict", ""))) for row in group_rows
+        )
+        special = "senado_ccj_notas" if group[:2] == ("senado", "ccj_notas") else "-"
+        lines.append(
+            "|".join(
+                [
+                    "G",
+                    group_ids[group],
+                    *(_catalog_json(value) for value in group),
+                    str(len(group_rows)),
+                    str(conflict_count),
+                    special,
+                ]
+            )
+        )
+        for prefix, prefixed_rows in _global_catalog_prefix_blocks(group_rows):
+            lines.append(f"P|{_catalog_json(prefix)}")
+            for row, path_component in prefixed_rows:
+                key = (
+                    str(row.get("source", "")),
+                    str(row.get("dataset", "")),
+                    str(row.get("record_type", "")),
+                    str(row.get("field_path", "")),
+                )
+                technical_types = [
+                    value
+                    for value in str(row.get("technical_types", "")).split("|")
+                    if value
+                ]
+                encoded_types = ",".join(type_codes[value] for value in technical_types)
+                presence = ",".join(
+                    _catalog_cell(row.get(name, ""))
+                    for name in (
+                        "records_universe",
+                        "field_absent",
+                        "present_null",
+                        "present_empty",
+                        "present_filled",
+                    )
+                )
+                lengths = ",".join(
+                    _catalog_cell(row.get(name, ""))
+                    for name in (
+                        "string_length_min",
+                        "string_length_median",
+                        "string_length_max",
+                    )
+                )
+                partitions = ",".join(
+                    _catalog_cell(row.get(name, ""))
+                    for name in ("first_partition", "last_partition")
+                )
+                lines.append(
+                    "|".join(
+                        [
+                            "F",
+                            field_ids[key],
+                            _catalog_json(path_component),
+                            encoded_types,
+                            presence,
+                            _global_catalog_cardinality(row),
+                            lengths,
+                            partitions,
+                            "!" if truthy(str(row.get("type_conflict", ""))) else "-",
+                        ]
+                    )
+                )
+                crosswalk_rows.append(
+                    {
+                        "field_id": field_ids[key],
+                        "group_id": group_ids[group],
+                        **{
+                            name: row.get(name, "")
+                            for name in GLOBAL_CATALOG_CROSSWALK_FIELDS[2:]
+                        },
+                    }
+                )
+
+    selected_sample_keys: set[tuple[str, str, str, str]] = set()
+    for group in observed_groups:
+        limit = (
+            ccj_sample_fields
+            if group[:2] == ("senado", "ccj_notas")
+            else standard_sample_fields
+        )
+        selected_sample_keys.update(
+            _select_global_catalog_sample_keys(fields_by_group[group], limit)
+        )
+
+    samples_by_key: defaultdict[
+        tuple[str, str, str, str], list[dict[str, Any]]
+    ] = defaultdict(list)
+    for sample in sample_rows:
+        key = (
+            str(sample.get("source", "")),
+            str(sample.get("dataset", "")),
+            str(sample.get("record_type", "")),
+            str(sample.get("field_path", "")),
+        )
+        if key in selected_sample_keys and key in field_ids:
+            samples_by_key[key].append(dict(sample))
+
+    lines.extend(
+        [
+            "# CONTEXT_SAMPLES",
+            (
+                "# Deterministic context_only samples from G01; they cannot support "
+                "a column or alias, and long strings remain length+sha256 descriptors."
+            ),
+            "# S|field_id|context_only|technical_type_code|safe_value_json",
+        ]
+    )
+    sample_crosswalk_rows: list[dict[str, Any]] = []
+    for key in sorted(samples_by_key):
+        samples = sorted(
+            samples_by_key[key],
+            key=lambda row: str(row.get("sample_hash", "")),
+        )[:samples_per_field]
+        for sample in samples:
+            value_type = str(sample.get("value_type", ""))
+            safe_value = _global_catalog_safe_value(sample.get("value"))
+            lines.append(
+                "|".join(
+                    [
+                        "S",
+                        field_ids[key],
+                        "context_only",
+                        type_codes.get(value_type, _catalog_json(value_type)),
+                        _catalog_json(safe_value),
+                    ]
+                )
+            )
+            sample_crosswalk_rows.append(
+                {
+                    "field_id": field_ids[key],
+                    "channel": "context_only",
+                    "source": key[0],
+                    "dataset": key[1],
+                    "record_type": key[2],
+                    "field_path": key[3],
+                    "sample_hash": sample.get("sample_hash", ""),
+                    "value_type": value_type,
+                    "value_json": _catalog_json(safe_value),
+                }
+            )
+
+    lines.extend(
+        [
+            "# INVENTORY_ISSUES",
+            "# X|severity|issue_type|relative_path|record_number|field_path|detail",
+        ]
+    )
+    for issue in sorted(
+        (dict(row) for row in issue_rows),
+        key=lambda row: (
+            str(row.get("relative_path", "")),
+            str(row.get("record_number", "")),
+            str(row.get("issue_type", "")),
+            str(row.get("field_path", "")),
+        ),
+    ):
+        lines.append(
+            "|".join(
+                [
+                    "X",
+                    *(
+                        _catalog_json(issue.get(name, ""))
+                        for name in (
+                            "severity",
+                            "issue_type",
+                            "relative_path",
+                            "record_number",
+                            "field_path",
+                            "detail",
+                        )
+                    ),
+                ]
+            )
+        )
+
+    catalog_text = "\n".join(lines) + "\n"
+    crosswalk_text = _csv_text(
+        crosswalk_rows,
+        GLOBAL_CATALOG_CROSSWALK_FIELDS,
+    )
+    samples_text = _csv_text(
+        sample_crosswalk_rows,
+        GLOBAL_CATALOG_SAMPLE_FIELDS,
+    )
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = {
+        "catalog": output_dir / "catalogo_global_gpt56.txt",
+        "crosswalk": output_dir / "catalogo_global_crosswalk.csv",
+        "samples": output_dir / "catalogo_global_amostras.csv",
+        "manifest": output_dir / "catalogo_global_manifest.json",
+    }
+    _write_reusable_text(paths["catalog"], catalog_text)
+    _write_reusable_text(paths["crosswalk"], crosswalk_text)
+    _write_reusable_text(paths["samples"], samples_text)
+
+    conflict_count = sum(
+        truthy(str(row.get("type_conflict", ""))) for row in ordered_fields
+    )
+    ccj_path_count = sum(
+        row.get("source") == "senado" and row.get("dataset") == "ccj_notas"
+        for row in ordered_fields
+    )
+    output_refs = [
+        {
+            "name": paths[name].name,
+            "sha256": sha256_file(paths[name]),
+            "bytes": paths[name].stat().st_size,
+            "rows": row_count,
+        }
+        for name, row_count in (
+            ("catalog", len(lines)),
+            ("crosswalk", len(crosswalk_rows)),
+            ("samples", len(sample_crosswalk_rows)),
+        )
+    ]
+    catalog_manifest = {
+        "catalog_version": GLOBAL_CATALOG_VERSION,
+        "prompt_version": GLOBAL_CATALOG_PROMPT_VERSION,
+        "inventory_operation_id": expected_operation_id,
+        "inventory_manifest_sha256": inventory_manifest_sha256,
+        "counts": {
+            "records_observed": int(counts["records_observed"]),
+            "records_read": int(counts["records_read"]),
+            "records_rejected": int(counts["records_rejected"]),
+            "record_groups": len(observed_groups),
+            "field_paths": len(ordered_fields),
+            "type_conflicts": conflict_count,
+            "ccj_notas_field_paths": ccj_path_count,
+            "inventory_issues": len(issue_rows),
+            "safe_sample_rows": len(sample_crosswalk_rows),
+        },
+        "sample_policy": {
+            "selection": (
+                "typed_conflicts_and_evenly_spread_field_paths_without_semantic_reading"
+            ),
+            "channel": "context_only",
+            "standard_fields_per_group": standard_sample_fields,
+            "ccj_notas_fields_per_group": ccj_sample_fields,
+            "samples_per_field": samples_per_field,
+            "long_strings": "length_and_sha256_only",
+        },
+        "invariants": {
+            "all_inventory_paths_in_crosswalk": len(crosswalk_rows)
+            == len(ordered_fields),
+            "automatic_drop_merge_priority_or_fill": 0,
+            "raw_records_read": 0,
+            "normalized_records_materialized": 0,
+        },
+        "outputs": output_refs,
+        "next_action": (
+            "Upload catalogo_global_gpt56.txt as user_data and count the exact "
+            "full Responses input before requesting a global schema proposal."
+        ),
+    }
+    manifest_text = json.dumps(
+        catalog_manifest,
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=2,
+    ) + "\n"
+    _write_reusable_text(paths["manifest"], manifest_text)
+    return {
+        "paths": paths,
+        "manifest": catalog_manifest,
+        "field_rows": crosswalk_rows,
+        "sample_rows": sample_crosswalk_rows,
+    }
+
+
+def global_schema_prompt() -> str:
+    return (
+        "Analise integralmente o arquivo de catálogo do Falando Nela v3. "
+        "Ele representa todos os caminhos inventariados em G01; reconstrua cada "
+        "caminho como o prefixo da linha P corrente mais o componente da linha F, "
+        "dentro do grupo G corrente. Proponha um vocabulário global e coerente de "
+        "colunas normalizadas para pesquisa comparável de pronunciamentos, debates, "
+        "sessões, reuniões, documentos e pareceres sobre conteúdo constitucional "
+        "na Câmara e no Senado. Priorize arena, data, evento ou sessão, proposição "
+        "ou documento, parlamentar ou orador, partido, UF, sexo ou gênero informado "
+        "pela fonte, identificadores oficiais e proveniência. Use somente nomes de "
+        "caminhos, tipos, presença, cardinalidade e estrutura. As linhas S são apenas "
+        "context_only: não podem sustentar coluna, preenchimento ou alias. Não extraia "
+        "nem infira informação de texto parlamentar. Não descarte, funda, priorize "
+        "nem preencha campo automaticamente. "
+        "Trate aliases apenas como candidatos para auditoria recorde a recorde. "
+        "Mantenha os 543 conflitos explícitos, dedique tratamento próprio a "
+        "senado/ccj_notas e reconheça as 14 linhas rejeitadas. Nesta resposta, "
+        "defina o schema canônico, famílias de campos, critérios de mapeamento e "
+        "casos que exigem revisão; não tente emitir uma decisão detalhada para cada "
+        "um dos 23.786 campos. Toda proposta permanece sujeita à revisão humana."
+    )
+
+
+def _global_catalog_type_codes(
+    field_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, str]:
+    observed = sorted(
+        {
+            technical_type_name
+            for row in field_rows
+            for technical_type_name in str(
+                row.get("technical_types", "")
+            ).split("|")
+            if technical_type_name
+        }
+    )
+    preferred = {
+        "array": "a",
+        "boolean": "b",
+        "bytes": "y",
+        "date": "d",
+        "datetime": "dt",
+        "decimal": "dc",
+        "integer": "i",
+        "null": "n",
+        "number": "r",
+        "object": "o",
+        "string": "s",
+        "time": "t",
+    }
+    result: dict[str, str] = {}
+    used: set[str] = set()
+    extra_index = 1
+    for name in observed:
+        code = preferred.get(name)
+        if code is None or code in used:
+            while f"x{extra_index}" in used:
+                extra_index += 1
+            code = f"x{extra_index}"
+            extra_index += 1
+        result[name] = code
+        used.add(code)
+    return result
+
+
+def _global_catalog_prefix_blocks(
+    group_rows: Sequence[Mapping[str, Any]],
+) -> list[tuple[str, list[tuple[Mapping[str, Any], str]]]]:
+    by_parent: defaultdict[str, list[tuple[Mapping[str, Any], str]]] = defaultdict(list)
+    direct: list[tuple[Mapping[str, Any], str]] = []
+    for row in group_rows:
+        path = str(row.get("field_path", ""))
+        parent, suffix = _global_catalog_parent_suffix(path)
+        by_parent[parent].append((row, suffix))
+    factored: dict[str, list[tuple[Mapping[str, Any], str]]] = {}
+    for parent, rows in by_parent.items():
+        full_size = sum(len(str(row.get("field_path", ""))) for row, _ in rows)
+        factored_size = len(parent) + sum(len(suffix) for _, suffix in rows)
+        if parent and len(rows) >= 2 and full_size - factored_size >= 8:
+            factored[parent] = rows
+        else:
+            direct.extend(
+                (row, str(row.get("field_path", ""))) for row, _ in rows
+            )
+    blocks: list[tuple[str, list[tuple[Mapping[str, Any], str]]]] = []
+    if direct:
+        blocks.append(
+            (
+                "",
+                sorted(
+                    direct,
+                    key=lambda item: str(item[0].get("field_path", "")),
+                ),
+            )
+        )
+    blocks.extend(
+        (
+            parent,
+            sorted(rows, key=lambda item: str(item[0].get("field_path", ""))),
+        )
+        for parent, rows in sorted(factored.items())
+    )
+    return blocks
+
+
+def _global_catalog_parent_suffix(path: str) -> tuple[str, str]:
+    if path == "$" or not path:
+        return "", path
+    if path.endswith("[]"):
+        return path[:-2], "[]"
+    for index in range(len(path) - 1, 0, -1):
+        if path[index] != ".":
+            continue
+        backslashes = 0
+        cursor = index - 1
+        while cursor >= 0 and path[cursor] == "\\":
+            backslashes += 1
+            cursor -= 1
+        if backslashes % 2 == 0:
+            return path[:index], path[index:]
+    return "", path
+
+
+def _select_global_catalog_sample_keys(
+    group_rows: Sequence[Mapping[str, Any]],
+    limit: int,
+) -> set[tuple[str, str, str, str]]:
+    if limit <= 0 or not group_rows:
+        return set()
+    ordered = sorted(
+        group_rows,
+        key=lambda row: str(row.get("field_path", "")),
+    )
+    conflicts = [
+        row for row in ordered if truthy(str(row.get("type_conflict", "")))
+    ]
+    conflict_limit = min(len(conflicts), max(1, limit // 2))
+    selected = _spread_sequence(conflicts, conflict_limit)
+    selected_keys = {
+        (
+            str(row.get("source", "")),
+            str(row.get("dataset", "")),
+            str(row.get("record_type", "")),
+            str(row.get("field_path", "")),
+        )
+        for row in selected
+    }
+    remaining = [
+        row
+        for row in ordered
+        if (
+            str(row.get("source", "")),
+            str(row.get("dataset", "")),
+            str(row.get("record_type", "")),
+            str(row.get("field_path", "")),
+        )
+        not in selected_keys
+    ]
+    for row in _spread_sequence(remaining, limit - len(selected_keys)):
+        selected_keys.add(
+            (
+                str(row.get("source", "")),
+                str(row.get("dataset", "")),
+                str(row.get("record_type", "")),
+                str(row.get("field_path", "")),
+            )
+        )
+    return selected_keys
+
+
+def _spread_sequence(
+    rows: Sequence[Mapping[str, Any]],
+    limit: int,
+) -> list[Mapping[str, Any]]:
+    if limit <= 0 or not rows:
+        return []
+    if limit >= len(rows):
+        return list(rows)
+    if limit == 1:
+        return [rows[0]]
+    indexes = {
+        round(position * (len(rows) - 1) / (limit - 1))
+        for position in range(limit)
+    }
+    return [rows[index] for index in sorted(indexes)]
+
+
+def _global_catalog_cardinality(row: Mapping[str, Any]) -> str:
+    value = _catalog_cell(row.get("cardinality", ""))
+    method = str(row.get("cardinality_method", ""))
+    if value == "-":
+        return "-"
+    if method == "exact_scalar_values":
+        return f"={value}"
+    if method == "kmv_scalar_estimate":
+        return f"~{value}"
+    return value
+
+
+def _global_catalog_safe_value(value: Any) -> Any:
+    if isinstance(value, str):
+        if len(value) <= DEFAULT_METADATA_VALUE_LIMIT:
+            return value
+        return {
+            "kind": "redacted_long_string",
+            "length": len(value),
+            "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+        }
+    if isinstance(value, Mapping):
+        return {
+            str(key): _global_catalog_safe_value(child)
+            for key, child in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_global_catalog_safe_value(child) for child in value]
+    return canonical_json_value(value)
+
+
+def _catalog_json(value: Any) -> str:
+    encoded = json.dumps(
+        canonical_json_value(value),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return encoded.replace("|", "\\u007c")
+
+
+def _catalog_cell(value: Any) -> str:
+    text = str(value)
+    return text if text else "-"
+
+
+def _csv_text(
+    rows: Sequence[Mapping[str, Any]],
+    fieldnames: Sequence[str],
+) -> str:
+    handle = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        handle,
+        fieldnames=fieldnames,
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return handle.getvalue()
+
+
+def _write_reusable_text(path: Path, content: str) -> None:
+    encoded = content.encode("utf-8")
+    if path.exists():
+        if path.read_bytes() != encoded:
+            raise FileExistsError(
+                f"Artefato existente diverge e não será sobrescrito: {path}"
+            )
+        return
+    path.write_bytes(encoded)
 
 
 def validated_config(config: SchemaConfig) -> SchemaConfig:

@@ -2,8 +2,11 @@
 
 ## Estado
 
-Specs aprovadas e ferramenta de evidências implementada em 2026-07-24.
-Execução integral, piloto GPT real e G02 permanecem pendentes. Adaptadores e
+Specs aprovadas e ferramenta de evidências implementada em 2026-07-24. G01 foi
+revalidado no runtime do pesquisador, e dois pilotos exploratórios de 150 e
+300 caminhos foram executados para orientar a ampliação. Eles não substituem
+a avaliação A/B formal. O catálogo global está implementado, mas sua execução
+integral, a chamada global e G02 permanecem pendentes. Adaptadores e
 materialização de registros normalizados continuam bloqueados.
 
 ## Regra de avanço
@@ -27,9 +30,23 @@ próprios.
 - [x] Revisar e aprovar `validation.md`.
 - [x] Revisar e aprovar `tech-stack.md`.
 - [x] Revisar e aprovar este plano.
-- [ ] Localizar os sete artefatos de G01 e conferir seus hashes.
+- [x] Localizar os sete artefatos de G01 e conferir seus hashes.
 - [ ] Confirmar que o fingerprint do raw permanece igual ao de G01.
 - [x] Implementar somente a ferramenta de evidências autorizada pelas specs.
+- [x] Executar pilotos exploratórios de 150 e 300 caminhos para avaliar o formato de proposta.
+- [x] Concluir que lotes independentes não fornecem visão semântica global ao modelo.
+- [x] Especificar uma chamada global com arquivo seguida de mapeamento por vocabulário congelado.
+- [x] Implementar catálogo TXT reversível e crosswalk dos caminhos originais.
+- [x] Implementar amostragem segura `context_only` e reforçada para `senado/ccj_notas`.
+- [x] Integrar ao caderno o upload `user_data` e a contagem exata de tokens.
+- [ ] Gerar o catálogo global no runtime atual a partir dos artefatos G01.
+- [ ] Confirmar no catálogo 23.786 caminhos, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
+- [ ] Fazer upload do TXT e contar exatamente o payload global.
+- [ ] Confirmar que o payload não excede 922.000 tokens sem truncamento.
+- [ ] Executar uma única chamada para propor o vocabulário global.
+- [ ] Revisar e congelar humanamente o vocabulário global.
+- [ ] Preparar Batch somente para mapear `field_id` com o vocabulário congelado.
+- [ ] Reconciliar uma proposta de disposição para todos os 23.786 `field_id`.
 - [ ] Cobrir os 23.786 caminhos no livro de decisões.
 - [ ] Catalogar categorias e definições relevantes das APIs oficiais.
 - [ ] Montar pacotes GPT apenas com evidências de metadados permitidas.
@@ -76,6 +93,9 @@ próprios.
 | S11 | A avaliação A/B mostra se os previews agregam qualidade proporcional ao custo? |
 | S12 | Marcadores e estruturas textuais foram integralmente adiados? |
 | S13 | O pesquisador aprovou categorias, nulos, regras e proveniência em G02? |
+| S14 | O catálogo global reconstrói exatamente os 23.786 caminhos? |
+| S15 | O arquivo e o prompt cabem numa única chamada sem truncamento? |
+| S16 | Batch apenas aplica um vocabulário global já revisado e congelado? |
 
 ## Entregas desta etapa
 
@@ -87,6 +107,8 @@ Depois de implementada e executada com autorização, a etapa entregará:
 - amostras estruturais e previews de contexto separados;
 - propostas GPT declarativas com sua trilha de execução;
 - avaliação A/B do efeito dos previews;
+- catálogo global TXT, crosswalk, amostras e recibo de contagem;
+- proposta de vocabulário global preservada para revisão;
 - auditoria recorde a recorde de duplicidades e aliases;
 - relatório completo dos conflitos de tipo;
 - trilha especial de `senado/ccj_notas`;

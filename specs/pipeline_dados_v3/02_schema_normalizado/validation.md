@@ -3,8 +3,9 @@
 ## Estado
 
 Contrato aprovado. Os testes sintéticos da implementação estão concluídos;
-validações que dependem da execução integral aprovada, do piloto real ou de
-revisão humana permanecem pendentes.
+os pilotos exploratórios não substituem a avaliação A/B formal. Validações que
+dependem da execução integral, do catálogo global ou de revisão humana
+permanecem pendentes.
 
 ## Pré-condições
 
@@ -332,3 +333,53 @@ pesquisador responsável revisar:
 
 Sem G02 aprovado, permanecem bloqueados os adaptadores por fonte e qualquer
 implementação de normalização.
+
+## Validação do catálogo global
+
+O catálogo compacto deverá ser validado junto com seu crosswalk antes de
+qualquer chamada global:
+
+```text
+linhas F = 23.786
+field_id únicos = 23.786
+caminhos reconstruídos ausentes = 0
+caminhos reconstruídos inventados = 0
+conflitos marcados = 543
+caminhos senado/ccj_notas = 20.523
+registros observados = 1.148.740 + 14
+```
+
+A concatenação do prefixo `P` corrente com o componente de caminho de cada
+linha `F` deverá reproduzir byte a byte o caminho original do crosswalk.
+Compactação nunca poderá normalizar, abreviar semanticamente ou retirar
+segmentos do caminho.
+
+- [x] V02-80 — Testar unicidade de IDs e cobertura bidirecional do catálogo em fixture.
+- [x] V02-81 — Testar reconstrução exata de todos os caminhos compactados em fixture.
+- [x] V02-82 — Testar reutilização de saída idêntica sem sobrescrita divergente.
+- [x] V02-83 — Testar que strings longas não aparecem literalmente no catálogo.
+- [ ] V02-84 — Confirmar 23.786 linhas de campo na execução integral.
+- [ ] V02-85 — Reconciliar 14 rejeições, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
+- [ ] V02-86 — Conferir os hashes do catálogo, crosswalk e trilha de amostras.
+- [ ] V02-87 — Reconstituir todos os caminhos da execução integral e comparar ao inventário.
+
+O arquivo do modelo deverá ser `catalogo_global_gpt56.txt`, enviado com
+`purpose=user_data`. CSV, planilha e `File Search` não poderão substituir o
+arquivo textual nessa chamada. A contagem será feita pelo endpoint oficial
+com exatamente o mesmo `file_id`, prompt, modelo e estrutura de entrada que a
+geração usará.
+
+- [ ] V02-88 — Registrar o `file_id`, o SHA-256 e a contagem exata do payload.
+- [ ] V02-89 — Confirmar que o payload completo não excede 922.000 tokens.
+- [ ] V02-90 — Rejeitar geração com truncamento automático ou catálogo parcial.
+- [ ] V02-91 — Confirmar que a chamada global recebeu todos os 23.786 caminhos.
+- [ ] V02-92 — Validar e preservar a resposta global sem aplicá-la.
+
+Batch não poderá definir o vocabulário global: cada linha é uma requisição
+independente. Se usado depois, todas as linhas deverão receber a mesma versão
+congelada do schema e mapear IDs existentes no crosswalk.
+
+- [ ] V02-93 — Registrar a aprovação humana do vocabulário global.
+- [ ] V02-94 — Confirmar que todo request Batch usa o mesmo schema congelado.
+- [ ] V02-95 — Reconciliar uma disposição proposta para cada um dos 23.786 IDs.
+- [ ] V02-96 — Confirmar zero descarte, fusão, prioridade ou preenchimento automático.

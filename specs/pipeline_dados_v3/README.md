@@ -6,8 +6,9 @@ Contrato geral aprovado. `01_inventario_metadados_raw` foi concluído e a
 ferramenta de evidências de `02_schema_normalizado` está implementada.
 
 O passo 01 foi concluído e G01 foi aprovado. A execução integral de G02, o
-piloto pago da OpenAI e qualquer dado normalizado v3 continuam condicionados
-aos gates explícitos do passo 02.
+catálogo global e qualquer dado normalizado v3 continuam condicionados aos
+gates explícitos do passo 02. Pilotos exploratórios foram executados, mas não
+substituem a avaliação e a aprovação formal de G02.
 
 ## Objetivo
 

@@ -16,7 +16,9 @@ from pipeline_dados_v3.schema_normalizado import (
     RawRecord,
     SchemaConfig,
     audit_linked_records,
+    build_compact_global_catalog,
     evaluate_context_ab,
+    global_schema_prompt,
     initialize_field_review,
     prepare_schema_evidence,
     read_jsonl,
@@ -209,6 +211,77 @@ def test_prepare_evidence_is_read_only_complete_and_deterministic(
         ).read_bytes() == (
             second["paths"]["manifest"].parent / name
         ).read_bytes()
+
+
+def test_compact_global_catalog_covers_every_path_and_is_reusable(
+    tmp_path: Path,
+) -> None:
+    setup = prepare_fixture_inputs(tmp_path)
+    inventory_root = setup["inventory_root"]
+    manifest_path = inventory_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    kwargs = {
+        "inventory_manifest": manifest,
+        "inventory_manifest_sha256": sha256_bytes(manifest_path.read_bytes()),
+        "field_rows": read_csv_rows(inventory_root / "inventario_campos.csv"),
+        "issue_rows": read_csv_rows(inventory_root / "inconsistencias.csv"),
+        "sample_rows": read_jsonl(inventory_root / "amostras_campos.jsonl"),
+        "output_dir": tmp_path / "compact-catalog",
+        "expected_operation_id": "fixture-g01",
+        "standard_sample_fields": 50,
+        "ccj_sample_fields": 50,
+        "samples_per_field": 2,
+    }
+    first = build_compact_global_catalog(**kwargs)
+    second = build_compact_global_catalog(**kwargs)
+
+    assert first["paths"]["catalog"].read_bytes() == second["paths"][
+        "catalog"
+    ].read_bytes()
+    assert len(first["field_rows"]) == setup["field_count"]
+    assert len({row["field_id"] for row in first["field_rows"]}) == setup[
+        "field_count"
+    ]
+    assert {
+        (
+            row["source"],
+            row["dataset"],
+            row["record_type"],
+            row["field_path"],
+        )
+        for row in first["field_rows"]
+    } == {
+        (
+            row["source"],
+            row["dataset"],
+            row["record_type"],
+            row["field_path"],
+        )
+        for row in kwargs["field_rows"]
+    }
+    compact_text = first["paths"]["catalog"].read_text(encoding="utf-8")
+    assert reconstruct_compact_paths(compact_text) == {
+        row["field_id"]: row["field_path"] for row in first["field_rows"]
+    }
+    assert setup["long_text"] not in compact_text
+    assert "redacted_long_string" in compact_text
+    assert first["manifest"]["counts"]["records_rejected"] == 1
+    assert first["manifest"]["counts"]["type_conflicts"] == 1
+    assert first["manifest"]["counts"]["ccj_notas_field_paths"] == setup[
+        "field_count"
+    ]
+    assert first["manifest"]["invariants"][
+        "all_inventory_paths_in_crosswalk"
+    ] is True
+    assert "23.786" in global_schema_prompt()
+
+    first["paths"]["catalog"].write_text("divergente\n", encoding="utf-8")
+    try:
+        build_compact_global_catalog(**kwargs)
+    except FileExistsError as exc:
+        assert "não será sobrescrito" in str(exc)
+    else:
+        raise AssertionError("Catálogo divergente não deveria ser sobrescrito.")
 
 
 def test_gpt_pilot_is_paired_a_b_and_never_applies_proposals(
@@ -412,6 +485,7 @@ def prepare_fixture_inputs(tmp_path: Path) -> dict[str, Any]:
             "mixed": 1,
             "content": long_text,
             "items": [{"value": 1}, {"value": 2}],
+            "odd.key|name": "opaque",
         },
         {
             "record_type": "nota",
@@ -539,6 +613,26 @@ def tree_hashes(root: Path) -> dict[str, bytes]:
 def read_csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def reconstruct_compact_paths(text: str) -> dict[str, str]:
+    prefix = ""
+    paths: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.startswith("G|"):
+            prefix = ""
+        elif line.startswith("P|"):
+            prefix = json.loads(line.split("|", 1)[1])
+        elif line.startswith("F|"):
+            _, field_id, path_json, *_ = line.split("|")
+            paths[field_id] = prefix + json.loads(path_json)
+    return paths
+
+
+def sha256_bytes(value: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(value).hexdigest()
 
 
 class FakeOpenAIResponse:

@@ -3,8 +3,10 @@
 ## Estado
 
 Stack aprovada e implementada para produzir as evidências e o contrato de
-G02. A execução integral e o piloto real permanecem sujeitos aos gates do
-plano; a aplicação do schema continua bloqueada.
+G02. Os pilotos exploratórios foram executados, e o catálogo global, seu
+upload e a contagem exata estão implementados. A execução integral desses
+artefatos e a chamada global permanecem sujeitas aos gates do plano; a
+aplicação do schema continua bloqueada.
 
 ## Ambiente
 
@@ -42,6 +44,10 @@ Nenhum derivado v1/v2 será carregado como entrada científica.
 | regras e configuração efetiva | JSON fechado e versionado |
 | amostras seguras | JSONL com coordenadas e hashes |
 | previews textuais de contexto | JSONL separado e limitado |
+| catálogo global do modelo | TXT UTF-8 line-oriented, reversível |
+| crosswalk do catálogo global | CSV UTF-8 com caminho original integral |
+| trilha de amostras do catálogo | CSV UTF-8 |
+| recibo de upload e tokens | JSON |
 | propostas GPT e trilha de execução | JSONL validado por schema fechado |
 | avaliação A/B | CSV UTF-8 |
 | manifest | JSON |
@@ -197,8 +203,40 @@ para que o validador impeça o uso acidental de contexto como evidência.
 
 ## Cliente GPT-5.6
 
-O piloto usará chamadas síncronas e pequenas. Batch só poderá ser considerado
-depois da revisão de qualidade, validade, tokens e custo do piloto.
+O piloto usa chamadas síncronas e pequenas. Depois da revisão exploratória, a
+definição do vocabulário global usará uma única chamada da Responses API com
+`catalogo_global_gpt56.txt` como `input_file`.
+
+O catálogo será enviado pela Files API com `purpose=user_data`. Antes da
+geração, `responses.input_tokens.count` receberá exatamente o mesmo modelo,
+arquivo, prompt e estrutura de mensagens. A chamada será bloqueada acima de
+922.000 tokens de entrada e usará truncamento desabilitado.
+
+O arquivo do modelo será TXT. CSV e XLSX não serão usados como `input_file`
+para esta decisão porque o fluxo de planilhas processa apenas uma visão
+reduzida das primeiras 1.000 linhas por aba. `File Search` também não será
+usado para definir o schema global, pois recuperação por relevância não
+garante que todos os caminhos integrem a decisão.
+
+O formato line-oriented terá:
+
+- cabeçalho com a operação G01 e suas contagens vinculantes;
+- legenda fechada de tipos técnicos;
+- linhas `G` para proveniência repetida por grupo;
+- linhas `P` para prefixos de caminho reversíveis;
+- exatamente uma linha `F` e um `field_id` por caminho inventariado;
+- linhas `S` apenas para amostras seguras marcadas `context_only`;
+- linhas `X` para as inconsistências preservadas de G01.
+
+O crosswalk separado preservará o caminho original integral e todas as
+métricas, permitindo provar que `P + componente F` reproduz o inventário
+exatamente. A compactação não modifica o raw e não interpreta nomes ou
+valores.
+
+Batch só poderá ser considerado depois que a proposta global for revisada e o
+vocabulário canônico for congelado. Cada linha Batch será tratada como
+requisição independente e receberá a mesma versão do schema; Batch aplicará o
+vocabulário aos `field_id`, mas nunca será usado para descobri-lo.
 
 As condições A e B serão executadas como pares com o mesmo modelo resolvido,
 parâmetros, prompt, JSON Schema e evidências. A condição B acrescentará somente
@@ -278,6 +316,14 @@ resolvido, parâmetros, prompt, JSON Schema, hashes da entrada e resposta bruta.
 - [x] T02-17 — Impedir `context_id` de satisfazer evidência obrigatória.
 - [x] T02-18 — Executar e comparar condições A/B pareadas.
 - [x] T02-19 — Reproduzir hashes das saídas determinísticas de Python.
+- [x] T02-20 — Implementar catálogo TXT global e crosswalk lossless.
+- [x] T02-21 — Implementar seleção compacta de amostras `context_only`.
+- [x] T02-22 — Implementar reutilização idempotente dos artefatos globais.
+- [x] T02-23 — Integrar upload `user_data` e contagem exata de tokens ao caderno.
+- [ ] T02-24 — Executar a contagem exata com o catálogo integral aprovado.
+- [ ] T02-25 — Confirmar que a entrada global cabe no máximo de 922.000 tokens.
+- [ ] T02-26 — Executar e preservar a proposta global sem aplicação automática.
+- [ ] T02-27 — Fixar o schema revisado antes de preparar Batch por `field_id`.
 
 ## Dependências proibidas nesta etapa
 

@@ -3,9 +3,11 @@
 ## Estado
 
 Specs aprovadas e implementação da ferramenta de evidências autorizada pelo
-pesquisador responsável em 2026-07-24. A autorização não inclui aplicar o
-schema, gerar dados normalizados, alterar o `raw/`, ampliar chamadas GPT após
-o piloto ou iniciar os submódulos seguintes.
+pesquisador responsável em 2026-07-24. Depois dos pilotos exploratórios, o
+pesquisador autorizou preparar o catálogo global, seu upload como arquivo e a
+contagem exata do payload. A geração será decidida depois dessa contagem. A
+autorização não inclui aplicar o schema, gerar dados normalizados, alterar o
+`raw/` ou iniciar os submódulos seguintes.
 
 O único inventário aceito como evidência estrutural é
 `raw-metadata-full-20260724t184418z`, aprovado em G01 em 2026-07-24.
@@ -354,6 +356,67 @@ incorretos, respostas com evidência insuficiente, tokens, latência e custo. Os
 previews só permanecerão no desenho se demonstrarem benefício revisado pelo
 pesquisador responsável.
 
+### Catálogo global e ampliação após o piloto
+
+Os pilotos exploratórios mostraram que lotes independentes são úteis para
+aplicar uma classificação já definida, mas não dão ao modelo uma visão global
+dos 23.786 caminhos. A ampliação adotará, portanto, duas fases distintas:
+
+1. uma única chamada global definirá o vocabulário canônico a partir de um
+   arquivo textual que represente todos os caminhos;
+2. somente depois de revisão e congelamento desse vocabulário, chamadas Batch
+   independentes poderão propor o mapeamento de cada caminho.
+
+O catálogo global será produzido apenas dos artefatos aprovados de G01, sem
+reler o raw. Ele deverá:
+
+- conter exatamente uma identidade para cada caminho do inventário;
+- preservar em crosswalk separado a fonte, o dataset, o `record_type`, o
+  caminho original integral e todas as métricas do inventário;
+- fatorar apenas repetições de proveniência e prefixos de caminho de maneira
+  reversível;
+- manter os tipos, estados de presença, cardinalidade, comprimentos, partições
+  e indicador de conflito;
+- reconciliar explicitamente 14 rejeições, 543 conflitos e os 20.523 caminhos
+  de `senado/ccj_notas`;
+- incluir amostras seguras de G01 em canal `context_only`, selecionadas por
+  regra determinística sem leitura semântica e incapazes de sustentar coluna
+  ou alias;
+- representar strings longas somente por tipo, tamanho e SHA-256;
+- produzir hashes e manifest próprios;
+- ser idempotente: saída existente idêntica será reutilizada e saída
+  divergente não será sobrescrita.
+
+O pesquisador autorizou em 2026-07-24 a seleção determinística dessas amostras
+`context_only` para dar ao modelo noção prática do banco sem exigir a edição
+manual de 23.786 linhas. Essa autorização não converte amostra em evidência,
+não libera conteúdo longo e não altera as regras dos previews textuais.
+
+O arquivo enviado ao modelo será `.txt`, não `.csv` ou planilha, para que os
+23.786 caminhos integrem o contexto em vez de serem submetidos ao fluxo
+reduzido de leitura de planilhas. `File Search` não será usado para esta
+decisão global, pois recuperação seletiva não comprova leitura integral.
+
+Antes da chamada de geração, o arquivo será enviado com `purpose=user_data` e
+o payload completo, incluindo o prompt versionado, será submetido ao endpoint
+de contagem exata de tokens. A geração permanecerá bloqueada se exceder o
+máximo de entrada do modelo ou se qualquer reconciliação falhar. Truncamento
+automático será proibido.
+
+A resposta global proporá apenas:
+
+- schema canônico e definições de colunas;
+- famílias estruturais de campos;
+- critérios declarativos de mapeamento;
+- candidatos a aliases ainda sujeitos à auditoria recorde a recorde;
+- conflitos e casos que exigem decisão humana.
+
+Ela não tentará emitir 23.786 decisões verbosas, aplicar mapeamentos, confirmar
+aliases ou autorizar descarte, fusão, prioridade e preenchimento. O Batch
+posterior receberá o mesmo vocabulário canônico congelado em cada requisição;
+suas linhas continuarão independentes e seus resultados serão apenas
+propostas vinculadas aos identificadores do crosswalk.
+
 ## Conflitos de tipo
 
 Cada um dos 543 conflitos deverá receber uma linha própria com tipos,
@@ -413,6 +476,11 @@ A ferramenta implementada prepara ou reserva ao menos:
 | `auditoria_aliases.csv` | pares, contagens, taxas e decisão humana |
 | `amostras_estruturais.jsonl` | registros `evidence` selecionados |
 | `previews_contexto.jsonl` | trechos `context_only` aprovados |
+| `catalogo_global_gpt56.txt` | representação integral compacta enviada ao modelo |
+| `catalogo_global_crosswalk.csv` | correspondência lossless entre IDs e caminhos originais |
+| `catalogo_global_amostras.csv` | trilha das amostras `context_only` efetivamente incluídas |
+| `catalogo_global_manifest.json` | hashes, contagens e política do catálogo global |
+| `upload_token_count.json` | `file_id`, hash e contagem exata do payload global |
 | `propostas_gpt.jsonl` | propostas declarativas, evidências e estados |
 | `execucao_gpt.jsonl` | modelo, prompt, tokens, custo, erros e recusas |
 | `avaliacao_contexto_ab.csv` | comparação pareada com e sem previews |
@@ -449,6 +517,14 @@ responsabilidades poderá ser eliminada.
 - [x] R02-21 — Impedir que preview de contexto seja evidência de coluna ou alias.
 - [x] R02-22 — Comparar condições pareadas com e sem previews textuais.
 - [ ] R02-23 — Manter previews somente após benefício aprovado na avaliação A/B.
+- [x] R02-24 — Implementar representação global reversível dos 23.786 caminhos.
+- [x] R02-25 — Preservar o caminho integral e as métricas no crosswalk do catálogo.
+- [x] R02-26 — Implementar amostragem segura `context_only` sem inferência semântica.
+- [ ] R02-27 — Executar o catálogo global sobre o inventário integral aprovado.
+- [ ] R02-28 — Contar exatamente o payload com arquivo e prompt antes da geração.
+- [ ] R02-29 — Obter e revisar a proposta global de vocabulário canônico.
+- [ ] R02-30 — Congelar humanamente o vocabulário antes de qualquer Batch integral.
+- [ ] R02-31 — Mapear os 23.786 IDs sem descarte ou fusão automática.
 
 ## Não objetivos
 

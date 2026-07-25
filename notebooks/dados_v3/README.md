@@ -29,9 +29,15 @@ completa nascem desligadas e cada gate exige a cópia literal do respectivo
 - separa amostras estruturais `evidence` de previews `context_only`;
 - mantém a preparação, a aprovação de previews, o piloto GPT-5.6 e a avaliação
   A/B em gates independentes, desligados por padrão;
+- reutiliza as variáveis já validadas de G01 para gerar, sem reler o raw, um
+  catálogo TXT compacto com os 23.786 caminhos e um crosswalk integral;
+- separa o upload `user_data` e a contagem exata de tokens da futura chamada
+  global, permitindo interromper antes de qualquer geração;
 - não materializa dados normalizados nem aplica propostas do modelo.
 
 O piloto reutiliza `OPENAI_API_KEY` apenas do cofre de secrets do Colab. A
 chave não é exibida nem escrita em artefatos. Uma tabela JSON de preços,
 versionada pelo pesquisador, é obrigatória para registrar o custo calculado.
-G02 continua pendente mesmo quando todas as células técnicas terminam.
+O catálogo global é enviado como TXT, não CSV, e Batch só poderá ser usado
+depois da revisão do vocabulário global. G02 continua pendente mesmo quando
+todas as células técnicas terminam.
