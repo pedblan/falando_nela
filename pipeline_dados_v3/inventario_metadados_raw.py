@@ -248,7 +248,9 @@ class InventoryAccumulator:
     group_records: Counter[tuple[str, str, str]] = field(default_factory=Counter)
     fields: dict[tuple[str, str, str, str], FieldStats] = field(default_factory=dict)
     issues: list[dict[str, Any]] = field(default_factory=list)
-    _issue_keys: set[tuple[str, str, str, str]] = field(default_factory=set)
+    _issue_keys: set[tuple[str, str, str, int | str, str, str]] = field(
+        default_factory=set
+    )
 
     def observe_record(
         self,
@@ -326,7 +328,14 @@ class InventoryAccumulator:
         record_number: int | str = "",
         field_path: str = "",
     ) -> None:
-        issue_key = (severity, issue_type, relative_path, detail)
+        issue_key = (
+            severity,
+            issue_type,
+            relative_path,
+            record_number,
+            field_path,
+            detail,
+        )
         if issue_key in self._issue_keys:
             return
         self._issue_keys.add(issue_key)

@@ -54,7 +54,7 @@ def test_full_inventory_is_read_only_and_reconciles_field_states(
     ]
     jsonl_path.write_text(
         "\n".join(json.dumps(record, ensure_ascii=False) for record in records)
-        + "\n{invalido\n",
+        + "\n{invalido\n{tambem-invalido\n",
         encoding="utf-8",
     )
     before = tree_signature(raw_root)
@@ -72,9 +72,9 @@ def test_full_inventory_is_read_only_and_reconciles_field_states(
     manifest = result["manifest"]
     assert manifest["execution_status"] == "succeeded"
     assert manifest["scientific_gate"] == "needs_review"
-    assert manifest["counts"]["records_observed"] == 3
+    assert manifest["counts"]["records_observed"] == 4
     assert manifest["counts"]["records_read"] == 2
-    assert manifest["counts"]["records_rejected"] == 1
+    assert manifest["counts"]["records_rejected"] == 2
     assert len(manifest["outputs"]) == 6
 
     by_path = {
@@ -99,7 +99,13 @@ def test_full_inventory_is_read_only_and_reconciles_field_states(
         if path.is_file()
     )
     assert long_text not in operation_text
-    assert any(issue["issue_type"] == "invalid_json_line" for issue in result["issues"])
+    rejected_issues = [
+        issue
+        for issue in result["issues"]
+        if issue["issue_type"] == "invalid_json_line"
+    ]
+    assert len(rejected_issues) == 2
+    assert {issue["record_number"] for issue in rejected_issues} == {3, 4}
 
 
 def test_json_csv_and_parquet_are_read_as_structured_records(

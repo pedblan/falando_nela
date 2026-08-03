@@ -1,0 +1,19 @@
+source,dataset,record_type,field_path,semantic_role,decision,decision_rationale,decision_by,decision_at
+camara,ccjc_eventos,notas_taquigraficas,$.payload.CodigoEvento,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+camara,ccjc_eventos,notas_taquigraficas,$.payload.TextoIntegral,text,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+camara,ccjc_eventos,notas_taquigraficas,$.payload.evento_id,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+camara,ccjc_eventos,notas_taquigraficas,$.payload.texto,text,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+camara,pareceres_pec,parecer_pec_texto,$.payload.TextoIntegral,text,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+camara,pareceres_pec,parecer_pec_texto,$.payload.texto,text,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas,$.payload.CodigoReuniao,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas,$.payload.TextoIntegral,text,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas,$.payload.codigo_reuniao,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas,$.payload.metadata.agenda,metadata,candidato,Auditoria exata tipada da hipótese rejeitada de alias,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas,$.payload.metadata.detalhe,metadata,candidato,Auditoria exata tipada da hipótese rejeitada de alias,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas,$.payload.texto,text,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas_status,$.payload.CodigoReuniao,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,ccj_notas,notas_taquigraficas_status,$.payload.codigo_reuniao,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,congresso_discursos,pronunciamento_texto,$.payload.CodigoPronunciamento,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,congresso_discursos,pronunciamento_texto,$.payload.codigo_pronunciamento,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,plenario_discursos,pronunciamento_texto,$.payload.CodigoPronunciamento,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25
+senado,plenario_discursos,pronunciamento_texto,$.payload.codigo_pronunciamento,metadata,candidato,Auditoria exata tipada da duplicação técnica aprovada,pesquisador responsável,2026-07-25

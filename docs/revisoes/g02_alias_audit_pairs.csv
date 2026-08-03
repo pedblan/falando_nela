@@ -1,0 +1,10 @@
+source,dataset,record_type,field_a,field_b,comparison_scope,candidate_signal
+camara,ccjc_eventos,notas_taquigraficas,$.payload.CodigoEvento,$.payload.evento_id,same_record,human_approved_structural_audit:alias-camara-event-id:technical_duplication
+camara,ccjc_eventos,notas_taquigraficas,$.payload.TextoIntegral,$.payload.texto,same_record,human_approved_structural_audit:alias-camara-notas-text:technical_duplication
+camara,pareceres_pec,parecer_pec_texto,$.payload.TextoIntegral,$.payload.texto,same_record,human_approved_structural_audit:alias-camara-parecer-text:technical_duplication
+senado,ccj_notas,notas_taquigraficas,$.payload.CodigoReuniao,$.payload.codigo_reuniao,same_record,human_approved_structural_audit:alias-senado-meeting-id:technical_duplication
+senado,ccj_notas,notas_taquigraficas_status,$.payload.CodigoReuniao,$.payload.codigo_reuniao,same_record,human_approved_structural_audit:alias-senado-meeting-id-status:technical_duplication
+senado,ccj_notas,notas_taquigraficas,$.payload.TextoIntegral,$.payload.texto,same_record,human_approved_structural_audit:alias-senado-notas-text:technical_duplication
+senado,congresso_discursos,pronunciamento_texto,$.payload.CodigoPronunciamento,$.payload.codigo_pronunciamento,same_record,human_approved_structural_audit:alias-senado-pronouncement-id-congresso:technical_duplication
+senado,plenario_discursos,pronunciamento_texto,$.payload.CodigoPronunciamento,$.payload.codigo_pronunciamento,same_record,human_approved_structural_audit:alias-senado-pronouncement-id-plenario:technical_duplication
+senado,ccj_notas,notas_taquigraficas,$.payload.metadata.agenda,$.payload.metadata.detalhe,same_record,human_approved_structural_audit:alias-ccj-agenda-detail-subtrees:not_alias

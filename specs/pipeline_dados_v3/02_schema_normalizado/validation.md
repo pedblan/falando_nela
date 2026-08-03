@@ -2,10 +2,22 @@
 
 ## Estado
 
-Contrato aprovado. Os testes sintéticos da implementação estão concluídos;
-os pilotos exploratórios não substituem a avaliação A/B formal. Validações que
-dependem da execução integral, do catálogo global ou de revisão humana
-permanecem pendentes.
+Contrato aprovado. Os testes sintéticos da implementação estão concluídos e o
+vocabulário conceitual da proposta `gpt56-global-schema-proposal-v1` foi
+revisado e aprovado pelo pesquisador em 2026-07-25. A chamada global foi
+reconciliada e o contrato lógico aprovado foi incorporado ao gerador e
+validado por testes. Isso não fecha o gate operacional completo de G02. Os
+pilotos exploratórios não substituem a avaliação A/B formal. A execução
+integral e os artefatos técnicos estão reconciliados; permanecem pendentes as
+decisões humanas do livro, dos aliases, dos conflitos, dos previews e do gate
+final.
+
+O Batch e seus dois reparos foram reconciliados em 2026-07-25: 23.786
+propostas únicas, zero IDs ausentes e custo efetivo total de US$ 19,7714390.
+O resultado permanece não aplicado e com decisão humana pendente. A auditoria
+integral do raw terminou em 2026-07-26 com fingerprint estável, 1.148.740
+registros relidos e os artefatos técnicos reconciliados; o gate humano
+operacional continua pendente.
 
 ## Pré-condições
 
@@ -19,14 +31,14 @@ permanecem pendentes.
 
 ## Validação da entrada
 
-- [ ] V02-01 — Verificar `operation_id`, versão do inventário e commit registrados no manifest.
-- [ ] V02-02 — Recalcular e conferir os hashes dos sete artefatos de G01.
-- [ ] V02-03 — Confirmar `1.148.754 = 1.148.740 + 14`.
-- [ ] V02-04 — Confirmar 50 grupos `fonte × dataset × record_type`.
-- [ ] V02-05 — Confirmar 23.786 caminhos no inventário de campos.
-- [ ] V02-06 — Confirmar 543 conflitos de tipo.
-- [ ] V02-07 — Confirmar a distribuição `540 + 1 + 2` dos conflitos.
-- [ ] V02-08 — Confirmar 20.523 caminhos em `senado/ccj_notas`.
+- [x] V02-01 — Verificar `operation_id`, versão do inventário e commit registrados no manifest.
+- [x] V02-02 — Recalcular e conferir os hashes dos sete artefatos de G01.
+- [x] V02-03 — Confirmar `1.148.754 = 1.148.740 + 14`.
+- [x] V02-04 — Confirmar 50 grupos `fonte × dataset × record_type`.
+- [x] V02-05 — Confirmar 23.786 caminhos no inventário de campos.
+- [x] V02-06 — Confirmar 543 conflitos de tipo.
+- [x] V02-07 — Confirmar a distribuição `540 + 1 + 2` dos conflitos.
+- [x] V02-08 — Confirmar 20.523 caminhos em `senado/ccj_notas`.
 
 Qualquer divergência bloqueia a etapa. A implementação não poderá
 escolher silenciosamente outro inventário nem reconstruir números a partir de
@@ -49,10 +61,10 @@ chaves inventadas = 0
 chaves do inventário sem decisão = 0
 ```
 
-- [ ] V02-09 — Validar unicidade das 23.786 chaves.
-- [ ] V02-10 — Validar cobertura bidirecional entre inventário e livro de decisões.
+- [x] V02-09 — Validar unicidade das 23.786 chaves.
+- [x] V02-10 — Validar cobertura bidirecional entre inventário e livro de decisões.
 - [ ] V02-11 — Exigir justificativa humana para todo `fora_do_schema_proposto`.
-- [ ] V02-12 — Confirmar que nenhuma decisão remove caminho ou proveniência.
+- [x] V02-12 — Confirmar que nenhuma decisão remove caminho ou proveniência.
 
 ## Rastreabilidade do schema
 
@@ -60,11 +72,11 @@ Toda categoria de domínio deverá possuir ao menos uma evidência observada.
 Campos técnicos de controle deverão estar rotulados separadamente.
 
 - [ ] V02-13 — Rejeitar categoria de domínio sem caminho no inventário aprovado.
-- [ ] V02-14 — Rejeitar mapeamento sem fonte, dataset, `record_type` e caminho original.
-- [ ] V02-15 — Rejeitar mapeamento sem estado de presença e tipos observados.
+- [x] V02-14 — Rejeitar mapeamento sem fonte, dataset, `record_type` e caminho original.
+- [x] V02-15 — Rejeitar mapeamento sem estado de presença e tipos observados.
 - [ ] V02-16 — Rejeitar regra sem identificador, versão e domínio de entrada.
-- [ ] V02-17 — Rejeitar prioridade, descarte ou fusão sem decisão humana explícita.
-- [ ] V02-18 — Confirmar que schemas v1/v2 não aparecem como fonte de evidência.
+- [x] V02-17 — Rejeitar prioridade, descarte ou fusão sem decisão humana explícita.
+- [x] V02-18 — Confirmar que schemas v1/v2 não aparecem como fonte de evidência.
 
 ## Presença, nulos e falhas
 
@@ -81,11 +93,11 @@ registros
 As 14 rejeições permanecem fora dessa equação de presença porque não foram
 interpretadas como registros, mas entram na reconciliação global da leitura.
 
-- [ ] V02-19 — Reconciliar presença para todo campo selecionado.
-- [ ] V02-20 — Demonstrar que metadado não preenchido nunca gera valor normalizado.
-- [ ] V02-21 — Manter tipo original de strings, objetos e coleções vazias.
-- [ ] V02-22 — Preservar as 14 rejeições por arquivo, linha e hash.
-- [ ] V02-23 — Confirmar que nenhuma rejeição foi reparada ou descartada.
+- [x] V02-19 — Reconciliar presença para todo campo selecionado.
+- [x] V02-20 — Demonstrar que metadado não preenchido nunca gera valor normalizado.
+- [x] V02-21 — Manter tipo original de strings, objetos e coleções vazias.
+- [x] V02-22 — Preservar as 14 rejeições por arquivo, linha e hash.
+- [x] V02-23 — Confirmar que nenhuma rejeição foi reparada ou descartada.
 
 ## Auditoria recorde a recorde de aliases
 
@@ -124,7 +136,7 @@ taxa_so_a = SA / U
 taxa_so_b = SB / U
 ```
 
-- [ ] V02-24 — Recalcular as contagens diretamente dos registros legíveis.
+- [x] V02-24 — Recalcular as contagens diretamente dos registros legíveis.
 - [x] V02-25 — Recalcular as taxas sem tratar ausente, nulo ou vazio como igualdade.
 - [x] V02-26 — Confirmar igualdade basal por valor JSON tipado e exato.
 - [ ] V02-27 — Separar qualquer taxa transformada da taxa exata.
@@ -171,22 +183,22 @@ Para comparações entre tipos de registro, a validação deverá provar:
 O relatório deverá ter exatamente 543 chaves conflitantes provenientes do
 inventário aprovado.
 
-- [ ] V02-36 — Reconciliar 540 conflitos em `senado/ccj_notas`.
-- [ ] V02-37 — Reconciliar 1 conflito em `senado/parlamentares`.
-- [ ] V02-38 — Reconciliar 2 conflitos em `senado/plenario_discursos`.
-- [ ] V02-39 — Exigir uma decisão ou o estado `conflito_aberto` para cada chave.
+- [x] V02-36 — Reconciliar 540 conflitos em `senado/ccj_notas`.
+- [x] V02-37 — Reconciliar 1 conflito em `senado/parlamentares`.
+- [x] V02-38 — Reconciliar 2 conflitos em `senado/plenario_discursos`.
+- [x] V02-39 — Exigir uma decisão ou o estado `conflito_aberto` para cada chave.
 - [x] V02-40 — Bloquear coerção pelo tipo majoritário.
 - [x] V02-41 — Bloquear serialização automática de objeto ou array como string.
 
 ## Trilha especial de `senado/ccj_notas`
 
-- [ ] V02-42 — Cobrir os 20.523 caminhos no relatório específico.
-- [ ] V02-43 — Segmentar as métricas por `record_type` e contexto estrutural.
+- [x] V02-42 — Cobrir os 20.523 caminhos no relatório específico.
+- [x] V02-43 — Segmentar as métricas por `record_type` e contexto estrutural.
 - [x] V02-44 — Preservar multiplicidade e ordem das coleções.
 - [x] V02-45 — Demonstrar que `[]` não foi usado como identidade de elemento.
-- [ ] V02-46 — Manter variantes `array|object` separadas ou explicitamente unidas.
+- [x] V02-46 — Manter variantes `array|object` separadas ou explicitamente unidas.
 - [ ] V02-47 — Quantificar estruturas sem identidade determinística de elemento.
-- [ ] V02-48 — Impedir que limites operacionais reduzam silenciosamente a cobertura.
+- [x] V02-48 — Impedir que limites operacionais reduzam silenciosamente a cobertura.
 
 ## Validação das propostas GPT-5.6
 
@@ -293,9 +305,9 @@ Para cada mapeamento proposto, uma amostra estratificada deverá:
 4. reaplicar a regra declarada;
 5. reproduzir exatamente o valor normalizado proposto.
 
-- [ ] V02-75 — Validar o percurso completo para todos os grupos de registro.
+- [x] V02-75 — Validar o percurso completo para todos os grupos de registro.
 - [ ] V02-76 — Incluir conflitos, nulos, vazios e falhas na amostra.
-- [ ] V02-77 — Registrar toda falha de percurso sem fallback.
+- [x] V02-77 — Registrar toda falha de percurso sem fallback.
 
 ## Invariantes operacionais
 
@@ -311,12 +323,13 @@ Para cada mapeamento proposto, uma amostra estratificada deverá:
 - Previews sem `context_only=true`: zero.
 - Propostas sustentadas somente por preview: zero.
 
-- [ ] V02-78 — Verificar os invariantes antes de abrir G02.
+- [x] V02-78 — Verificar os invariantes antes de abrir G02.
 
 ## Gate G02
 
-Sucesso técnico não aprova o schema. G02 só poderá ser aprovado quando o
-pesquisador responsável revisar:
+Sucesso técnico e aprovação conceitual isolada não aprovam o gate operacional.
+O vocabulário global foi aprovado em 2026-07-25, mas G02 só poderá ser
+aprovado integralmente quando o pesquisador responsável revisar:
 
 - o schema lógico proposto;
 - a cobertura dos 23.786 caminhos;
@@ -365,8 +378,8 @@ repetidas no TXT.
 - [x] V02-83 — Testar o perfil `schema_core` e a ausência de strings longas literais.
 - [x] V02-84 — Confirmar 23.786 linhas de campo na execução integral.
 - [x] V02-85 — Reconciliar 14 rejeições, 543 conflitos e 20.523 caminhos de `senado/ccj_notas`.
-- [ ] V02-86 — Conferir os hashes do catálogo, crosswalk e trilha de amostras.
-- [ ] V02-87 — Reconstituir todos os caminhos da execução integral e comparar ao inventário.
+- [x] V02-86 — Conferir os hashes do catálogo, crosswalk e trilha de amostras.
+- [x] V02-87 — Reconstituir todos os caminhos da execução integral e comparar ao inventário.
 
 O arquivo do modelo deverá ser `catalogo_global_gpt56.txt`, enviado com
 `purpose=user_data`. CSV, planilha e `File Search` não poderão substituir o
@@ -375,20 +388,48 @@ com exatamente o mesmo `file_id`, prompt, modelo e estrutura de entrada que a
 geração usará.
 
 - [x] V02-88 — Registrar o `file_id`, o SHA-256 e a contagem exata de arquivo + prompt.
-- [x] V02-89 — Confirmar que arquivo + prompt `schema_core`, com 691.302 tokens, não excedem 922.000.
-- [ ] V02-90 — Rejeitar geração com truncamento automático ou catálogo parcial.
-- [ ] V02-91 — Confirmar que a chamada global recebeu todos os 23.786 caminhos.
-- [ ] V02-92 — Validar e preservar a resposta global sem aplicá-la.
+- [x] V02-89 — Confirmar que a entrada `schema_core` não excede 922.000 tokens.
+- [x] V02-90 — Rejeitar geração com truncamento automático ou catálogo parcial.
+- [x] V02-91 — Confirmar que a chamada global recebeu todos os 23.786 caminhos.
+- [x] V02-92 — Validar e preservar a resposta global sem aplicá-la.
 
 Batch não poderá definir o vocabulário global: cada linha é uma requisição
-independente. Se usado depois, todas as linhas deverão receber a mesma versão
-congelada do schema e mapear IDs existentes no crosswalk.
+independente. Na operação autorizada, todas as linhas recebem a mesma versão
+congelada do schema e mapeiam somente IDs existentes no crosswalk. A
+reconciliação usa `custom_id`, porque a API não garante a ordem da saída.
 
-- [ ] V02-93 — Registrar a aprovação humana do vocabulário global.
-- [ ] V02-94 — Confirmar que todo request Batch usa o mesmo schema congelado.
-- [ ] V02-95 — Reconciliar uma disposição proposta para cada um dos 23.786 IDs.
-- [ ] V02-96 — Confirmar zero descarte, fusão, prioridade ou preenchimento automático.
+- [x] V02-93 — Registrar a aprovação humana do vocabulário global.
+- [x] V02-94 — Confirmar que todo request Batch usa o mesmo schema congelado.
+- [x] V02-95 — Reconciliar uma disposição proposta para cada um dos 23.786 IDs.
+- [x] V02-96 — Confirmar zero descarte, fusão, prioridade ou preenchimento automático.
 - [x] V02-97 — Testar contrato fechado, referências `field_id` e custo de contexto longo.
 - [x] V02-98 — Implementar recibo idempotente e preservação imediata no Drive.
-- [ ] V02-99 — Recontar a requisição com o JSON Schema exato antes da geração.
+- [x] V02-99 — Recontar a requisição com o JSON Schema exato antes da geração.
 - [x] V02-100 — Testar submissão idempotente e preservação pela continuação CLI.
+
+## Validação do contrato humano aprovado
+
+O registro
+`docs/revisoes/g02_schema_global_revisao_humana.md` é a evidência da decisão
+humana de 2026-07-25. A incorporação normativa deverá manter a distinção entre
+aprovação conceitual e conclusão operacional.
+
+- [x] V02-101 — Registrar a decisão individual sobre os 40 candidatos da proposta global.
+- [x] V02-102 — Registrar as duas famílias temáticas omitidas com exemplos observados.
+- [x] V02-103 — Registrar a decisão humana sobre as oito hipóteses de alias.
+- [x] V02-104 — Registrar as entidades e cardinalidades aprovadas para `senado/ccj_notas`.
+- [x] V02-105 — Registrar coordenadas de registro, pointer concreto e política de indexação.
+- [x] V02-106 — Validar no schema gerado os namespaces distintos de reunião, evento, sessão, pronunciamento, proposição, matéria, processo e documento.
+- [x] V02-107 — Validar `source_record_coordinate` e `source_value_coordinate` em todas as ocorrências propostas.
+- [x] V02-108 — Validar no schema gerado as relações `1:N`, `0:N` e `0..1` aprovadas.
+- [x] V02-109 — Demonstrar que duplicações técnicas preservam ambas as linhagens e seu escopo.
+- [x] V02-110 — Validar `speech_indexing_source_raw` e `proposition_subject_source` sem mistura com índices técnicos.
+- [x] V02-111 — Confirmar que nenhum artefato de G02 presume tabela Parquet, partição ou índice físico.
+- [x] V02-112 — Confirmar 99 `custom_id` únicos e 1.353.952 tokens na entrada Batch exata.
+- [x] V02-113 — Preservar a rejeição integral do alias `gpt-5.6` antes de reenviar.
+- [x] V02-114 — Confirmar que a tentativa válida usa `gpt-5.6-sol` e permanece não aplicada.
+- [x] V02-115 — Validar saída bruta, erros, cobertura, uso e custo após a conclusão do Batch.
+- [x] V02-116 — Revalidar o fingerprint do raw antes e depois da auditoria integral.
+- [x] V02-117 — Rejeitar cobertura parcial mesmo quando todas as requisições terminam com HTTP 200.
+- [x] V02-118 — Excluir 23 combinações inválidas sem corrigir silenciosamente a resposta bruta.
+- [x] V02-119 — Testar reparo somente dos IDs pendentes e união final sem IDs repetidos.

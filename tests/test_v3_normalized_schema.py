@@ -7,28 +7,44 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from jsonschema import Draft202012Validator
+
 from pipeline_dados_v3.inventario_metadados_raw import (
     InventoryConfig,
     run_inventory,
 )
 from pipeline_dados_v3.schema_normalizado import (
     APPROVED_INVENTORY_MANIFEST_SHA256,
+    APPROVED_LOGICAL_FIELDS,
     AliasMetrics,
+    BATCH_MAPPING_OPERATION_ID,
     LinkRule,
     RawRecord,
     SchemaConfig,
     audit_linked_records,
+    batch_frozen_vocabulary,
+    batch_mapping_output_json_schema,
     build_compact_global_catalog,
+    count_batch_mapping_input_tokens,
+    draft_logical_schema,
+    estimate_gpt56_batch_cost,
     estimate_gpt56_global_cost,
     evaluate_context_ab,
+    generate_alias_candidates,
     GLOBAL_PROPOSAL_SCHEMA_VERSION,
     global_proposal_json_schema,
     global_schema_prompt,
     initialize_field_review,
+    merge_batch_mapping_attempts,
+    prepare_batch_mapping,
+    prepare_batch_repair,
     prepare_schema_evidence,
     read_jsonl,
+    reconcile_rejected_lines,
+    retrieve_batch_mapping,
     retrieve_global_proposal,
     run_gpt_pilot,
+    submit_batch_mapping,
     submit_global_proposal,
     validate_global_proposal,
     validate_proposal,
@@ -44,6 +60,205 @@ def test_approved_g01_manifest_hash_is_pinned() -> None:
         APPROVED_INVENTORY_MANIFEST_SHA256
         == "b54b1c7c686859b5d95e0e2a65aca6cc74e5f2504b0e3b6ae778af414292f3c9"
     )
+
+
+def test_logical_schema_encodes_approved_provenance_entities_and_aliases() -> None:
+    schema = draft_logical_schema()
+    Draft202012Validator.check_schema(schema)
+
+    record_coordinate = schema["$defs"]["source_record_coordinate"]
+    assert set(record_coordinate["required"]) == {
+        "source",
+        "dataset",
+        "record_type",
+        "source_file_path",
+        "source_record_number",
+        "record_locator_scheme",
+    }
+    value_coordinate = schema["$defs"]["source_value_coordinate"]
+    assert value_coordinate["properties"]["array_index_base"]["const"] == (
+        "zero_based"
+    )
+    assert {
+        "catalog_field_path",
+        "source_value_pointer",
+        "source_container_shape",
+        "source_occurrence_id",
+    }.issubset(value_coordinate["required"])
+
+    entities = schema["properties"]["normalized"]["properties"]["entities"][
+        "properties"
+    ]
+    expected_entities = {
+        "committee_meetings": "committee_meeting",
+        "events": "event",
+        "plenary_sessions": "plenary_session",
+        "legislative_sessions": "legislative_session",
+        "pronouncements": "pronouncement",
+        "propositions": "proposition",
+        "legislative_matters": "legislative_matter",
+        "legislative_processes": "legislative_process",
+        "documents": "document",
+        "agenda_items": "agenda_item",
+        "opinions": "opinion",
+        "taquigraphic_quarters": "taquigraphic_quarter",
+        "taquigraphic_markers": "taquigraphic_marker",
+    }
+    for collection, entity_type in expected_entities.items():
+        assert entities[collection]["items"]["properties"]["entity_type"] == {
+            "const": entity_type
+        }
+
+    cardinalities = {
+        (
+            item["source_entity"],
+            item["relationship"],
+            item["target_entity"],
+        ): item["cardinality"]
+        for item in schema["x-cardinalities"]
+    }
+    assert cardinalities[
+        (
+            "legible_raw_record",
+            "has_source_value_occurrence",
+            "source_value_occurrence",
+        )
+    ] == "1:N"
+    assert cardinalities[
+        ("committee_meeting", "has_part", "meeting_part")
+    ] == "0:N"
+    assert cardinalities[
+        (
+            "committee_meeting_observation",
+            "has_presidency",
+            "participation",
+        )
+    ] == "0..1"
+
+    canonical_fields = set(
+        schema["$defs"]["lineaged_value"]["properties"]["canonical_field"][
+            "enum"
+        ]
+    )
+    assert {
+        "speech_indexing_source_raw",
+        "proposition_subject_source",
+        "committee_meeting_id",
+        "plenary_session_id",
+        "legislative_session_id",
+        "pronouncement_official_id",
+    }.issubset(canonical_fields)
+    assert "index" not in canonical_fields
+    assert schema["x-index-policy"]["generic_index_field_allowed"] is False
+
+    alias_decisions = schema["x-approved-technical-duplications"]
+    assert sum(
+        item["decision"] == "technical_duplication"
+        for item in alias_decisions
+    ) == 7
+    assert sum(item["decision"] == "not_alias" for item in alias_decisions) == 1
+    assert all(item["raw_mutation_allowed"] is False for item in alias_decisions)
+    assert all(
+        item["preserve_all_source_lineages"] is True
+        for item in alias_decisions
+    )
+    agenda_detail = next(
+        item
+        for item in alias_decisions
+        if item["rule_id"] == "alias-ccj-agenda-detail-subtrees"
+    )
+    assert agenda_detail["field_ids"] == ["F13711", "F16294"]
+    assert agenda_detail["source_paths"] == [
+        "$.payload.metadata.agenda",
+        "$.payload.metadata.detalhe",
+    ]
+    assert agenda_detail["canonical_target"] is None
+    meeting_id_duplication = next(
+        item
+        for item in alias_decisions
+        if item["rule_id"] == "alias-senado-meeting-id"
+    )
+    assert meeting_id_duplication["source_paths"] == [
+        "$.payload.CodigoReuniao",
+        "$.payload.codigo_reuniao",
+    ]
+    assert meeting_id_duplication["supporting_field_ids"] == [
+        "F16569",
+        "F16570",
+    ]
+
+    assert schema["x-physical-layout"] == "deferred_to_g03_g05"
+    assert schema["x-parquet-layout-assumed"] is False
+    assert schema["x-normalized-record-materialization"] is False
+
+
+def test_logical_schema_accepts_a_minimal_fully_lineaged_record() -> None:
+    schema = draft_logical_schema()
+    occurrence_id = "sha256:" + ("1" * 64)
+    mapping_rule = {
+        "method": "python_regra_aprovada",
+        "rule_id": "copy-envelope-field-v1",
+        "rule_version": "1",
+        "validation_state": "valid",
+        "human_decision": "approved",
+    }
+
+    def lineaged_value(canonical_field: str, value: str) -> dict[str, Any]:
+        return {
+            "canonical_field": canonical_field,
+            "logical_type": "string",
+            "normalized_value": value,
+            "source_occurrence_ids": [occurrence_id],
+            "mapping_rule": mapping_rule,
+        }
+
+    instance = {
+        "schema_version": "normalized-schema-evidence-v3.1",
+        "source_record_coordinate": {
+            "source": "senado",
+            "dataset": "ccj_notas",
+            "record_type": "reuniao_detalhe",
+            "source_file_path": "senado/ccj_notas/metadata/run.jsonl",
+            "source_record_number": 1842,
+            "record_locator_scheme": "jsonl_physical_line_1_based",
+        },
+        "source_field_states": [
+            {
+                "catalog_field_path": "$.source",
+                "presence_state": "filled",
+                "technical_types": ["string"],
+                "source_occurrence_ids": [occurrence_id],
+            }
+        ],
+        "source_value_occurrences": [
+            {
+                "coordinate": {
+                    "catalog_field_path": "$.source",
+                    "source_value_pointer": "/source",
+                    "source_container_shape": [],
+                    "source_occurrence_id": occurrence_id,
+                    "array_index_base": "zero_based",
+                },
+                "technical_type": "string",
+                "presence_state": "filled",
+                "original_value": "senado",
+            }
+        ],
+        "normalized": {
+            "record_scope": {
+                "source": lineaged_value("source", "senado"),
+                "dataset": lineaged_value("dataset", "ccj_notas"),
+                "record_type": lineaged_value(
+                    "record_type",
+                    "reuniao_detalhe",
+                ),
+            },
+            "record_metadata": [],
+            "entities": {},
+            "relationships": [],
+        },
+    }
+    Draft202012Validator(schema).validate(instance)
 
 
 def test_alias_metrics_distinguish_presence_type_and_zero_denominators() -> None:
@@ -163,7 +378,7 @@ def test_prepare_evidence_is_read_only_complete_and_deterministic(
     assert first["manifest"]["scientific_gate"] == "needs_review"
     assert first["manifest"]["invariants"]["normalized_records_materialized"] == 0
     assert len(first["field_book_rows"]) == setup["field_count"]
-    assert first["manifest"]["counts"]["rejected_lines"] == 1
+    assert first["manifest"]["counts"]["rejected_lines"] == 2
     assert first["manifest"]["counts"]["type_conflicts"] == 1
     conflict_rows = read_csv_rows(first["paths"]["conflicts"])
     assert len(conflict_rows) == 1
@@ -219,6 +434,36 @@ def test_prepare_evidence_is_read_only_complete_and_deterministic(
         ).read_bytes() == (
             second["paths"]["manifest"].parent / name
         ).read_bytes()
+
+    source_manifest = first["paths"]["manifest"]
+    source_payload = json.loads(source_manifest.read_text(encoding="utf-8"))
+    source_payload["counts"]["rejected_lines"] = 1
+    source_manifest.write_text(
+        json.dumps(source_payload, ensure_ascii=False, sort_keys=True, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    inventory_manifest = setup["inventory_root"] / "manifest.json"
+    reconciled = reconcile_rejected_lines(
+        raw_root=setup["raw_root"],
+        inventory_root=setup["inventory_root"],
+        source_audit_root=source_manifest.parent,
+        output_base=tmp_path / "rejected-reconciliation",
+        operation_id="schema-fixture-rejected-lines",
+        code_commit=COMMIT,
+        expected_inventory_operation_id="fixture-g01",
+        expected_inventory_manifest_sha256=sha256_bytes(
+            inventory_manifest.read_bytes()
+        ),
+    )
+    assert len(reconciled["rows"]) == 2
+    assert reconciled["manifest"]["counts"] == {
+        "records_rejected_expected": 2,
+        "records_rejected_reconciled": 2,
+        "source_issue_rows_deduplicated": 1,
+        "deduplication_gap_recovered": 1,
+    }
+    assert reconciled["manifest"]["invariants"]["raw_writes"] == 0
 
 
 def test_compact_global_catalog_covers_every_path_and_is_reusable(
@@ -280,7 +525,7 @@ def test_compact_global_catalog_covers_every_path_and_is_reusable(
     assert field_lines
     assert all(len(line.split("|")) == 8 for line in field_lines)
     assert first["manifest"]["catalog_profile"] == "schema_core"
-    assert first["manifest"]["counts"]["records_rejected"] == 1
+    assert first["manifest"]["counts"]["records_rejected"] == 2
     assert first["manifest"]["counts"]["type_conflicts"] == 1
     assert first["manifest"]["counts"]["ccj_notas_field_paths"] == setup[
         "field_count"
@@ -474,6 +719,502 @@ def test_global_submission_is_reusable_and_completion_is_not_applied(
     assert json.loads(
         (drive_dir / "execution.json").read_text(encoding="utf-8")
     )["proposal_applied"] is False
+
+
+def batch_fixture_inputs(tmp_path: Path) -> tuple[Path, Path]:
+    crosswalk = tmp_path / "catalogo_global_crosswalk.csv"
+    fieldnames = [
+        "field_id",
+        "group_id",
+        "source",
+        "dataset",
+        "record_type",
+        "field_path",
+        "technical_types",
+        "records_universe",
+        "field_absent",
+        "present_null",
+        "present_empty",
+        "present_filled",
+        "fill_rate",
+        "cardinality",
+        "cardinality_method",
+        "string_length_min",
+        "string_length_median",
+        "string_length_max",
+        "first_partition",
+        "last_partition",
+        "type_conflict",
+    ]
+    rows = [
+        {
+            "field_id": "F00001",
+            "group_id": "G001",
+            "source": "senado",
+            "dataset": "ccj_notas",
+            "record_type": "notas_taquigraficas",
+            "field_path": "$.payload.CodigoReuniao",
+            "technical_types": "string",
+            "records_universe": "10",
+            "field_absent": "0",
+            "present_null": "0",
+            "present_empty": "0",
+            "present_filled": "10",
+            "fill_rate": "1",
+            "cardinality": "3",
+            "cardinality_method": "exact_scalar_values",
+            "string_length_min": "1",
+            "string_length_median": "2",
+            "string_length_max": "3",
+            "first_partition": "",
+            "last_partition": "",
+            "type_conflict": "False",
+        },
+        {
+            "field_id": "F00002",
+            "group_id": "G001",
+            "source": "senado",
+            "dataset": "ccj_notas",
+            "record_type": "notas_taquigraficas",
+            "field_path": "$.payload.TextoIntegral",
+            "technical_types": "string",
+            "records_universe": "10",
+            "field_absent": "1",
+            "present_null": "1",
+            "present_empty": "2",
+            "present_filled": "6",
+            "fill_rate": "0.6",
+            "cardinality": "6",
+            "cardinality_method": "exact_scalar_values",
+            "string_length_min": "0",
+            "string_length_median": "20",
+            "string_length_max": "100",
+            "first_partition": "",
+            "last_partition": "",
+            "type_conflict": "False",
+        },
+        {
+            "field_id": "F00003",
+            "group_id": "G001",
+            "source": "senado",
+            "dataset": "ccj_notas",
+            "record_type": "notas_taquigraficas",
+            "field_path": "$.payload.metadata.agenda",
+            "technical_types": "array|object",
+            "records_universe": "10",
+            "field_absent": "5",
+            "present_null": "0",
+            "present_empty": "1",
+            "present_filled": "4",
+            "fill_rate": "0.4",
+            "cardinality": "",
+            "cardinality_method": "not_applicable_complex",
+            "string_length_min": "",
+            "string_length_median": "",
+            "string_length_max": "",
+            "first_partition": "",
+            "last_partition": "",
+            "type_conflict": "True",
+        },
+    ]
+    with crosswalk.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    proposal = global_proposal_fixture()
+    proposal_text = json.dumps(proposal)
+    proposal_text = proposal_text.replace('"f1"', '"F00001"')
+    proposal_text = proposal_text.replace('"f2"', '"F00002"')
+    proposal_path = tmp_path / "proposta_schema_global.json"
+    proposal_path.write_text(proposal_text, encoding="utf-8")
+    return crosswalk, proposal_path
+
+
+class FakeBatchInputTokens:
+    def count(self, **kwargs: Any) -> SimpleNamespace:
+        assert kwargs["model"] == "gpt-5.6-sol"
+        assert kwargs["text"]["format"]["strict"] is True
+        return SimpleNamespace(input_tokens=100)
+
+
+class FakeBatchResponses:
+    def __init__(self) -> None:
+        self.input_tokens = FakeBatchInputTokens()
+
+
+class FakeBatchFiles:
+    def __init__(self, output_text: str) -> None:
+        self.output_text = output_text
+        self.create_calls = 0
+
+    def create(self, **kwargs: Any) -> SimpleNamespace:
+        assert kwargs["purpose"] == "batch"
+        assert kwargs["file"].read(1)
+        self.create_calls += 1
+        return SimpleNamespace(id="file-batch-input")
+
+    def content(self, file_id: str) -> SimpleNamespace:
+        assert file_id == "file-batch-output"
+        return SimpleNamespace(text=self.output_text)
+
+
+class FakeBatchObject:
+    def __init__(self, status: str) -> None:
+        self.id = "batch-fixture"
+        self.status = status
+        self.input_file_id = "file-batch-input"
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "status": self.status,
+            "input_file_id": self.input_file_id,
+            "output_file_id": (
+                "file-batch-output" if self.status == "completed" else None
+            ),
+            "error_file_id": None,
+            "request_counts": {
+                "total": 2,
+                "completed": 2 if self.status == "completed" else 0,
+                "failed": 0,
+            },
+            "metadata": {
+                "operation_id": BATCH_MAPPING_OPERATION_ID,
+            },
+        }
+
+
+class FakeBatches:
+    def __init__(self) -> None:
+        self.create_calls = 0
+
+    def list(self, limit: int) -> list[Any]:
+        assert limit == 100
+        return []
+
+    def create(self, **kwargs: Any) -> FakeBatchObject:
+        assert kwargs["endpoint"] == "/v1/responses"
+        assert kwargs["completion_window"] == "24h"
+        self.create_calls += 1
+        return FakeBatchObject("validating")
+
+    def retrieve(self, batch_id: str) -> FakeBatchObject:
+        assert batch_id == "batch-fixture"
+        return FakeBatchObject("completed")
+
+
+class FakeBatchClient:
+    def __init__(self, output_text: str) -> None:
+        self.responses = FakeBatchResponses()
+        self.files = FakeBatchFiles(output_text)
+        self.batches = FakeBatches()
+
+
+def fake_batch_output(operation_root: Path) -> str:
+    manifest = json.loads(
+        (operation_root / "batch_manifest.json").read_text(encoding="utf-8")
+    )
+    lines = []
+    for request in read_jsonl(operation_root / "batch_input.jsonl"):
+        payload = json.loads(
+            request["body"]["input"][1]["content"][0]["text"]
+        )
+        ids = [
+            field["id"]
+            for block in payload["path_blocks"]
+            for field in block["f"]
+        ]
+        response_payload = {
+            "schema_version": "gpt56-field-mapping-response-v1",
+            "frozen_vocabulary_sha256": manifest["vocabulary_sha256"],
+            "mappings": [
+                {
+                    "field_id": field_id,
+                    "decision": "preserve_unmapped",
+                    "canonical_candidate_or_null": None,
+                    "mapping_operation": "preserve_unmapped",
+                    "review_reason": "fixture sem regra substantiva",
+                }
+                for field_id in ids
+            ],
+        }
+        lines.append(
+            json.dumps(
+                {
+                    "custom_id": request["custom_id"],
+                    "response": {
+                        "status_code": 200,
+                        "body": {
+                            "model": "gpt-5.6-sol",
+                            "output": [
+                                {
+                                    "type": "message",
+                                    "content": [
+                                        {
+                                            "type": "output_text",
+                                            "text": json.dumps(
+                                                response_payload,
+                                                ensure_ascii=False,
+                                            ),
+                                        }
+                                    ],
+                                }
+                            ],
+                            "usage": {
+                                "input_tokens": 100,
+                                "input_tokens_details": {
+                                    "cached_tokens": 0,
+                                },
+                                "output_tokens": 20,
+                                "output_tokens_details": {
+                                    "reasoning_tokens": 5,
+                                },
+                            },
+                        },
+                    },
+                    "error": None,
+                },
+                ensure_ascii=False,
+            )
+        )
+    return "\n".join(reversed(lines)) + "\n"
+
+
+def test_batch_mapping_is_frozen_complete_idempotent_and_not_applied(
+    tmp_path: Path,
+) -> None:
+    crosswalk, proposal_path = batch_fixture_inputs(tmp_path)
+    operation_root = tmp_path / "batch"
+    prepared = prepare_batch_mapping(
+        crosswalk,
+        proposal_path,
+        operation_root,
+        chunk_size=2,
+        expected_field_paths=3,
+    )
+    assert prepared["manifest"]["counts"]["field_ids"] == 3
+    assert prepared["manifest"]["counts"]["requests"] == 2
+    assert prepared["manifest"]["proposal_applied"] is False
+    request_hashes = {
+        json.loads(
+            request["body"]["input"][1]["content"][0]["text"]
+        )["frozen_vocabulary_sha256"]
+        for request in prepared["requests"]
+    }
+    assert request_hashes == {prepared["manifest"]["vocabulary_sha256"]}
+    vocabulary = batch_frozen_vocabulary(
+        json.loads(proposal_path.read_text(encoding="utf-8"))
+    )
+    assert set(vocabulary["approved_fields"]) == set(APPROVED_LOGICAL_FIELDS)
+    Draft202012Validator.check_schema(batch_mapping_output_json_schema())
+
+    client = FakeBatchClient("")
+    estimate = count_batch_mapping_input_tokens(
+        operation_root,
+        client=client,
+    )
+    assert estimate["input_tokens"] == 200
+    assert estimate["fits_conservative_queue_limit"] is True
+    first = submit_batch_mapping(
+        operation_root,
+        confirm_operation_id=BATCH_MAPPING_OPERATION_ID,
+        execute_batch=True,
+        client=client,
+    )
+    second = submit_batch_mapping(
+        operation_root,
+        confirm_operation_id=BATCH_MAPPING_OPERATION_ID,
+        execute_batch=True,
+        client=client,
+    )
+    assert first["reused"] is False
+    assert second["reused"] is True
+    assert client.batches.create_calls == 1
+    assert client.files.create_calls == 1
+
+    client.files.output_text = fake_batch_output(operation_root)
+    result = retrieve_batch_mapping(operation_root, client=client)
+    assert result["status"] == "completed_validated"
+    assert result["field_ids_reconciled"] == 3
+    assert result["proposal_applied"] is False
+    rows = read_csv_rows(
+        operation_root / "mapeamentos_batch_propostos.csv"
+    )
+    assert [row["field_id"] for row in rows] == [
+        "F00001",
+        "F00002",
+        "F00003",
+    ]
+    assert all(row["human_decision"] == "nao_avaliado" for row in rows)
+    assert all(row["proposal_applied"] == "False" for row in rows)
+
+
+def test_batch_partial_coverage_prepares_disjoint_repair_and_merges(
+    tmp_path: Path,
+) -> None:
+    crosswalk, proposal_path = batch_fixture_inputs(tmp_path)
+    operation_root = tmp_path / "batch"
+    prepare_batch_mapping(
+        crosswalk,
+        proposal_path,
+        operation_root,
+        chunk_size=2,
+        expected_field_paths=3,
+    )
+    primary_client = FakeBatchClient("")
+    count_batch_mapping_input_tokens(operation_root, client=primary_client)
+    submit_batch_mapping(
+        operation_root,
+        confirm_operation_id=BATCH_MAPPING_OPERATION_ID,
+        execute_batch=True,
+        client=primary_client,
+    )
+    output_rows = [
+        json.loads(line)
+        for line in fake_batch_output(operation_root).splitlines()
+    ]
+    partial_row = next(
+        row
+        for row in output_rows
+        if len(
+            json.loads(
+                row["response"]["body"]["output"][0]["content"][0]["text"]
+            )["mappings"]
+        )
+        > 1
+    )
+    response_text = partial_row["response"]["body"]["output"][0][
+        "content"
+    ][0]["text"]
+    response_payload = json.loads(response_text)
+    response_payload["mappings"] = response_payload["mappings"][:1]
+    partial_row["response"]["body"]["output"][0]["content"][0]["text"] = (
+        json.dumps(response_payload, ensure_ascii=False)
+    )
+    invalid_row = next(row for row in output_rows if row is not partial_row)
+    invalid_text = invalid_row["response"]["body"]["output"][0]["content"][0][
+        "text"
+    ]
+    invalid_payload = json.loads(invalid_text)
+    invalid_payload["mappings"][0]["decision"] = "type_conflict_open"
+    invalid_payload["mappings"][0]["mapping_operation"] = "preserve_unmapped"
+    invalid_row["response"]["body"]["output"][0]["content"][0]["text"] = (
+        json.dumps(invalid_payload, ensure_ascii=False)
+    )
+    primary_client.files.output_text = "\n".join(
+        json.dumps(row, ensure_ascii=False) for row in output_rows
+    )
+    primary = retrieve_batch_mapping(operation_root, client=primary_client)
+    assert primary["status"] == "completed_incomplete_coverage"
+    assert primary["field_ids_reconciled"] == 1
+    assert primary["missing_field_ids"] == 2
+    assert primary["invalid_mappings"] == 1
+    assert primary["scientific_gate"] == "repair_required"
+
+    repair_root = tmp_path / "repair"
+    repair_id = f"{BATCH_MAPPING_OPERATION_ID}-repair-001"
+    repair = prepare_batch_repair(
+        operation_root,
+        repair_root,
+        operation_id=repair_id,
+        chunk_size=1,
+    )
+    assert repair["manifest"]["counts"]["field_ids"] == 2
+    assert repair["manifest"]["counts"]["requests"] == 2
+    repair_client = FakeBatchClient("")
+    count_batch_mapping_input_tokens(repair_root, client=repair_client)
+    submit_batch_mapping(
+        repair_root,
+        confirm_operation_id=repair_id,
+        execute_batch=True,
+        client=repair_client,
+    )
+    repair_client.files.output_text = fake_batch_output(repair_root)
+    repaired = retrieve_batch_mapping(repair_root, client=repair_client)
+    assert repaired["status"] == "completed_validated"
+    assert repaired["field_ids_reconciled"] == 2
+
+    merged = merge_batch_mapping_attempts(operation_root, [repair_root])
+    assert merged["status"] == "completed_validated"
+    assert merged["field_ids_reconciled"] == 3
+    assert merged["missing_field_ids"] == 0
+    assert merged["proposal_applied"] is False
+
+
+def test_batch_cost_uses_half_price_and_never_hides_output_ceiling() -> None:
+    assert estimate_gpt56_batch_cost(
+        input_tokens=1_000_000,
+        output_tokens=1_000_000,
+    ) == Decimal("17.5")
+    assert estimate_gpt56_batch_cost(
+        input_tokens=1_000_000,
+        cached_input_tokens=1_000_000,
+        output_tokens=0,
+    ) == Decimal("0.25")
+
+
+def test_human_approved_structural_alias_audit_accepts_text_without_retyping_it(
+    tmp_path: Path,
+) -> None:
+    field_rows = [
+        {
+            "source": "senado",
+            "dataset": "ccj_notas",
+            "record_type": "notas_taquigraficas",
+            "field_path": path,
+            "technical_types": "string",
+        }
+        for path in ("$.payload.TextoIntegral", "$.payload.texto")
+    ]
+    roles = {
+        (
+            row["source"],
+            row["dataset"],
+            row["record_type"],
+            row["field_path"],
+        ): "text"
+        for row in field_rows
+    }
+    manual = tmp_path / "manual.csv"
+    with manual.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "source",
+                "dataset",
+                "record_type",
+                "field_a",
+                "field_b",
+                "comparison_scope",
+                "candidate_signal",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "source": "senado",
+                "dataset": "ccj_notas",
+                "record_type": "notas_taquigraficas",
+                "field_a": "$.payload.TextoIntegral",
+                "field_b": "$.payload.texto",
+                "comparison_scope": "same_record",
+                "candidate_signal": (
+                    "human_approved_structural_audit:"
+                    "alias-senado-notas-text:technical_duplication"
+                ),
+            }
+        )
+    candidates = generate_alias_candidates(
+        field_rows,
+        field_roles=roles,
+        manual_alias_path=manual,
+        max_per_group=None,
+    )
+    assert len(candidates) == 1
+    assert candidates[0].candidate_signal.startswith(
+        "human_approved_structural_audit:"
+    )
+    assert set(roles.values()) == {"text"}
 
 
 def test_gpt_pilot_is_paired_a_b_and_never_applies_proposals(
@@ -699,7 +1440,7 @@ def prepare_fixture_inputs(tmp_path: Path) -> dict[str, Any]:
     ]
     path.write_text(
         "\n".join(json.dumps(record, ensure_ascii=False) for record in records)
-        + "\n{invalido\n",
+        + "\n{invalido\n{tambem-invalido\n",
         encoding="utf-8",
     )
     inventory = run_inventory(

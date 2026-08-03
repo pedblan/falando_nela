@@ -4,9 +4,14 @@
 
 Stack aprovada e implementada para produzir as evidências e o contrato de
 G02. Os pilotos exploratórios foram executados, e o catálogo global, seu
-upload e a contagem exata estão implementados. A execução integral desses
-artefatos e a chamada global permanecem sujeitas aos gates do plano; a
-aplicação do schema continua bloqueada.
+upload e a contagem exata estão implementados. A proposta global
+`gpt56-global-schema-proposal-v1` foi recebida e seu vocabulário conceitual foi
+aprovado em 2026-07-25. A preservação e a validação operacional de todos os
+artefatos da chamada global estão concluídas. O Batch controlado e dois
+reparos incrementais foram preservados e reconciliados em 23.786 propostas
+únicas, sem aplicação. O livro integral e a auditoria raw foram produzidos e
+reconciliados; o gate humano final de G02 permanece pendente e a aplicação do
+schema continua bloqueada.
 
 ## Ambiente
 
@@ -56,6 +61,58 @@ Nenhum derivado v1/v2 será carregado como entrada científica.
 JSON Schema expressará o contrato lógico. O formato físico de tabelas
 normalizadas, inclusive eventual Parquet, pertence à etapa que implementar os
 adaptadores e não será presumido aqui.
+
+## Representação do contrato humano aprovado
+
+`schema_normalizado.schema.json` deverá expressar entidades e ocorrências, não
+uma única linha larga com os 40 candidatos recebidos do modelo. Os destinos
+normativos, famílias e cardinalidades estão definidos em `requirements.md` e
+no registro `docs/revisoes/g02_schema_global_revisao_humana.md`.
+
+Toda ocorrência mapeada deverá aceitar estes objetos técnicos:
+
+```json
+{
+  "source_record_coordinate": {
+    "source_file_path": "senado/ccj_notas/metadata/run-id.jsonl",
+    "source_record_number": 1842,
+    "record_locator_scheme": "jsonl_physical_line_1_based"
+  },
+  "source_value_coordinate": {
+    "catalog_field_path": "$.payload.reuniao.partes[].itens[].doma.idProcesso",
+    "source_value_pointer": "/payload/reuniao/partes/1/itens/0/doma/idProcesso",
+    "source_container_shape": {
+      "partes": "array",
+      "itens": "array"
+    },
+    "source_occurrence_id": "sha256-versionado"
+  }
+}
+```
+
+`record_locator_scheme` será enum fechado e versionado. JSONL usará linha
+física `one_based`; CSV usará linha de dados `one_based`, sem cabeçalho; e
+Parquet, quando existir como entrada observada, usará linha lógica
+`one_based`. JSON Pointer usará índices de array `zero_based`.
+
+`source_occurrence_id` será SHA-256 de uma serialização canônica e versionada
+de:
+
+```text
+source + dataset + record_type
++ source_file_path + source_record_number
++ source_value_pointer
+```
+
+O hash não substituirá ID oficial. `source_container_shape` preservará
+variantes como `partes=object` e `partes=array`; o schema usará união tipada
+explícita, sem embrulhar objeto em array artificial.
+
+As sete duplicações técnicas aprovadas serão representadas como regras
+declarativas com escopo exato de `source + dataset + record_type`, caminhos de
+ambos os lados e decisão humana versionada. A rejeição das subárvores de agenda
+e detalhe será representada por vínculo via `committee_meeting_id`, nunca por
+regra de alias.
 
 ## Python permitido
 
@@ -125,6 +182,15 @@ determinísticos por:
 - hash de valor tipado preenchido.
 
 Os índices apenas produzem candidatos. Eles não atribuem equivalência.
+
+Esses índices temporários são diferentes de:
+
+- indexação temática de domínio, por exemplo `Indexacao` do Senado ou
+  `keywords` da Câmara;
+- índice físico futuro, por exemplo uma estrutura de consulta sobre
+  `committee_meeting_id`.
+
+G02 não criará coluna genérica `index` nem definirá índices físicos.
 
 `senado/ccj_notas` terá processamento em streaming, checkpoints locais
 temporários e relatórios por `record_type`. Limites de memória ou tempo deverão
@@ -204,8 +270,11 @@ para que o validador impeça o uso acidental de contexto como evidência.
 ## Cliente GPT-5.6
 
 O piloto usa chamadas síncronas e pequenas. Depois da revisão exploratória, a
-definição do vocabulário global usará uma única chamada da Responses API com
-`catalogo_global_gpt56.txt` como `input_file`.
+definição do vocabulário global usou uma única chamada da Responses API com
+`catalogo_global_gpt56.txt` como `input_file`. A proposta resultante foi
+revisada humanamente; recibo, resposta bruta, contagem com o JSON Schema exato
+e demais artefatos operacionais ainda deverão ser reconciliados antes do
+encerramento de G02.
 
 O catálogo será enviado pela Files API com `purpose=user_data`. Antes da
 geração, `responses.input_tokens.count` receberá exatamente o mesmo modelo,
@@ -239,17 +308,38 @@ métricas, permitindo provar que `P + componente F` reproduz o inventário
 exatamente. A compactação não modifica o raw e não interpreta nomes ou
 valores.
 
-Batch só poderá ser considerado depois que a proposta global for revisada e o
-vocabulário canônico for congelado. Cada linha Batch será tratada como
-requisição independente e receberá a mesma versão do schema; Batch aplicará o
-vocabulário aos `field_id`, mas nunca será usado para descobri-lo.
+O vocabulário conceitual foi revisado e congelado, o schema lógico foi
+incorporado ao gerador e a chamada global foi reconciliada. O pesquisador
+autorizou em 2026-07-25 o Batch de disposição dos `field_id`. Cada linha é
+uma requisição independente, recebe a mesma versão do schema e usa o
+vocabulário somente como classificação proposta; Batch não o descobre e não
+aplica seus resultados.
 
-A chamada global autorizada usará background mode, `reasoning=medium`,
+A implementação usa o endpoint `/v1/responses`, o modelo explícito
+`gpt-5.6-sol`, `reasoning_effort=low`, Structured Outputs estrito,
+`store=false`, janela `24h` e até 400 campos por requisição. A entrada
+integral tem 99 requisições, 1.353.952 tokens e 5.296.324 bytes. `custom_id`
+é a chave de reconciliação, pois a ordem do arquivo de saída pode divergir da
+entrada. O gerador expande localmente os prefixos compactados e recupera a
+proveniência original do crosswalk depois da validação.
+
+A tentativa inicial com o alias `gpt-5.6` falhou na validação do Batch com
+`model_not_found`, sem requisições processadas. Ela foi preservada e a
+tentativa válida foi criada com `gpt-5.6-sol`; os dois recibos permanecem
+distintos.
+
+O reconciliador preserva respostas parciais em artefatos separados, mas só
+conta como coberta uma disposição que satisfaça as regras cruzadas entre
+`decision`, `canonical_candidate_or_null` e `mapping_operation`. O comando
+`batch-repair-prepare` cria um novo lote apenas com os IDs pendentes e
+`batch-merge` exige união disjunta antes de produzir a reconciliação final.
+
+O contrato da chamada global exigiu background mode, `reasoning=medium`,
 `max_output_tokens=32000`, Structured Outputs estrito, `store=true` e
-`truncation=disabled`. A contagem imediatamente anterior incluirá a mesma
-entrada e o mesmo JSON Schema da geração. O catálogo e seus crosswalks serão
-copiados para o Drive antes da submissão; o `response_id` será gravado assim
-que a API aceitar a requisição. Consulta e submissão permanecerão em células
+`truncation=disabled`. A reconciliação de 2026-07-25 confirmou 692.031 tokens
+na entrada exata, incluindo o mesmo JSON Schema da geração, e verificou que o
+catálogo e seus crosswalks foram copiados para o Drive antes da submissão e
+que o `response_id` foi preservado. Consulta e submissão permanecem em células
 separadas.
 
 Os subcomandos `global-submit` e `global-status` exporão o mesmo contrato para
@@ -260,10 +350,10 @@ Colab atualize visualmente as células do `.ipynb`.
 Nos preços standard vigentes em 2026-07-24, requisições GPT-5.6 acima de
 272.000 tokens usam efetivamente US$ 10/M para entrada não armazenada em
 cache, US$ 1/M para entrada em cache, US$ 12,50/M para gravação em cache e
-US$ 45/M para saída. Para a medição inicial de 691.302 tokens e o teto de
-32.000 tokens de saída, o intervalo conservador é US$ 8,353020 a
-US$ 10,081275. A execução registrará as classes de tokens efetivamente
-reportadas e recalculará o custo real.
+US$ 45/M para saída. A estimativa final para 692.031 tokens de entrada e o
+teto de 32.000 tokens de saída foi de US$ 8,36031 a US$ 10,0903875. A execução
+registrou 13.712 tokens de saída, 1.182 tokens de raciocínio e custo efetivo de
+US$ 7,53735.
 
 As condições A e B serão executadas como pares com o mesmo modelo resolvido,
 parâmetros, prompt, JSON Schema e evidências. A condição B acrescentará somente
@@ -349,13 +439,23 @@ resolvido, parâmetros, prompt, JSON Schema, hashes da entrada e resposta bruta.
 - [x] T02-23 — Integrar upload `user_data` e contagem exata de tokens ao caderno.
 - [x] T02-24 — Implementar perfil `schema_core` sem remover caminhos ou métricas do crosswalk.
 - [x] T02-25 — Executar a contagem exata de arquivo + prompt com o catálogo `schema_core` integral.
-- [x] T02-26 — Confirmar 691.302 tokens, abaixo do máximo conservador de 922.000.
-- [ ] T02-27 — Executar e preservar a proposta global sem aplicação automática.
-- [ ] T02-28 — Fixar o schema revisado antes de preparar Batch por `field_id`.
+- [x] T02-26 — Confirmar a medição preliminar de 691.302 tokens, abaixo do máximo conservador de 922.000.
+- [x] T02-27 — Receber e revisar a proposta global sem aplicação automática.
+- [x] T02-28 — Fixar nas quatro specs o vocabulário conceitual antes de preparar Batch por `field_id`.
 - [x] T02-29 — Implementar JSON Schema global fechado e validação de `field_id`.
 - [x] T02-30 — Implementar submissão única em background, recibo no Drive e consulta separada.
 - [x] T02-31 — Implementar cálculo de custo GPT-5.6 para contexto longo.
 - [x] T02-32 — Expor submissão e consulta como subcomandos retomáveis.
+- [x] T02-33 — Reconciliar e preservar recibo, resposta bruta, contagem exata e manifest da chamada global.
+- [x] T02-34 — Implementar no gerador as coordenadas técnicas aprovadas.
+- [x] T02-35 — Implementar no schema lógico as entidades e cardinalidades aprovadas.
+- [x] T02-36 — Validar as sete regras de duplicação técnica e a rejeição do oitavo alias.
+- [x] T02-37 — Manter formato físico e eventual Parquet fora do contrato de G02.
+- [x] T02-38 — Implementar preparo, contagem, submissão e retomada idempotentes do Batch.
+- [x] T02-39 — Fixar `gpt-5.6-sol`, 99 requisições e reconciliação por `custom_id`.
+- [x] T02-40 — Validar vocabulário fechado e expandir proveniência somente pelo crosswalk.
+- [x] T02-41 — Preservar saída, erros, uso e custo reais depois da conclusão do Batch.
+- [x] T02-42 — Implementar detecção de cobertura parcial, reparo incremental e união disjunta.
 
 ## Dependências proibidas nesta etapa
 

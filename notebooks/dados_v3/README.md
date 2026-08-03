@@ -46,12 +46,32 @@ chave não é exibida nem escrita em artefatos. Uma tabela JSON de preços,
 versionada pelo pesquisador, é obrigatória para registrar o custo calculado.
 O catálogo global é enviado como TXT, não CSV. A execução `schema_core` medida
 em 2026-07-24 teve 691.302 tokens para arquivo + prompt; a célula de submissão
-reconta incluindo o JSON Schema. Batch só poderá ser usado depois da revisão
-do vocabulário global. G02 continua pendente mesmo quando todas as células
-técnicas terminam.
+recontou 692.031 tokens incluindo o JSON Schema. A chamada terminou sem
+truncamento e permaneceu não aplicada. Depois da revisão e da autorização
+específica, o mapeamento integral foi preparado em 99 requisições Batch com
+`gpt-5.6-sol`. A tentativa principal e dois reparos disjuntos reconciliaram
+23.786 propostas únicas, que continuam não aplicadas e não avaliadas
+humanamente. G02 continua pendente mesmo quando todas as células técnicas
+terminam.
 
 Um `git pull` atualiza o arquivo `.ipynb` no clone, mas não acrescenta células
 à interface de um caderno que já está aberto. Nesse caso, mantenha o runtime e
 use `python -m pipeline_dados_v3.schema_normalizado global-submit` e
 `global-status` em uma célula curta. Os subcomandos usam os mesmos caminhos,
 gates, recibos, validações e regra de não aplicação das células 12 e 13.
+
+Para a continuação controlada do mapeamento integral, a CLI também oferece:
+
+- `batch-prepare`, que congela o vocabulário, cria a entrada JSONL e não chama
+  a API;
+- `batch-count`, que conta a entrada exata e registra a estimativa de custo;
+- `batch-submit`, que exige `--execute-batch` e confirmação literal da
+  operação;
+- `batch-status`, que consulta, baixa e reconcilia a saída quando ela termina.
+- `batch-repair-prepare`, que cria um lote menor somente com os IDs ainda não
+  validados;
+- `batch-merge`, que exige a união disjunta das tentativas e comprova a
+  cobertura final.
+
+Nenhum desses comandos aplica o schema, modifica o raw ou materializa
+Parquets.

@@ -15,7 +15,7 @@ for revisado e aprovado.
 - [x] Executar o inventário completo no Colab.
 - [x] Revisar o relatório e aprovar G01.
 - [x] Especificar `02_schema_normalizado`.
-- [ ] Propor categorias usando apenas os metadados observados.
+- [x] Propor e revisar o vocabulário conceitual usando apenas os metadados observados.
 - [ ] Especificar adaptadores determinísticos por fonte.
 - [ ] Especificar e pilotar planos declarativos de identificação textual com
   GPT-5.6, incluindo comparação de qualidade, tokens e custo.
@@ -28,6 +28,6 @@ for revisado e aprovado.
 - Estrutura v3: criada.
 - Contrato geral: aprovado.
 - Primeiro submódulo: concluído; G01 aprovado.
-- Segundo submódulo: ferramenta implementada; execução integral e G02
-  pendentes.
+- Segundo submódulo: ferramenta implementada e vocabulário conceitual aprovado;
+  Batch e auditoria integral reconciliados; gate humano de G02 pendente.
 - Demais submódulos: reservados.
