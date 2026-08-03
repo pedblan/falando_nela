@@ -27,7 +27,10 @@ uv run falando-nela doctor --json
 
 Em `2026-08-03`, uma cópia sem `.venv` instalou 104 pacotes locked, executou
 Ruff e formatação sem divergência, passou 183 testes e concluiu o diagnóstico
-estruturado sem criar a raiz de dados.
+estruturado sem criar a raiz de dados. Depois do merge
+`c0563d249c8a0d0af36af9e37e24acba94b5ffef`, um clone limpo do estado
+integrado passou nas mesmas verificações e em 189 testes; os seis testes
+adicionais pertencem ao fechamento G02 já presente em `main`.
 
 ## Bloqueios
 

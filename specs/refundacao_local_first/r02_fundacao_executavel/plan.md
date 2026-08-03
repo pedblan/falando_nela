@@ -9,9 +9,10 @@
 - [x] Configurar Ruff e CI sem credenciais ou acesso externo.
 - [x] Executar instalação locked, lint, formatação, testes e diagnóstico.
 - [x] Revisar o diff e sincronizar o contrato principal.
+- [x] Integrar a fundação validada em `main` por merge não destrutivo.
 
 ## Gate
 
 R02 termina somente quando uma instalação limpa pelo lockfile passa em todas as
 verificações, o diagnóstico válido funciona e configurações perigosas falham de
-modo explícito. O gate não autoriza R03.
+modo explícito. O merge em `main` não autoriza R03.

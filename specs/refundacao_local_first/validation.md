@@ -73,9 +73,12 @@ uv run falando-nela doctor --json
 - [x] Confirmar que `doctor` falha claramente quando a raiz de produção está dentro do clone.
 - [x] Confirmar que CI usa apenas fixtures e não possui credenciais externas.
 
-Evidência de `2026-08-03`: `uv sync --locked --all-groups`, `uv lock --check`,
-Ruff, formatação, 183 testes e `falando-nela doctor --json` passaram numa cópia
-limpa; a raiz externa informada ao diagnóstico não foi criada.
+Evidência de `2026-08-03`: a candidata R02 passou em 183 testes. Depois do
+merge `c0563d249c8a0d0af36af9e37e24acba94b5ffef`, um clone limpo da `main`
+instalou 104 pacotes com `uv sync --locked --all-groups`, passou em
+`uv lock --check`, Ruff, formatação, 189 testes e
+`falando-nela doctor --json`; a raiz externa informada ao diagnóstico não foi
+criada.
 
 ## V03 — amostragem piloto do Drive e compressão
 

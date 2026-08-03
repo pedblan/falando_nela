@@ -2,10 +2,11 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-03`; implementação incremental iniciada na
-branch `codex/refundacao-r02-foundation`, em worktree própria a partir de
-`main`. Nenhuma migração real, remoção ou operação paga foi autorizada por essa
-aprovação.
+Contrato aprovado em `2026-08-03`; R01 e R02 foram concluídos e R02 foi
+integrado localmente em `main` a partir da branch
+`codex/refundacao-r02-foundation`. As etapas seguintes continuarão em branches
+e worktrees próprias. Nenhuma migração real, remoção ou operação paga foi
+autorizada por essa aprovação.
 
 ## Resultado principal
 
@@ -62,9 +63,15 @@ registrado em `docs/refundacao/inventario_legado_colab_20260803.md`.
 - [x] Adicionar fixtures mínimas fora da área de dados de produção.
 - [x] Configurar pytest, Ruff e CI sem acesso externo.
 - [x] Comprovar instalação limpa e execução de um comando diagnóstico.
+- [x] Integrar a fundação validada em `main` por merge não destrutivo.
 
 **Gate R02:** clone limpo instala com lockfile, roda lint e testes e recusa
 produção quando `FALANDO_NELA_DATA_ROOT` não estiver configurado corretamente.
+
+Evidência de `2026-08-03`: o commit R02
+`341297f2d31021b765c9865a0d4e7e68cae4778a` foi integrado pelo merge
+`c0563d249c8a0d0af36af9e37e24acba94b5ffef`; um clone limpo do estado
+integrado passou em lockfile, Ruff, formatação, 189 testes e diagnóstico.
 
 ## R03 — piloto da amostra anual de 1% no Drive
 
