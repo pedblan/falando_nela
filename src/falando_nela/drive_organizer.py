@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
@@ -34,6 +34,10 @@ from falando_nela.sources import (
 )
 
 CANONICAL_PREFIX = "data/raw/v1"
+COPY_SENTINEL_CATEGORIES = ("metadata", "monthly_text", "transcription_queue")
+DEFAULT_COPY_BATCH_FILES = 100
+DEFAULT_COPY_BATCH_BYTES = 512 * 1024 * 1024
+DEFAULT_SENTINEL_MAX_BYTES = 10 * 1024 * 1024
 ORGANIZED_DATASETS = {
     ("camara", "ccjc_eventos"),
     ("camara", "pareceres_pec"),
@@ -477,6 +481,74 @@ class RcloneCopyTransport:
             "return_code": result.returncode,
         }
 
+    def copy_batch_command(
+        self,
+        *,
+        files_from_path: Path,
+        combined_path: Path,
+    ) -> list[str]:
+        return [
+            self.executable,
+            "copy",
+            pinned_rclone_remote_path(
+                self.source_remote,
+                self.source_folder_id,
+            ),
+            pinned_rclone_remote_path(
+                self.destination_remote,
+                self.destination_folder_id,
+                CANONICAL_PREFIX,
+            ),
+            "--files-from0",
+            str(files_from_path),
+            "--combined",
+            str(combined_path),
+            "--immutable",
+            "--checksum",
+            "--check-first",
+            "--retries",
+            "1",
+            "--transfers",
+            "4",
+            "--config",
+            str(self.config_path),
+            "--ask-password=false",
+        ]
+
+    def execute_copy_batch(
+        self,
+        *,
+        files_from_path: Path,
+        combined_path: Path,
+    ) -> dict[str, Any]:
+        combined_path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{combined_path.name}.",
+            suffix=".rclone.tmp",
+            dir=combined_path.parent,
+        )
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        try:
+            result = subprocess.run(
+                self.copy_batch_command(
+                    files_from_path=files_from_path,
+                    combined_path=temporary,
+                ),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            atomic_write_bytes(combined_path, temporary.read_bytes())
+            return {
+                "return_code": result.returncode,
+                "combined_path": str(combined_path),
+                "combined_sha256": sha256_file(combined_path),
+                "combined_bytes": combined_path.stat().st_size,
+            }
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def dry_run_command(self, *, files_from_path: Path, combined_path: Path) -> list[str]:
         return [
             self.executable,
@@ -572,6 +644,7 @@ class RcloneCopyTransport:
                 self.destination_folder_id,
             ),
             "--recursive",
+            "--files-only",
             "--hash",
             "--config",
             str(self.config_path),
@@ -579,11 +652,11 @@ class RcloneCopyTransport:
         ]
 
     def destination_entry_count(self) -> int:
+        return len(self.destination_inventory())
+
+    def destination_inventory(self) -> list[SourceObject]:
         result = subprocess.run(
-            self.destination_list_command(),
-            check=False,
-            capture_output=True,
-            text=True,
+            self.destination_list_command(), check=False, capture_output=True, text=True
         )
         if result.returncode != 0:
             raise SourceError(
@@ -596,7 +669,25 @@ class RcloneCopyTransport:
             raise SourceError("rclone lsjson do destino retornou JSON inválido") from exc
         if not isinstance(items, list):
             raise SourceError("rclone lsjson do destino não retornou uma lista")
-        return len(items)
+        objects: list[SourceObject] = []
+        for item in items:
+            if not isinstance(item, dict) or item.get("IsDir") is True:
+                continue
+            locator = item.get("Path")
+            size = item.get("Size")
+            if not isinstance(locator, str) or not isinstance(size, int):
+                raise SourceError("rclone lsjson do destino retornou item inválido")
+            hashes = item.get("Hashes") if isinstance(item.get("Hashes"), dict) else {}
+            objects.append(
+                SourceObject(
+                    locator=locator,
+                    size_bytes=size,
+                    provider_hashes={str(key): str(value) for key, value in hashes.items()},
+                    modified_time=(str(item.get("ModTime")) if item.get("ModTime") else None),
+                    provider_id=(str(item.get("ID")) if isinstance(item.get("ID"), str) else None),
+                )
+            )
+        return sorted(objects, key=lambda item: (item.locator, item.provider_id or ""))
 
     def destination_stat(self, entry: CopyPlanEntry) -> SourceObject | None:
         result = subprocess.run(
@@ -713,6 +804,628 @@ def validate_combined_dry_run(
         "files": len(entries),
         "bytes": sum(entry.size_bytes for entry in entries),
         "markers": {"+": len(entries), "=": 0, "-": 0, "*": 0, "!": 0},
+    }
+
+
+def build_copy_execution_plan(
+    plan: CopyPlan,
+    *,
+    batch_max_files: int = DEFAULT_COPY_BATCH_FILES,
+    batch_max_bytes: int = DEFAULT_COPY_BATCH_BYTES,
+    sentinel_max_bytes: int = DEFAULT_SENTINEL_MAX_BYTES,
+) -> dict[str, Any]:
+    if batch_max_files <= 0 or batch_max_bytes <= 0 or sentinel_max_bytes <= 0:
+        raise LayoutError("limites da cópia devem ser positivos")
+    sentinel_entries: list[CopyPlanEntry] = []
+    for category in COPY_SENTINEL_CATEGORIES:
+        eligible = [
+            entry
+            for entry in plan.entries
+            if entry.category == category and entry.size_bytes > 0 and entry.provider_hashes
+        ]
+        if not eligible:
+            raise LayoutError(f"categoria sem candidato sentinela verificável: {category}")
+        sentinel_entries.append(
+            min(eligible, key=lambda entry: (entry.size_bytes, entry.source_locator))
+        )
+    sentinel_bytes = sum(entry.size_bytes for entry in sentinel_entries)
+    if sentinel_bytes > sentinel_max_bytes:
+        raise LayoutError(f"lote sentinela excede limite: {sentinel_bytes} > {sentinel_max_bytes}")
+    sentinel_locators = {entry.destination_locator for entry in sentinel_entries}
+    remaining = sorted(
+        (entry for entry in plan.entries if entry.destination_locator not in sentinel_locators),
+        key=lambda entry: entry.destination_locator,
+    )
+    batches: list[dict[str, Any]] = []
+    current: list[CopyPlanEntry] = []
+    current_bytes = 0
+
+    def flush() -> None:
+        nonlocal current, current_bytes
+        if not current:
+            return
+        batches.append(
+            {
+                "batch_id": f"batch-{len(batches) + 1:04d}",
+                "files": len(current),
+                "bytes": current_bytes,
+                "destination_locators": [entry.destination_locator for entry in current],
+            }
+        )
+        current = []
+        current_bytes = 0
+
+    for entry in remaining:
+        would_exceed = current and (
+            len(current) >= batch_max_files or current_bytes + entry.size_bytes > batch_max_bytes
+        )
+        if would_exceed:
+            flush()
+        current.append(entry)
+        current_bytes += entry.size_bytes
+        if len(current) >= batch_max_files or current_bytes >= batch_max_bytes:
+            flush()
+    flush()
+    return {
+        "schema_version": 1,
+        "files": plan.files,
+        "bytes": plan.bytes,
+        "sentinel": {
+            "files": len(sentinel_entries),
+            "bytes": sentinel_bytes,
+            "destination_locators": [
+                entry.destination_locator
+                for entry in sorted(sentinel_entries, key=lambda item: item.category)
+            ],
+        },
+        "batch_max_files": batch_max_files,
+        "batch_max_bytes": batch_max_bytes,
+        "sentinel_max_bytes": sentinel_max_bytes,
+        "batches": batches,
+    }
+
+
+def execute_drive_copy(
+    *,
+    transport: RcloneCopyTransport,
+    source: InventorySource,
+    source_inventory_path: Path,
+    dry_run_operation_root: Path,
+    data_root: Path,
+    operation_id: str,
+    source_folder_id: str,
+    destination_folder_id: str,
+    through: str,
+    batch_max_files: int = DEFAULT_COPY_BATCH_FILES,
+    batch_max_bytes: int = DEFAULT_COPY_BATCH_BYTES,
+    sentinel_max_bytes: int = DEFAULT_SENTINEL_MAX_BYTES,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", operation_id):
+        raise LayoutError("operation_id inválido")
+    if through not in {"sentinel", "all"}:
+        raise LayoutError("through deve ser sentinel ou all")
+    resolved_data_root = data_root.expanduser().resolve(strict=True)
+    resolved_dry_run_root = dry_run_operation_root.expanduser().resolve(strict=True)
+    if not resolved_dry_run_root.is_relative_to(resolved_data_root):
+        raise LayoutError("operação de dry-run deve ficar dentro da raiz de dados")
+    plan_path = resolved_dry_run_root / "copy-plan.jsonl"
+    plan_summary_path = resolved_dry_run_root / "copy-plan-summary.json"
+    dry_run_summary_path = resolved_dry_run_root / "dry-run-summary.json"
+    combined_path = resolved_dry_run_root / "dry-run-combined.txt"
+    dry_run_manifest_path = resolved_dry_run_root / "operation.json"
+    plan = load_copy_plan(plan_path)
+    _validate_copy_dry_run_inputs(
+        manifest_path=dry_run_manifest_path,
+        plan_path=plan_path,
+        plan_summary_path=plan_summary_path,
+        dry_run_summary_path=dry_run_summary_path,
+        combined_path=combined_path,
+        plan=plan,
+        source_folder_id=source_folder_id,
+        destination_folder_id=destination_folder_id,
+    )
+    expected_source = load_source_inventory(source_inventory_path)
+    input_artifacts = {
+        "dry_run_manifest_sha256": sha256_file(dry_run_manifest_path),
+        "copy_plan_sha256": sha256_file(plan_path),
+        "dry_run_summary_sha256": sha256_file(dry_run_summary_path),
+        "source_inventory_sha256": sha256_file(source_inventory_path),
+    }
+    configuration = {
+        "source": source.descriptor(),
+        "source_folder_id": source_folder_id,
+        "destination_remote": transport.destination_remote,
+        "destination_folder_id": destination_folder_id,
+        "destination_scope": "drive.file",
+        "batch_max_files": batch_max_files,
+        "batch_max_bytes": batch_max_bytes,
+        "sentinel_max_bytes": sentinel_max_bytes,
+        "command_contract": [
+            "copy",
+            "--files-from0",
+            "--immutable",
+            "--checksum",
+            "--retries=1",
+            "--transfers=4",
+        ],
+    }
+    operation_root = resolved_data_root / "operations" / "organize_drive" / operation_id
+    operation = RecoverableOperation(
+        manifest_path=operation_root / "operation.json",
+        operation_id=operation_id,
+        contract_version=1,
+        implementation_version="r03-drive-copy-v2",
+        input_fingerprint=fingerprint(input_artifacts),
+        config_fingerprint=fingerprint(configuration),
+        stages=(
+            ("prepare", ()),
+            ("destination_preflight", ("prepare",)),
+            ("copy_sentinel", ("destination_preflight",)),
+            ("copy_batches", ("copy_sentinel",)),
+            ("verify_all", ("copy_batches",)),
+            ("verify_source", ("verify_all",)),
+            ("publish_catalog", ("verify_source",)),
+        ),
+        configuration={**configuration, "inputs": input_artifacts},
+    )
+    execution_plan_path = operation_root / "copy-execution-plan.json"
+    preflight_path = operation_root / "destination-preflight.json"
+    sentinel_results_path = operation_root / "sentinel-results.json"
+    progress_path = operation_root / "copy-progress.json"
+    batch_artifacts_root = operation_root / "batches"
+    verification_path = operation_root / "destination-verification.json"
+    source_verification_path = operation_root / "source-verification.json"
+    catalog_path = operation_root / "copy-catalog.jsonl"
+    catalog_summary_path = operation_root / "copy-catalog-summary.json"
+
+    _recover_readonly_interruption(operation, "prepare")
+    if operation.begin("prepare"):
+        try:
+            execution_plan = build_copy_execution_plan(
+                plan,
+                batch_max_files=batch_max_files,
+                batch_max_bytes=batch_max_bytes,
+                sentinel_max_bytes=sentinel_max_bytes,
+            )
+            execution_plan["copy_plan_sha256"] = sha256_file(plan_path)
+            atomic_write_json(execution_plan_path, execution_plan)
+            operation.complete("prepare", artifact=artifact_metadata(execution_plan_path))
+        except (LayoutError, OSError) as exc:
+            operation.fail("prepare", error_type=type(exc).__name__, message=str(exc), blocked=True)
+            raise
+    execution_plan = _load_json_object(execution_plan_path, label="plano de execução")
+    entry_by_destination = {entry.destination_locator: entry for entry in plan.entries}
+
+    _recover_readonly_interruption(operation, "destination_preflight")
+    if operation.begin("destination_preflight"):
+        try:
+            observed = transport.destination_inventory()
+            _validate_destination_subset(plan, observed)
+            atomic_write_json(
+                preflight_path,
+                {
+                    "status": "compatible",
+                    "entries": len(observed),
+                    "bytes": sum(item.size_bytes for item in observed),
+                },
+            )
+            operation.complete("destination_preflight", artifact=artifact_metadata(preflight_path))
+        except SourceError as exc:
+            operation.fail(
+                "destination_preflight",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                blocked=True,
+            )
+            raise
+
+    _recover_copy_interruption(operation, "copy_sentinel")
+    if operation.begin("copy_sentinel"):
+        try:
+            sentinel_entries = [
+                entry_by_destination[str(locator)]
+                for locator in execution_plan["sentinel"]["destination_locators"]
+            ]
+            results = []
+            for completed_files, entry in enumerate(sentinel_entries, start=1):
+                result = transport.copy_entry(entry, dry_run=False)
+                results.append(result)
+                _emit_progress(
+                    progress_callback,
+                    operation_id=operation_id,
+                    stage="copy_sentinel",
+                    status=str(result["status"]),
+                    completed_files=completed_files,
+                    total_files=len(sentinel_entries),
+                    destination_locator=entry.destination_locator,
+                )
+            atomic_write_json(
+                sentinel_results_path,
+                {
+                    "status": "completed",
+                    "files": len(results),
+                    "bytes": sum(entry.size_bytes for entry in sentinel_entries),
+                    "results": results,
+                },
+            )
+            operation.complete("copy_sentinel", artifact=artifact_metadata(sentinel_results_path))
+        except (CopyConflict, CopyResultAmbiguous, OSError, SourceError) as exc:
+            operation.fail(
+                "copy_sentinel",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                blocked=True,
+                remote_result_ambiguous=isinstance(exc, CopyResultAmbiguous),
+            )
+            raise
+    if through == "sentinel":
+        return _drive_copy_payload(
+            operation,
+            through=through,
+            execution_plan=execution_plan,
+            sentinel_results_path=sentinel_results_path,
+            catalog_summary_path=None,
+        )
+
+    _recover_copy_interruption(operation, "copy_batches")
+    if operation.begin("copy_batches"):
+        try:
+            progress = _load_copy_progress(progress_path)
+            attempt_number = int(operation.stage("copy_batches")["attempts"])
+            total_batch_files = len(plan.entries) - int(execution_plan["sentinel"]["files"])
+            for batch in execution_plan["batches"]:
+                batch_id = str(batch["batch_id"])
+                batch_entries = [
+                    entry_by_destination[str(locator)] for locator in batch["destination_locators"]
+                ]
+                _emit_progress(
+                    progress_callback,
+                    operation_id=operation_id,
+                    stage="copy_batches",
+                    status="batch_started",
+                    batch_id=batch_id,
+                    completed_files=int(progress["completed_files"]),
+                    total_files=total_batch_files,
+                )
+                observed_before = transport.destination_inventory()
+                _validate_destination_subset(plan, observed_before)
+                observed_before_map = {item.locator: item for item in observed_before}
+                missing_entries = [
+                    entry
+                    for entry in batch_entries
+                    if entry.destination_locator not in observed_before_map
+                ]
+                for entry in batch_entries:
+                    observed = observed_before_map.get(entry.destination_locator)
+                    if observed is not None and not destination_matches(entry, observed):
+                        raise CopyConflict(
+                            f"destino existente diverge: {entry.destination_locator}"
+                        )
+                batch_result: dict[str, Any] = {
+                    "return_code": 0,
+                    "combined_path": None,
+                    "combined_sha256": None,
+                    "combined_bytes": 0,
+                }
+                if missing_entries:
+                    missing_digest = fingerprint(
+                        [entry.source_locator for entry in missing_entries]
+                    ).removeprefix("sha256:")[:12]
+                    artifact_stem = f"{batch_id}-attempt-{attempt_number:02d}-{missing_digest}"
+                    files_from_path = batch_artifacts_root / f"{artifact_stem}-locators.bin"
+                    combined_path = batch_artifacts_root / f"{artifact_stem}-combined.txt"
+                    atomic_write_bytes(
+                        files_from_path,
+                        b"".join(
+                            entry.source_locator.encode("utf-8") + b"\0"
+                            for entry in missing_entries
+                        ),
+                    )
+                    batch_result = transport.execute_copy_batch(
+                        files_from_path=files_from_path,
+                        combined_path=combined_path,
+                    )
+                observed_after = transport.destination_inventory()
+                _validate_destination_subset(plan, observed_after)
+                observed_after_map = {item.locator: item for item in observed_after}
+                missing_after: list[str] = []
+                batch_results: list[dict[str, Any]] = []
+                for entry in batch_entries:
+                    observed = observed_after_map.get(entry.destination_locator)
+                    if observed is None:
+                        missing_after.append(entry.destination_locator)
+                        continue
+                    if not destination_matches(entry, observed):
+                        raise CopyConflict(f"destino do lote diverge: {entry.destination_locator}")
+                    existed_before = entry.destination_locator in observed_before_map
+                    status = (
+                        "reused_verified"
+                        if existed_before
+                        else (
+                            "copied_verified"
+                            if int(batch_result["return_code"]) == 0
+                            else "reconciled_after_error"
+                        )
+                    )
+                    result = {
+                        "source_locator": entry.source_locator,
+                        "destination_locator": entry.destination_locator,
+                        "status": status,
+                        "dry_run": False,
+                        "batch_id": batch_id,
+                    }
+                    progress["results"][entry.destination_locator] = result
+                    batch_results.append(result)
+                progress["completed_files"] = len(progress["results"])
+                progress["completed_bytes"] = sum(
+                    entry_by_destination[locator].size_bytes for locator in progress["results"]
+                )
+                atomic_write_json(progress_path, progress)
+                atomic_write_json(
+                    batch_artifacts_root / f"{batch_id}-attempt-{attempt_number:02d}-summary.json",
+                    {
+                        "status": "completed" if not missing_after else "incomplete",
+                        "batch_id": batch_id,
+                        "attempt": attempt_number,
+                        "planned_files": len(batch_entries),
+                        "requested_files": len(missing_entries),
+                        "verified_files": len(batch_results),
+                        "missing_after": missing_after,
+                        "transport": batch_result,
+                    },
+                )
+                for result in batch_results:
+                    _emit_progress(
+                        progress_callback,
+                        operation_id=operation_id,
+                        stage="copy_batches",
+                        status=str(result["status"]),
+                        batch_id=batch_id,
+                        completed_files=int(progress["completed_files"]),
+                        total_files=total_batch_files,
+                        completed_bytes=int(progress["completed_bytes"]),
+                        destination_locator=str(result["destination_locator"]),
+                    )
+                if missing_after:
+                    if int(batch_result["return_code"]) != 0:
+                        raise CopyResultAmbiguous(
+                            f"lote {batch_id} incompleto após falha: missing={len(missing_after)}"
+                        )
+                    raise CopyConflict(
+                        f"lote {batch_id} incompleto após retorno zero: missing={len(missing_after)}"
+                    )
+            progress["status"] = "completed"
+            atomic_write_json(progress_path, progress)
+            operation.complete("copy_batches", artifact=artifact_metadata(progress_path))
+        except (CopyConflict, CopyResultAmbiguous, OSError, SourceError) as exc:
+            operation.fail(
+                "copy_batches",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                blocked=True,
+                remote_result_ambiguous=isinstance(exc, CopyResultAmbiguous),
+            )
+            raise
+
+    _recover_readonly_interruption(operation, "verify_all")
+    if operation.begin("verify_all"):
+        try:
+            observed = transport.destination_inventory()
+            _validate_destination_complete(plan, observed)
+            atomic_write_json(
+                verification_path,
+                {
+                    "status": "completed",
+                    "files": len(observed),
+                    "bytes": sum(item.size_bytes for item in observed),
+                },
+            )
+            operation.complete("verify_all", artifact=artifact_metadata(verification_path))
+        except SourceError as exc:
+            operation.fail(
+                "verify_all", error_type=type(exc).__name__, message=str(exc), blocked=True
+            )
+            raise
+
+    _recover_readonly_interruption(operation, "verify_source")
+    if operation.begin("verify_source"):
+        try:
+            current_source = source.list_objects(prefix="")
+            _validate_source_unchanged(expected_source, current_source)
+            atomic_write_json(
+                source_verification_path,
+                {
+                    "status": "unchanged",
+                    "files": len(current_source),
+                    "bytes": sum(item.size_bytes for item in current_source),
+                },
+            )
+            operation.complete(
+                "verify_source", artifact=artifact_metadata(source_verification_path)
+            )
+        except SourceError as exc:
+            operation.fail(
+                "verify_source", error_type=type(exc).__name__, message=str(exc), blocked=True
+            )
+            raise
+
+    _recover_readonly_interruption(operation, "publish_catalog")
+    if operation.begin("publish_catalog"):
+        try:
+            payload = b"".join(
+                canonical_json_bytes(
+                    {
+                        **entry.as_dict(),
+                        "status": "copied_verified",
+                    }
+                )
+                + b"\n"
+                for entry in sorted(plan.entries, key=lambda item: item.destination_locator)
+            )
+            atomic_write_bytes(catalog_path, payload)
+            atomic_write_json(
+                catalog_summary_path,
+                {
+                    "status": "completed",
+                    "files": plan.files,
+                    "bytes": plan.bytes,
+                    "catalog_path": str(catalog_path),
+                    "catalog_sha256": sha256_file(catalog_path),
+                },
+            )
+            operation.complete("publish_catalog", artifact=artifact_metadata(catalog_summary_path))
+        except OSError as exc:
+            operation.fail("publish_catalog", error_type=type(exc).__name__, message=str(exc))
+            raise
+    return _drive_copy_payload(
+        operation,
+        through=through,
+        execution_plan=execution_plan,
+        sentinel_results_path=sentinel_results_path,
+        catalog_summary_path=catalog_summary_path,
+    )
+
+
+def _validate_copy_dry_run_inputs(
+    *,
+    manifest_path: Path,
+    plan_path: Path,
+    plan_summary_path: Path,
+    dry_run_summary_path: Path,
+    combined_path: Path,
+    plan: CopyPlan,
+    source_folder_id: str,
+    destination_folder_id: str,
+) -> None:
+    manifest = _load_json_object(manifest_path, label="manifesto do dry-run")
+    if manifest.get("status") != "completed":
+        raise CopyConflict("dry-run integral não está concluído")
+    configuration = manifest.get("configuration")
+    if not isinstance(configuration, dict):
+        raise LayoutError("configuração do dry-run é inválida")
+    if (
+        configuration.get("source_folder_id") != source_folder_id
+        or configuration.get("destination_folder_id") != destination_folder_id
+    ):
+        raise CopyConflict("IDs da cópia divergem do dry-run aprovado")
+    plan_summary = _load_json_object(plan_summary_path, label="resumo do plano")
+    if (
+        plan_summary.get("plan_sha256") != sha256_file(plan_path)
+        or plan_summary.get("files") != plan.files
+        or plan_summary.get("bytes") != plan.bytes
+    ):
+        raise CopyConflict("plano de cópia diverge do resumo autenticado")
+    _validate_dry_run_artifacts(dry_run_summary_path, combined_path, plan.entries)
+
+
+def _validate_destination_subset(plan: CopyPlan, observed: Sequence[SourceObject]) -> None:
+    expected = {entry.destination_locator: entry for entry in plan.entries}
+    seen: set[str] = set()
+    for item in observed:
+        if item.locator in seen:
+            raise CopyConflict(f"destino duplicado: {item.locator}")
+        seen.add(item.locator)
+        entry = expected.get(item.locator)
+        if entry is None:
+            raise CopyConflict(f"objeto inesperado no destino: {item.locator}")
+        if not destination_matches(entry, item):
+            raise CopyConflict(f"destino existente diverge: {item.locator}")
+
+
+def _validate_destination_complete(plan: CopyPlan, observed: Sequence[SourceObject]) -> None:
+    _validate_destination_subset(plan, observed)
+    expected = {entry.destination_locator for entry in plan.entries}
+    actual = {item.locator for item in observed}
+    if expected != actual:
+        raise CopyConflict(
+            f"catálogo de destino incompleto: missing={len(expected - actual)}, "
+            f"added={len(actual - expected)}"
+        )
+
+
+def _validate_source_unchanged(
+    expected: Sequence[SourceObject], observed: Sequence[SourceObject]
+) -> None:
+    def keyed(items: Sequence[SourceObject]) -> dict[tuple[str, str], SourceObject]:
+        result: dict[tuple[str, str], SourceObject] = {}
+        for item in items:
+            key = (item.locator, item.provider_id or "")
+            if key in result:
+                raise CopyConflict(f"identidade duplicada na origem: {key[0]}")
+            result[key] = item
+        return result
+
+    expected_map = keyed(expected)
+    observed_map = keyed(observed)
+    if set(expected_map) != set(observed_map):
+        raise CopyConflict("inventário da origem mudou depois da cópia")
+    for key, expected_item in expected_map.items():
+        observed_item = observed_map[key]
+        if expected_item.size_bytes != observed_item.size_bytes:
+            raise CopyConflict(f"tamanho da origem mudou: {expected_item.locator}")
+        common_hashes = set(expected_item.provider_hashes) & set(observed_item.provider_hashes)
+        if common_hashes and any(
+            expected_item.provider_hashes[name] != observed_item.provider_hashes[name]
+            for name in common_hashes
+        ):
+            raise CopyConflict(f"hash da origem mudou: {expected_item.locator}")
+
+
+def _emit_progress(
+    callback: Callable[[dict[str, Any]], None] | None,
+    **event: Any,
+) -> None:
+    if callback is not None:
+        callback({"event": "progress", **event})
+
+
+def _load_copy_progress(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {
+            "schema_version": 1,
+            "status": "running",
+            "completed_files": 0,
+            "completed_bytes": 0,
+            "results": {},
+        }
+    progress = _load_json_object(path, label="progresso da cópia")
+    if not isinstance(progress.get("results"), dict):
+        raise LayoutError("progresso da cópia é inválido")
+    return progress
+
+
+def _recover_copy_interruption(operation: RecoverableOperation, stage_id: str) -> None:
+    if operation.stage(stage_id)["status"] == "running":
+        operation.recover_interrupted(
+            stage_id,
+            remote_result_ambiguous=True,
+            message="execução anterior interrompida; destinos serão reconciliados antes da retomada",
+        )
+
+
+def _drive_copy_payload(
+    operation: RecoverableOperation,
+    *,
+    through: str,
+    execution_plan: dict[str, Any],
+    sentinel_results_path: Path,
+    catalog_summary_path: Path | None,
+) -> dict[str, Any]:
+    snapshot = operation.snapshot()
+    return {
+        "operation_id": snapshot["operation_id"],
+        "status": snapshot["status"],
+        "through": through,
+        "manifest_path": str(operation.manifest_path),
+        "files": execution_plan["files"],
+        "bytes": execution_plan["bytes"],
+        "sentinel_files": execution_plan["sentinel"]["files"],
+        "sentinel_bytes": execution_plan["sentinel"]["bytes"],
+        "sentinel_results_path": str(sentinel_results_path),
+        "catalog_summary_path": (
+            str(catalog_summary_path) if catalog_summary_path is not None else None
+        ),
     }
 
 

@@ -14,11 +14,17 @@ from falando_nela.drive_organizer import (
     CopyConflict,
     LayoutError,
     RcloneCopyTransport,
+    execute_drive_copy,
     execute_drive_dry_run,
     plan_drive_organization,
     reconcile_drive_inventory,
 )
 from falando_nela.operations import OperationError
+from falando_nela.sample_import import (
+    PILOT_PREFIX,
+    SampleImportError,
+    execute_pilot_sample,
+)
 from falando_nela.sources import RcloneRawSource, SourceError, inspect_rclone_config
 
 
@@ -75,6 +81,38 @@ def build_parser() -> argparse.ArgumentParser:
     drive_dry_run.add_argument("--data-root", type=Path)
     drive_dry_run.add_argument("--repo-root", type=Path, default=Path.cwd())
     drive_dry_run.add_argument("--json", action="store_true", dest="as_json")
+    drive_copy = drive_commands.add_parser(
+        "copy", help="copia e reconcilia o sentinela ou toda a árvore canônica"
+    )
+    drive_copy.add_argument("--operation-id", required=True)
+    drive_copy.add_argument("--source-inventory", type=Path, required=True)
+    drive_copy.add_argument("--dry-run-operation-root", type=Path, required=True)
+    drive_copy.add_argument("--rclone-config", type=Path, required=True)
+    drive_copy.add_argument("--source-remote", default="raw-source-ro")
+    drive_copy.add_argument("--source-folder-id", required=True)
+    drive_copy.add_argument("--destination-remote", default="raw-destination-rw")
+    drive_copy.add_argument("--destination-folder-id", required=True)
+    drive_copy.add_argument("--through", choices=("sentinel", "all"), default="sentinel")
+    drive_copy.add_argument("--batch-max-files", type=int, default=100)
+    drive_copy.add_argument("--batch-max-bytes", type=int, default=512 * 1024 * 1024)
+    drive_copy.add_argument("--sentinel-max-bytes", type=int, default=10 * 1024 * 1024)
+    drive_copy.add_argument("--data-root", type=Path)
+    drive_copy.add_argument("--repo-root", type=Path, default=Path.cwd())
+    drive_copy.add_argument("--json", action="store_true", dest="as_json")
+    sample = subcommands.add_parser("sample", help="materializa amostras raw aprovadas")
+    sample_commands = sample.add_subparsers(dest="sample_command", required=True)
+    sample_pilot = sample_commands.add_parser(
+        "pilot", help="publica o piloto determinístico do Plenário do Senado em 2010"
+    )
+    sample_pilot.add_argument("--operation-id", required=True)
+    sample_pilot.add_argument("--copy-catalog-summary", type=Path, required=True)
+    sample_pilot.add_argument("--rclone-config", type=Path, required=True)
+    sample_pilot.add_argument("--source-remote", default="raw-source-ro")
+    sample_pilot.add_argument("--source-folder-id", required=True)
+    sample_pilot.add_argument("--confirm-source-folder-id", required=True)
+    sample_pilot.add_argument("--data-root", type=Path)
+    sample_pilot.add_argument("--repo-root", type=Path, default=Path.cwd())
+    sample_pilot.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -209,7 +247,101 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_human_drive_dry_run(payload)
         return 0
+    if args.command == "drive-organize" and args.drive_command == "copy":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            transport = RcloneCopyTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                destination_remote=args.destination_remote,
+                destination_folder_id=args.destination_folder_id,
+                config_snapshot=config_snapshot,
+            )
+            payload = execute_drive_copy(
+                transport=transport,
+                source=source,
+                source_inventory_path=args.source_inventory,
+                dry_run_operation_root=args.dry_run_operation_root,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                source_folder_id=args.source_folder_id,
+                destination_folder_id=args.destination_folder_id,
+                through=args.through,
+                batch_max_files=args.batch_max_files,
+                batch_max_bytes=args.batch_max_bytes,
+                sentinel_max_bytes=args.sentinel_max_bytes,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            CopyConflict,
+            LayoutError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha na cópia da organização do Drive: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_drive_copy(payload)
+        return 0
+    if args.command == "sample" and args.sample_command == "pilot":
+        try:
+            if args.confirm_source_folder_id != args.source_folder_id:
+                raise SampleImportError("confirmação literal do ID canônico diverge")
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix=PILOT_PREFIX,
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+            )
+            payload = execute_pilot_sample(
+                source=source,
+                copy_catalog_summary_path=args.copy_catalog_summary,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                sample_seed=settings.sample_seed,
+                quota_bytes=settings.sample_local_quota_bytes,
+                minimum_free_bytes=settings.minimum_free_bytes,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            OSError,
+            OperationError,
+            SampleImportError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha ao materializar piloto amostral: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_sample_pilot(payload)
+        return 0
     return 2
+
+
+def _print_progress(event: dict[str, object]) -> None:
+    print(json.dumps(event, ensure_ascii=False, sort_keys=True), file=sys.stderr, flush=True)
 
 
 def _print_human_doctor(payload: dict[str, object]) -> None:
@@ -242,3 +374,22 @@ def _print_human_drive_dry_run(payload: dict[str, object]) -> None:
     print(f"- bytes: {payload['bytes']}", file=sys.stderr)
     print(f"- excluídos: {payload['excluded_files']}", file=sys.stderr)
     print(f"- relatório: {payload['dry_run_summary_path']}", file=sys.stderr)
+
+
+def _print_human_drive_copy(payload: dict[str, object]) -> None:
+    print(f"Cópia do Drive: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- limite executado: {payload['through']}", file=sys.stderr)
+    print(f"- sentinelas: {payload['sentinel_files']}", file=sys.stderr)
+    print(f"- bytes sentinela: {payload['sentinel_bytes']}", file=sys.stderr)
+    if payload["catalog_summary_path"] is not None:
+        print(f"- catálogo: {payload['catalog_summary_path']}", file=sys.stderr)
+
+
+def _print_human_sample_pilot(payload: dict[str, object]) -> None:
+    print(f"Amostra piloto: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- sample_id: {payload['sample_id']}", file=sys.stderr)
+    print(f"- população: {payload['population']}", file=sys.stderr)
+    print(f"- selecionados: {payload['selected_count']}", file=sys.stderr)
+    print(f"- manifesto: {payload['sample_manifest_path']}", file=sys.stderr)

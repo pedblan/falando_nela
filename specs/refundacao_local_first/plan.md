@@ -87,24 +87,24 @@ integrado passou em lockfile, Ruff, formatação, 189 testes e diagnóstico.
 - [x] Criar pelo remote `drive.file` uma nova raiz operacional `falando_nela`, confirmar vazia e congelar seu ID por readback.
 - [x] Congelar o mapeamento de plenários e comissões sem alterar conteúdo nem periodicidade.
 - [x] Executar e revisar dry-run integral da cópia imutável.
-- [ ] Copiar e reconciliar um lote sentinela antes de ampliar.
-- [ ] Copiar em lotes retomáveis e validar a árvore canônica `data/raw/v1/`.
-- [ ] Expor a árvore canônica validada por remote read-only para a amostragem.
+- [x] Copiar e reconciliar um lote sentinela antes de ampliar.
+- [x] Copiar em lotes retomáveis e validar a árvore canônica `data/raw/v1/`.
+- [x] Expor a árvore canônica validada por remote read-only para a amostragem.
 - [x] Confirmar humanamente a pasta raw de origem pelo ID `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
 - [x] Configurar um remote `rclone` exclusivo com escopo `drive.readonly`.
 - [x] Comparar a listagem atual do Drive com o inventário G01 aprovado.
 - [x] Reconciliar pelo ID do provedor os dois arquivos acidentais que o rclone lista com o mesmo caminho `camara/plenario_discursos/ano=1900/Untitled`.
 - [x] Gerar inventário somente leitura do corpus de origem sem chamar APIs parlamentares.
-- [ ] Definir a população ativa por data substantiva a partir de `2010-01-01`.
+- [x] Definir a população ativa do piloto por data substantiva em 2010.
 - [x] Escolher o primeiro ano não vazio do estrato `senado × plenario_discursos × pronunciamento_texto`.
-- [ ] Contar a população `N` do estrato e persistir identidades, chaves e locators.
-- [ ] Calcular `k=max(1, ceil(N × 0.01))` e congelar as `k` menores chaves.
-- [ ] Materializar somente os registros selecionados sem alterar a origem.
-- [ ] Compactar a amostra fechada como gzip determinístico.
-- [ ] Reconciliar população, selecionados, identidades, hashes, bytes e rejeições.
-- [ ] Encerrar a operação após publicar raw e metadados técnicos, sem produzir Parquet, DuckDB ou análise.
-- [ ] Reexecutar a mesma operação e comprovar idempotência.
-- [ ] Injetar interrupção entre cada etapa e comprovar retomada sem repetir etapa concluída.
+- [x] Contar a população `N` do estrato e persistir identidades, chaves e locators.
+- [x] Calcular `k=max(1, ceil(N × 0.01))` e congelar as `k` menores chaves.
+- [x] Materializar somente os registros selecionados sem alterar a origem.
+- [x] Compactar a amostra fechada como gzip determinístico.
+- [x] Reconciliar população, selecionados, identidades, hashes, bytes e rejeições.
+- [x] Encerrar a operação após publicar raw e metadados técnicos, sem produzir Parquet, DuckDB ou análise.
+- [x] Reexecutar a mesma operação e comprovar idempotência.
+- [x] Injetar interrupção entre cada etapa e comprovar retomada sem repetir etapa concluída.
 
 **Gate R03:** árvore canônica copy-first reconciliada sem alterar a origem; raw
 e manifest do estrato piloto aprovados; quota exata da meta anual de 1%; zero
@@ -138,6 +138,16 @@ metadata-only de `camara/parlamentares` e `senado/parlamentares`; eles foram
 incluídos explicitamente pelo contrato raw transversal e a segunda tentativa
 concluiu. A etapa remota de dry-run concluiu na primeira tentativa e a
 reexecução não a repetiu. Nenhum arquivo raw foi copiado.
+
+Evidência posterior de conclusão em `2026-08-03`: o sentinela validou três
+arquivos e 78.822 bytes. A operação `r03-drive-copy-batched-20260803` executou
+38 lotes, reconciliou 2.887 arquivos e 14.686.043.352 bytes, publicou catálogo
+final e relistou a origem com 2.891 arquivos e 14.686.044.612 bytes
+inalterados. A operação `r03-sample-pilot-2010-20260803` confirmou 11 arquivos,
+89.253.442 bytes, `N=2.996` e `k=30`; publicou somente os 30 registros
+selecionados em gzip determinístico e foi reexecutada com zero nova leitura e
+zero duplicação. Google Cloud Batch, Marimo e a ampliação para outros estratos
+permanecem fora de R03.
 
 ## R04 — primeiro recorte vertical amostral em marimo
 

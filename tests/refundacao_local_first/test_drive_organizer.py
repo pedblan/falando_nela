@@ -7,16 +7,18 @@ from pathlib import Path
 
 import pytest
 
-from falando_nela.cli import build_parser, main
+from falando_nela.cli import _print_progress, build_parser, main
 from falando_nela.drive_organizer import (
     CANONICAL_PREFIX,
     CopyConflict,
     CopyResultAmbiguous,
     LayoutError,
     RcloneCopyTransport,
+    build_copy_execution_plan,
     build_copy_plan,
     classify_raw_locator,
     destination_matches,
+    execute_drive_copy,
     execute_drive_dry_run,
     plan_drive_organization,
     reconcile_drive_inventory,
@@ -94,6 +96,46 @@ def test_drive_plan_defaults_match_operational_remotes() -> None:
     )
     assert dry_run_args.source_remote == "raw-source-ro"
     assert dry_run_args.destination_remote == "raw-destination-rw"
+
+    copy_args = build_parser().parse_args(
+        [
+            "drive-organize",
+            "copy",
+            "--operation-id",
+            "org-copy-defaults",
+            "--source-inventory",
+            "source-inventory.jsonl",
+            "--dry-run-operation-root",
+            "operations/dry-run",
+            "--rclone-config",
+            "rclone.conf",
+            "--source-folder-id",
+            SOURCE_FOLDER_ID,
+            "--destination-folder-id",
+            DESTINATION_FOLDER_ID,
+        ]
+    )
+    assert copy_args.source_remote == "raw-source-ro"
+    assert copy_args.destination_remote == "raw-destination-rw"
+    assert copy_args.through == "sentinel"
+
+    sample_args = build_parser().parse_args(
+        [
+            "sample",
+            "pilot",
+            "--operation-id",
+            "sample-defaults",
+            "--copy-catalog-summary",
+            "copy-catalog-summary.json",
+            "--rclone-config",
+            "rclone.conf",
+            "--source-folder-id",
+            DESTINATION_FOLDER_ID,
+            "--confirm-source-folder-id",
+            DESTINATION_FOLDER_ID,
+        ]
+    )
+    assert sample_args.source_remote == "raw-source-ro"
 
 
 @pytest.mark.parametrize(
@@ -303,6 +345,16 @@ def test_copy_command_is_immutable_dry_run_and_contains_no_token(tmp_path: Path)
         assert required in aggregate
     assert aggregate[aggregate.index("--retries") + 1] == "1"
     assert all(forbidden not in aggregate for forbidden in ("sync", "move", "delete", "purge"))
+    batch = transport.copy_batch_command(
+        files_from_path=files_from,
+        combined_path=combined,
+    )
+    assert batch[1] == "copy"
+    assert "--files-from0" in batch
+    assert "--immutable" in batch
+    assert "--checksum" in batch
+    assert batch[batch.index("--transfers") + 1] == "4"
+    assert "--server-side-across-configs" not in batch
 
 
 def test_copy_error_and_destination_verification_do_not_accept_weak_evidence(
@@ -786,3 +838,237 @@ def test_cli_failure_is_nonzero_and_does_not_echo_rclone_token(
     assert "drive.readonly" in captured.err
     assert SENTINEL_TOKEN not in captured.err
     assert "Traceback" not in captured.err
+
+
+def test_progress_event_is_json_on_stderr_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    event = {"event": "progress", "stage": "copy_batches", "completed_files": 12}
+
+    _print_progress(event)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err) == event
+
+
+def test_copy_execution_plan_selects_three_categories_and_bounded_batches() -> None:
+    objects = [
+        SourceObject(
+            "senado/plenario_discursos/ano=2010/mes=02/a.jsonl",
+            8,
+            provider_hashes={"MD5": "a"},
+        ),
+        SourceObject(
+            "senado/plenario_discursos/ano=2010/mes=03/b.jsonl",
+            20,
+            provider_hashes={"MD5": "b"},
+        ),
+        SourceObject(
+            "senado/plenario_discursos/metadata/c.jsonl",
+            4,
+            provider_hashes={"MD5": "c"},
+        ),
+        SourceObject(
+            "senado/plenario_discursos/transcription_queue/d.jsonl",
+            6,
+            provider_hashes={"MD5": "d"},
+        ),
+        SourceObject(
+            "senado/ccj_notas/ano=2010/mes=01/e.jsonl",
+            30,
+            provider_hashes={"MD5": "e"},
+        ),
+    ]
+
+    execution = build_copy_execution_plan(
+        build_copy_plan(objects), batch_max_files=1, batch_max_bytes=25
+    )
+
+    assert execution["sentinel"]["files"] == 3
+    assert execution["sentinel"]["bytes"] == 18
+    assert [batch["files"] for batch in execution["batches"]] == [1, 1]
+    assert [batch["bytes"] for batch in execution["batches"]] == [30, 20]
+
+
+class _FakeCopyExecutionTransport:
+    source_remote = "raw-source-ro"
+    destination_remote = "raw-destination-rw"
+
+    def __init__(
+        self,
+        source_objects: list[SourceObject],
+        *,
+        fail_batch_once: bool = False,
+    ) -> None:
+        self.objects: dict[str, SourceObject] = {}
+        self.copy_calls = 0
+        self.batch_calls = 0
+        self.fail_batch_once = fail_batch_once
+        self.entries_by_source = {
+            entry.source_locator: entry
+            for entry in build_copy_plan(
+                [item for item in source_objects if item.locator.endswith(".jsonl")]
+            ).entries
+        }
+
+    def destination_inventory(self) -> list[SourceObject]:
+        return sorted(self.objects.values(), key=lambda item: item.locator)
+
+    def destination_stat(self, entry: object) -> SourceObject | None:
+        return self.objects.get(entry.destination_locator)  # type: ignore[attr-defined]
+
+    def copy_entry(self, entry: object, *, dry_run: bool) -> dict[str, object]:
+        assert not dry_run
+        self.copy_calls += 1
+        copied = SourceObject(
+            entry.destination_locator,  # type: ignore[attr-defined]
+            entry.size_bytes,  # type: ignore[attr-defined]
+            provider_hashes=entry.provider_hashes,  # type: ignore[attr-defined]
+        )
+        self.objects[copied.locator] = copied
+        return {
+            "source_locator": entry.source_locator,  # type: ignore[attr-defined]
+            "destination_locator": entry.destination_locator,  # type: ignore[attr-defined]
+            "status": "copied_verified",
+            "dry_run": False,
+        }
+
+    def execute_copy_batch(
+        self,
+        *,
+        files_from_path: Path,
+        combined_path: Path,
+    ) -> dict[str, object]:
+        self.batch_calls += 1
+        locators = [
+            item.decode("utf-8") for item in files_from_path.read_bytes().split(b"\0") if item
+        ]
+        combined_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.fail_batch_once:
+            self.fail_batch_once = False
+            combined_path.write_text("")
+            return {
+                "return_code": 1,
+                "combined_path": str(combined_path),
+                "combined_sha256": sha256_file(combined_path),
+                "combined_bytes": 0,
+            }
+        combined_path.write_text("".join(f"+ {locator}\n" for locator in locators))
+        for locator in locators:
+            self.copy_entry(self.entries_by_source[locator], dry_run=False)
+        return {
+            "return_code": 0,
+            "combined_path": str(combined_path),
+            "combined_sha256": sha256_file(combined_path),
+            "combined_bytes": combined_path.stat().st_size,
+        }
+
+
+def test_drive_copy_stops_at_sentinel_then_resumes_all_without_duplicate_copy(
+    tmp_path: Path,
+) -> None:
+    objects = [
+        SourceObject(
+            "controle.ipynb",
+            3,
+            provider_hashes={"sha256": "e" * 64},
+            provider_id="excluded-id",
+        ),
+        SourceObject(
+            "senado/plenario_discursos/ano=2010/mes=02/a.jsonl",
+            8,
+            provider_hashes={"MD5": "a"},
+            provider_id="a-id",
+        ),
+        SourceObject(
+            "senado/plenario_discursos/ano=2010/mes=03/b.jsonl",
+            20,
+            provider_hashes={"MD5": "b"},
+            provider_id="b-id",
+        ),
+        SourceObject(
+            "senado/plenario_discursos/metadata/c.jsonl",
+            4,
+            provider_hashes={"MD5": "c"},
+            provider_id="c-id",
+        ),
+        SourceObject(
+            "senado/plenario_discursos/transcription_queue/d.jsonl",
+            6,
+            provider_hashes={"MD5": "d"},
+            provider_id="d-id",
+        ),
+    ]
+    baseline = tmp_path / "g01.csv"
+    _write_baseline(baseline, objects)
+    identity_map = tmp_path / "provider-identity-map.json"
+    _write_identity_map(
+        identity_map,
+        baseline=baseline,
+        provider_id="excluded-id",
+        locator="controle.ipynb",
+        size_bytes=3,
+        content_sha256="e" * 64,
+    )
+    data_root = tmp_path / "data"
+    source = _FakeSource(objects)
+    reconciliation = reconcile_drive_inventory(
+        source=source,
+        baseline_csv=baseline,
+        provider_identity_map_path=identity_map,
+        data_root=data_root,
+        operation_id="copy-reconciliation",
+        source_folder_id=SOURCE_FOLDER_ID,
+    )
+    dry_run = execute_drive_dry_run(
+        transport=_FakeDryRunTransport(),  # type: ignore[arg-type]
+        reconciliation_manifest_path=Path(str(reconciliation["manifest_path"])),
+        source_inventory_path=Path(str(reconciliation["inventory_path"])),
+        source_reconciliation_path=Path(str(reconciliation["reconciliation_path"])),
+        provider_identity_map_path=identity_map,
+        data_root=data_root,
+        operation_id="copy-dry-run",
+        source_folder_id=SOURCE_FOLDER_ID,
+        destination_folder_id=DESTINATION_FOLDER_ID,
+    )
+    transport = _FakeCopyExecutionTransport(objects, fail_batch_once=True)
+    progress_events: list[dict[str, object]] = []
+    arguments = {
+        "transport": transport,
+        "source": source,
+        "source_inventory_path": Path(str(reconciliation["inventory_path"])),
+        "dry_run_operation_root": Path(str(dry_run["manifest_path"])).parent,
+        "data_root": data_root,
+        "operation_id": "copy-real",
+        "source_folder_id": SOURCE_FOLDER_ID,
+        "destination_folder_id": DESTINATION_FOLDER_ID,
+        "batch_max_files": 1,
+        "batch_max_bytes": 25,
+        "progress_callback": progress_events.append,
+    }
+
+    sentinel = execute_drive_copy(**arguments, through="sentinel")  # type: ignore[arg-type]
+    assert sentinel["sentinel_files"] == 3
+    assert transport.copy_calls == 3
+
+    with pytest.raises(CopyResultAmbiguous, match="batch-0001.*missing=1"):
+        execute_drive_copy(**arguments, through="all")  # type: ignore[arg-type]
+    assert transport.copy_calls == 3
+    assert transport.batch_calls == 1
+
+    completed = execute_drive_copy(**arguments, through="all")  # type: ignore[arg-type]
+    assert completed["status"] == "completed"
+    assert transport.copy_calls == 4
+    assert transport.batch_calls == 2
+    assert Path(str(completed["catalog_summary_path"])).is_file()
+
+    repeated = execute_drive_copy(**arguments, through="all")  # type: ignore[arg-type]
+    assert repeated == completed
+    assert transport.copy_calls == 4
+    assert transport.batch_calls == 2
+    assert {event["stage"] for event in progress_events} == {
+        "copy_sentinel",
+        "copy_batches",
+    }
+    assert any(event["status"] == "copied_verified" for event in progress_events)

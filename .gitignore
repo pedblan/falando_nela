@@ -21,3 +21,4 @@ data/samples/**
 !data/samples/**/
 !data/samples/**/README.md
 !data/samples/**/.gitkeep
+data_samples/

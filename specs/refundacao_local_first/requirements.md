@@ -243,9 +243,12 @@ refazer a coleta nem perder a proveniência já acumulada.
 
 ## Armazenamento local
 
-- **RF-STORE-01:** dados de produção ficarão fora do clone Git. A raiz será
-  obrigatoriamente fornecida por `FALANDO_NELA_DATA_ROOT`; não haverá caminho
-  absoluto pessoal ou de Colab como default de produção.
+- **RF-STORE-01:** dados integrais e de produção ficarão fora do clone Git. A
+  raiz será obrigatoriamente fornecida por `FALANDO_NELA_DATA_ROOT`; não haverá
+  caminho pessoal ou de Colab como default de produção. A única exceção dentro
+  do clone será `<repo>/data_samples`, exatamente para os profiles `local` e
+  `sample_annual_1pct`; ela será integralmente ignorada pelo Git e nunca poderá
+  receber o profile `full` ou execução `cloud`.
 - **RF-STORE-02:** a raiz terá as áreas
   `raw/sample_annual_1pct/<sample_id>/`, `sentinels/`, `operations/`,
   `processed/`, `snapshots/`, `cache/` e `tmp/`. Somente `cache/` e `tmp/`

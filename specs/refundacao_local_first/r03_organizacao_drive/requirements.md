@@ -73,9 +73,10 @@ O escopo inicial cobre:
   relatório G01 já reconciliados. Ele congelará exatamente os locators
   `copy_immutable` em uma lista NUL-delimited e executará uma única sessão
   `rclone copy --files-from0 --dry-run --immutable --checksum --retries 1`.
-  A execução real continuará usando `copyto` por objeto; o comando agregado é
-  exclusivo do ensaio sem efeito para reduzir inicializações, chamadas de
-  listagem e risco de concorrência sobre a configuração cifrada.
+  A execução real usará a mesma lista congelada particionada em lotes limitados,
+  com `rclone copy --files-from0 --immutable --checksum --retries 1
+  --transfers 4`. Cada lote atravessará o cliente, sem cópia server-side, e só
+  ganhará checkpoint após readback e reconciliação de todos os seus objetos.
 
 ## Operação recuperável
 
@@ -87,14 +88,18 @@ discover -> map -> dry_run -> copy_sentinel -> verify_sentinel
 - **R03-ORG-06:** o manifest registrará fingerprints dos dois inventários, do
   mapeamento e da configuração não secreta; etapas, tentativas, remote IDs,
   bytes, hashes, erros e ambiguidade remota.
-- **R03-ORG-07:** antes de cada cópia, destino ausente será confirmado. Depois
-  da resposta, o destino será relistado e comparado antes de `completed`.
+- **R03-ORG-07:** antes de cada lote, o destino será inventariado e objetos já
+  presentes serão reconciliados. Depois da resposta, o destino será relistado e
+  cada objeto do lote será comparado por caminho, tamanho e hash antes de
+  `completed`.
 - **R03-ORG-08:** se a resposta da cópia for ambígua, a retomada reconciliará o
-  destino; não repetirá automaticamente o efeito.
+  destino e reconstruirá a lista apenas com objetos ainda ausentes; não repetirá
+  automaticamente efeitos já confirmados.
 - **R03-ORG-09:** objeto já existente e idêntico será reutilizado; objeto
   divergente será bloqueado, nunca substituído.
-- **R03-ORG-10:** lotes terão contagem e bytes limitados, checkpoints próprios
-  e avanço condicionado à verificação do lote anterior.
+- **R03-ORG-10:** lotes terão contagem e bytes limitados, listas e relatórios de
+  transporte próprios, progresso por objeto e avanço condicionado à verificação
+  integral do lote anterior.
 - **R03-ORG-11:** o catálogo final provará bijeção entre todos os arquivos
   aceitos da origem e seus destinos, com zero ausência, acréscimo ou colisão.
 - **R03-ORG-12:** o dry-run só será concluído quando o relatório combinado do

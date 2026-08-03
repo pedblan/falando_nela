@@ -95,34 +95,43 @@ criada.
 - [x] Confirmar por contrato e fixtures corpus textual em `ano=YYYY/mes=MM/` e metadata fora do corpus mensal.
 - [x] Confirmar que comandos construídos não contêm `sync`, `move`, `delete`, `purge`, substituição ou cópia server-side forçada.
 - [x] Revisar o dry-run integral e confirmar correspondência exata com o plano congelado.
-- [ ] Aprovar o lote sentinela.
-- [ ] Reconciliar sentinela por caminho, tamanho e hash antes do lote seguinte.
+- [x] Aprovar o lote sentinela.
+- [x] Reconciliar sentinela por caminho, tamanho e hash antes do lote seguinte.
 - [x] Adulterar artefato local e retomar apenas inventário e mapa dependente.
-- [ ] Reconciliar integralmente origem e árvore canônica antes da amostragem.
+- [x] Reconciliar integralmente origem e árvore canônica antes da amostragem.
 - [x] Confirmar o ID da pasta raw como `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
 - [x] Confirmar que o remote de origem tem escopo efetivo somente leitura.
 - [x] Reproduzir por listagem read-only 2.891 arquivos e 14.686.044.612 bytes, distinguindo 2.887 JSONL dos quatro itens não raw.
 - [x] Reconciliar pelo ID do Drive os dois itens exibidos pelo rclone com o mesmo caminho e a distinção `Untitled`/`Untitled (1)` da baseline G01.
 - [x] Reconciliar 2.891 arquivos e 13,68 GiB da baseline ou bloquear diante da divergência.
-- [ ] Confirmar que nenhum comando usa `sync`, `move`, `delete` ou upload no remote de origem.
-- [ ] Executar inventário read-only da origem com rede de coleta desabilitada.
-- [ ] Selecionar o primeiro ano não vazio de `senado × plenario_discursos × pronunciamento_texto`.
-- [ ] Confirmar a identidade estável de todo registro da população piloto.
-- [ ] Verificar que a primeira passagem produz `N`, chaves e locators sem materializar o raw integral.
-- [ ] Calcular `k=max(1, ceil(N × 0.01))` e selecionar exatamente as `k` menores chaves.
-- [ ] Recalcular a seleção com ordem de leitura diferente e obter as mesmas identidades.
-- [ ] Congelar o manifest antes de iniciar a segunda passagem.
-- [ ] Materializar somente os registros listados no manifest congelado.
-- [ ] Confirmar que a operação publica somente raw e metadados técnicos, sem Parquet, DuckDB, normalização ou análise.
-- [ ] Confirmar que ledger SQLite e manifests JSON contêm apenas estado operacional, identidades, locators, contagens e hashes.
-- [ ] Criar `.jsonl.gz` determinístico em caminho temporário e promovê-lo atomicamente após validação.
-- [ ] Descompactar em streaming e comparar cada registro e `sha256_uncompressed` com a origem.
-- [ ] Verificar `sha256_stored_object`, tamanho comprimido e integridade gzip.
-- [ ] Comparar população, selecionados, válidos, vazios e rejeitados antes e depois da compressão.
-- [ ] Reexecutar com o mesmo `operation_id` e confirmar zero arquivo duplicado ou substituído.
-- [ ] Confirmar que nenhum timestamp variável do cabeçalho gzip altera a saída entre execuções.
-- [ ] Injetar falha antes e depois de cada etapa e confirmar retomada pelo último artefato validado.
+- [x] Confirmar que nenhum comando usa `sync`, `move`, `delete` ou upload no remote de origem.
+- [x] Executar inventário read-only da origem sem chamar rede de coleta parlamentar.
+- [x] Selecionar o primeiro ano não vazio de `senado × plenario_discursos × pronunciamento_texto`.
+- [x] Confirmar a identidade estável de todo registro da população piloto.
+- [x] Verificar que a primeira passagem produz `N`, chaves e locators sem materializar o raw integral.
+- [x] Calcular `k=max(1, ceil(N × 0.01))` e selecionar exatamente as `k` menores chaves.
+- [x] Recalcular a seleção com ordem de leitura diferente e obter as mesmas identidades.
+- [x] Congelar o manifest antes de iniciar a segunda passagem.
+- [x] Materializar somente os registros listados no manifest congelado.
+- [x] Confirmar que a operação publica somente raw e metadados técnicos, sem Parquet, DuckDB, normalização ou análise.
+- [x] Confirmar que ledger SQLite e manifests JSON contêm apenas estado operacional, identidades, locators, contagens e hashes.
+- [x] Criar `.jsonl.gz` determinístico em caminho temporário e promovê-lo atomicamente após validação.
+- [x] Descompactar em streaming e comparar cada registro e `sha256_uncompressed` com a origem.
+- [x] Verificar `sha256_stored_object`, tamanho comprimido e integridade gzip.
+- [x] Comparar população, selecionados, válidos, vazios e rejeitados antes e depois da compressão.
+- [x] Reexecutar com o mesmo `operation_id` e confirmar zero arquivo duplicado ou substituído.
+- [x] Confirmar que nenhum timestamp variável do cabeçalho gzip altera a saída entre execuções.
+- [x] Injetar falha antes e depois de cada etapa e confirmar retomada pelo último artefato validado.
 - [ ] Confirmar que uma etapa cloud já confirmada é reconciliada por `remote_id` e não repetida.
+
+Evidência de fechamento de R03 em `2026-08-03`: 38 lotes concluídos com zero
+ausência e zero retorno de transporte não zero; destino com 2.887 arquivos e
+14.686.043.352 bytes; origem inalterada com 2.891 arquivos e 14.686.044.612
+bytes. O piloto publicou 30 de 2.996 registros em gzip de 169.507 bytes, com
+`mtime=0`, sem nome no header e SHA-256 armazenado
+`09ce1293e61ca8d8ef8691b35d87319c957e89bbc3bd109b239ae7623ed9b0cc`.
+A reexecução fez zero stream e preservou o mesmo hash. O item cloud permanece
+fora de R03.
 
 ## V04 — corte temporal, estratificação e proveniência
 

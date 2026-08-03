@@ -7,6 +7,15 @@ anual não vazio do corpus textual do Plenário do Senado a partir da árvore
 canônica copy-first já reconciliada. A operação termina em raw gzip e metadados
 técnicos; processamento e análise pertencem a R04.
 
+## Raiz local aprovada
+
+- **R03-PILOT-ROOT-01:** a execução real usará exatamente
+  `/Users/pedblan/PycharmProjects/falando_nela/data_samples`.
+- **R03-PILOT-ROOT-02:** `data_samples/` será ignorada integralmente pelo Git e
+  só será aceita com `profile=local` e
+  `data_profile=sample_annual_1pct`; `cloud`, `full` e qualquer outro caminho
+  interno ao clone serão recusados.
+
 ## Estrato e baseline
 
 - **R03-REQ-01:** o estrato é
@@ -74,7 +83,7 @@ técnicos; processamento e análise pertencem a R04.
 ## Etapas, retomada e publicação
 
 ```text
-preflight -> inventory -> rank -> materialize -> validate -> publish
+preflight -> inventory -> rank -> freeze_selection -> materialize -> validate -> publish
 ```
 
 - **R03-REQ-15:** cada etapa seguirá
@@ -97,9 +106,10 @@ preflight -> inventory -> rank -> materialize -> validate -> publish
 - **R03-REQ-21:** a publicação ficará em
   `raw/sample_annual_1pct/<sample_id>/senado/plenario_discursos/ano=2010/` e
   será imutável. Reexecução idêntica não substituirá nem duplicará arquivos.
-- **R03-REQ-22:** operação, ledger e staging ficarão em
-  `operations/import_raw/<operation_id>/`; arquivos parciais nunca entrarão no
-  snapshot publicado.
+- **R03-REQ-22:** manifestos e ledger ficarão em
+  `operations/sample_pilot/<operation_id>/`; os JSONL e gzip temporários ficarão
+  em `tmp/<operation_id>/`. Arquivos parciais nunca entrarão no snapshot
+  publicado.
 - **R03-REQ-23:** o total da operação será bloqueado antes de exceder a quota
   local de 2 GiB ou a reserva mínima de 5 GiB.
 

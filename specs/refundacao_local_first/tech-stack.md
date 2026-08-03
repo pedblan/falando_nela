@@ -104,7 +104,7 @@ Variáveis não secretas padronizadas:
 
 | Variável | Contrato |
 |---|---|
-| `FALANDO_NELA_DATA_ROOT` | raiz externa obrigatória dos dados de produção |
+| `FALANDO_NELA_DATA_ROOT` | `/Users/pedblan/PycharmProjects/falando_nela/data_samples` para a amostra local; dados integrais permanecem externos |
 | `FALANDO_NELA_PROFILE` | `local` ou `cloud`; default `local` |
 | `FALANDO_NELA_DUCKDB_MEMORY_LIMIT` | default local `4GB` |
 | `FALANDO_NELA_DUCKDB_THREADS` | default local `4` |
@@ -160,11 +160,11 @@ Variáveis não secretas padronizadas:
 - O plano de cópia será um JSONL imutável com uma linha por arquivo, ordenado
   por destino. Cada linha conterá locators de origem e destino, bytes, hashes,
   classe de layout e periodicidade, sem credenciais.
-- O transporte usará somente `rclone copyto --immutable` para destinos
-  individuais congelados. `--dry-run` antecederá toda escrita. A opção
-  `--server-side-across-configs` não será usada: os dados atravessarão o cliente
-  rclone em streaming, sem exigir que a credencial `drive.file` do destino
-  tenha visibilidade sobre o raw legado.
+- O transporte real usará `rclone copy --files-from0 --immutable --checksum`
+  sobre lotes congelados, com até quatro transferências client-side. `--dry-run`
+  antecederá toda escrita. A opção `--server-side-across-configs` não será usada:
+  os dados atravessarão o cliente rclone em streaming, sem exigir que a
+  credencial `drive.file` do destino tenha visibilidade sobre o raw legado.
 - Para o dry-run integral, sem efeito remoto, os locators congelados serão
   passados em arquivo NUL-delimited a uma única sessão
   `rclone copy --files-from0 --dry-run --immutable --checksum --retries 1`.
@@ -185,9 +185,9 @@ Variáveis não secretas padronizadas:
   no projeto Google Cloud `falando-nela-pedblan`; o arquivo cifrado fica em
   `~/Library/Application Support/falando-nela/rclone/rclone.conf`, fora do
   clone, com modo `0600`.
-- A retomada reconciliará o objeto de destino antes de repetir uma tentativa
-  cuja resposta seja ambígua. Objeto já presente e idêntico será reutilizado;
-  objeto presente e divergente bloqueará o lote.
+- A retomada inventariará o destino e reconstruirá cada lote somente com os
+  objetos ainda ausentes depois de uma tentativa ambígua. Objeto já presente e
+  idêntico será reutilizado; objeto presente e divergente bloqueará o lote.
 - `falando-nela drive-organize reconcile` gera, antes do dry-run, inventário
   read-only JSONL e relatório de reconciliação sob
   `operations/organize_drive/<operation_id>/`. O fingerprint inclui ID do
@@ -198,8 +198,9 @@ Variáveis não secretas padronizadas:
 - Textos de plenário e comissão mantêm `ano=YYYY/mes=MM/`; `metadata/` e
   `transcription_queue/` mantêm seus caminhos. O organizador não abre nem
   reserializa o conteúdo para decidir o destino.
-- A árvore canônica validada será exposta por outro remote read-only às etapas
-  de amostragem. A credencial gravável não será usada pelo importador local.
+- A árvore canônica validada será lida pela credencial `raw-source-ro`, com
+  escopo `drive.readonly` e override literal para o ID canônico. A credencial
+  gravável não será usada pelo importador local.
 
 ### Dimensionamento observado em 2026-08-03
 
