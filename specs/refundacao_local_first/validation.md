@@ -82,12 +82,31 @@ criada.
 
 ## V03 — amostragem piloto do Drive e compressão
 
-- [ ] Confirmar o ID da pasta raw como `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
-- [ ] Confirmar que o remote de origem tem escopo efetivo somente leitura.
-- [ ] Reconciliar 2.891 arquivos e 13,68 GiB da baseline ou bloquear diante da divergência.
+- [x] Registrar a aprovação humana da estratégia copy-first em `2026-08-03`.
+- [x] Confirmar por readback que a raiz antiga foi renomeada para `falando_nela_arquivo`, preservando o ID `15QW3SAIFIw_bzRhlI7m2sVMTL9UKjnzB`.
+- [x] Confirmar por readback que `falando_nela_refundacao`, ID `1zt4au5VQxXj3W1QHCzMD_eg2M2De66nH`, permanece reserva.
+- [x] Criar a nova raiz operacional `falando_nela` pelo remote `drive.file`, confirmar que começa vazia e registrar o ID `17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq`.
+- [x] Confirmar remotes e credenciais distintos para origem e destino.
+- [x] Confirmar localmente que token sentinela não aparece em comando, erro ou manifest.
+- [x] Confirmar localmente cifra obrigatória, permissões privadas, inspeção redigida e ausência de prompt na configuração rclone.
+- [x] Confirmar que toda referência rclone fixa o `root_folder_id` aprovado mesmo quando a projeção redigida o mascara como `XXX`.
+- [x] Classificar com fixtures todo dataset declarado de plenário e comissão sem heurística ambígua.
+- [x] Preservar no mapa o caminho relativo exato sob `data/raw/v1/`.
+- [x] Confirmar por contrato e fixtures corpus textual em `ano=YYYY/mes=MM/` e metadata fora do corpus mensal.
+- [x] Confirmar que comandos construídos não contêm `sync`, `move`, `delete`, `purge`, substituição ou cópia server-side forçada.
+- [x] Revisar o dry-run integral e confirmar correspondência exata com o plano congelado.
+- [ ] Aprovar o lote sentinela.
+- [ ] Reconciliar sentinela por caminho, tamanho e hash antes do lote seguinte.
+- [x] Adulterar artefato local e retomar apenas inventário e mapa dependente.
+- [ ] Reconciliar integralmente origem e árvore canônica antes da amostragem.
+- [x] Confirmar o ID da pasta raw como `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
+- [x] Confirmar que o remote de origem tem escopo efetivo somente leitura.
+- [x] Reproduzir por listagem read-only 2.891 arquivos e 14.686.044.612 bytes, distinguindo 2.887 JSONL dos quatro itens não raw.
+- [x] Reconciliar pelo ID do Drive os dois itens exibidos pelo rclone com o mesmo caminho e a distinção `Untitled`/`Untitled (1)` da baseline G01.
+- [x] Reconciliar 2.891 arquivos e 13,68 GiB da baseline ou bloquear diante da divergência.
 - [ ] Confirmar que nenhum comando usa `sync`, `move`, `delete` ou upload no remote de origem.
 - [ ] Executar inventário read-only da origem com rede de coleta desabilitada.
-- [ ] Selecionar o primeiro ano não vazio de `senado × plenario_discursos × discurso`.
+- [ ] Selecionar o primeiro ano não vazio de `senado × plenario_discursos × pronunciamento_texto`.
 - [ ] Confirmar a identidade estável de todo registro da população piloto.
 - [ ] Verificar que a primeira passagem produz `N`, chaves e locators sem materializar o raw integral.
 - [ ] Calcular `k=max(1, ceil(N × 0.01))` e selecionar exatamente as `k` menores chaves.

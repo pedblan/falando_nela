@@ -28,6 +28,8 @@ Referência: [projetos e lockfile do uv](https://docs.astral.sh/uv/guides/projec
   acompanhar `origin/main` por fast-forward.
 - `falando_nela_refundacao/` é uma worktree Git irmã e temporária, vinculada ao
   mesmo repositório, usada somente para desenvolver e validar a refundação.
+- O sufixo `/` distingue essa worktree local da pasta homônima de reserva no
+  Google Drive; elas não compartilham conteúdo nem finalidade operacional.
 - Nenhuma das duas pastas é raiz de produção ou backup dos dados; essas raízes
   permanecem externas ao clone e são configuradas por ambiente.
 - Depois do merge, a igualdade entre o commit do checkout canônico e
@@ -113,6 +115,7 @@ Variáveis não secretas padronizadas:
 | `FALANDO_NELA_DATA_PROFILE` | `sample_annual_1pct` por default; `full` exige gate explícito |
 | `FALANDO_NELA_SAMPLE_SEED` | constante versionada `falando-nela-amostra-anual-v1` |
 | `FALANDO_NELA_SAMPLE_LOCAL_QUOTA` | default `2GiB` para amostra e temporários próprios |
+| `RCLONE_PASSWORD_COMMAND` | comando absoluto que recupera do Chaves do macOS a senha da configuração cifrada |
 
 - Configuração versionável fica em TOML ou JSON sem segredos.
 - `.env` poderá ser usado localmente, será ignorado pelo Git e não será lido
@@ -141,6 +144,62 @@ Variáveis não secretas padronizadas:
   origem.
 - `rclone sync`, `move`, `delete` e qualquer operação server-side mutável são
   proibidos no remote de origem.
+
+### Organização copy-first no Drive
+
+- O remote `raw-source-ro` aponta para o raw da árvore antiga com
+  `scope=drive.readonly` e `root_folder_id=1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`,
+  sob `falando_nela_arquivo`; o remote `raw-destination-rw`, com
+  `scope=drive.file`, criou na raiz do Drive a nova pasta operacional
+  `falando_nela`, ID `17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq`, vazia e dedicada
+  à árvore `data/raw/v1/`.
+- `falando_nela_refundacao` é pasta de reserva e não será usada por nenhum dos
+  remotes. Como `drive.file` enxerga os itens criados pelo próprio aplicativo,
+  o remote gravável criará a pasta operacional antes de seu ID ser congelado
+  em `root_folder_id`.
+- O plano de cópia será um JSONL imutável com uma linha por arquivo, ordenado
+  por destino. Cada linha conterá locators de origem e destino, bytes, hashes,
+  classe de layout e periodicidade, sem credenciais.
+- O transporte usará somente `rclone copyto --immutable` para destinos
+  individuais congelados. `--dry-run` antecederá toda escrita. A opção
+  `--server-side-across-configs` não será usada: os dados atravessarão o cliente
+  rclone em streaming, sem exigir que a credencial `drive.file` do destino
+  tenha visibilidade sobre o raw legado.
+- Para o dry-run integral, sem efeito remoto, os locators congelados serão
+  passados em arquivo NUL-delimited a uma única sessão
+  `rclone copy --files-from0 --dry-run --immutable --checksum --retries 1`.
+  O relatório `--combined` deverá conter somente `+` e exatamente o conjunto
+  planejado; isso evita milhares de processos e não altera o transporte
+  individual `copyto` escolhido para a execução real.
+- A versão mínima do rclone será `1.64`, que oferece `config redacted`. O
+  arquivo de configuração ficará cifrado, com modo `0600` ou mais restrito; a
+  aplicação executará `config encryption check` e analisará apenas a projeção
+  efêmera de `config redacted`. Todos os comandos usarão
+  `--ask-password=false`, e a senha será obtida do Chaves do macOS por
+  `RCLONE_PASSWORD_COMMAND`; `RCLONE_CONFIG_PASS` será recusado.
+- Como `config redacted` mascara `root_folder_id` no rclone 1.75, cada origem e
+  destino será referenciado como remote com override explícito do ID aprovado.
+  Assim, o caminho efetivo fica fixado sem ler ou registrar a configuração
+  descriptografada.
+- A instância instalada é rclone 1.75.0. O cliente OAuth desktop próprio fica
+  no projeto Google Cloud `falando-nela-pedblan`; o arquivo cifrado fica em
+  `~/Library/Application Support/falando-nela/rclone/rclone.conf`, fora do
+  clone, com modo `0600`.
+- A retomada reconciliará o objeto de destino antes de repetir uma tentativa
+  cuja resposta seja ambígua. Objeto já presente e idêntico será reutilizado;
+  objeto presente e divergente bloqueará o lote.
+- `falando-nela drive-organize reconcile` gera, antes do dry-run, inventário
+  read-only JSONL e relatório de reconciliação sob
+  `operations/organize_drive/<operation_id>/`. O fingerprint inclui ID do
+  provedor, caminho, tamanho, hashes e modificação. Quando uma baseline sem IDs
+  não distingue objetos atuais de mesmo caminho e conteúdo, um mapa JSON
+  validado preserva o conjunto dos IDs como grupo de equivalência ligado ao
+  conjunto de locators da baseline; ele não inventa uma bijeção individual.
+- Textos de plenário e comissão mantêm `ano=YYYY/mes=MM/`; `metadata/` e
+  `transcription_queue/` mantêm seus caminhos. O organizador não abre nem
+  reserializa o conteúdo para decidir o destino.
+- A árvore canônica validada será exposta por outro remote read-only às etapas
+  de amostragem. A credencial gravável não será usada pelo importador local.
 
 ### Dimensionamento observado em 2026-08-03
 
@@ -196,12 +255,16 @@ um SSD local. Ganhos de gzip não serão antecipados.
 - `--immutable`, `--checksum` quando suportado, dry-run prévio e catálogo
   SHA-256 próprio como defesa contra substituição ou diferenças de backend.
 - O remote usa o menor escopo OAuth que permita criar e validar a árvore de
-  backup; tokens ficam na configuração do usuário, fora do projeto.
+  backup; tokens ficam na configuração cifrada do usuário, fora do projeto, e
+  a senha da configuração permanece no gerenciador de credenciais do sistema.
 
 O backend Drive expõe hashes e o comando `copy` não apaga o destino;
 `--immutable` falha diante de substituição. Referências:
 [backend Google Drive](https://rclone.org/drive/) e
 [`rclone copy`](https://rclone.org/commands/rclone_copy/).
+O manuseio da configuração segue a
+[cifra de configuração](https://rclone.org/docs/#configuration-encryption) e
+[`rclone config redacted`](https://rclone.org/commands/rclone_config_redacted/).
 
 ## Computação sob demanda
 

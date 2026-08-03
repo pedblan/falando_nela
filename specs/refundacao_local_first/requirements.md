@@ -30,7 +30,8 @@ refazer a coleta nem perder a proveniência já acumulada.
 - **RF-GIT-05:** o checkout local chamado `falando_nela` será a pasta canônica
   do projeto. A pasta irmã `falando_nela_refundacao` será apenas uma worktree
   temporária para desenvolver e validar a linha local-first; ela não constitui
-  outro repositório, outra história nem uma nova raiz de dados.
+  outro repositório, outra história nem uma nova raiz de dados. Essa worktree
+  local é independente da pasta homônima de reserva existente no Google Drive.
 - **RF-GIT-06:** depois de a linha local-first ser integrada e publicada em
   `main`, o checkout `falando_nela` será atualizado por fast-forward e validado
   no mesmo commit remoto. A worktree `falando_nela_refundacao` só poderá ser
@@ -69,7 +70,10 @@ refazer a coleta nem perder a proveniência já acumulada.
 
 - **RF-IMPORT-01:** a fonte inicial será a pasta raw atualmente aprovada no
   Drive, ID `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`, sob
-  `falando_nela/data/raw`. O ID deverá ser repetido no manifest e confirmado
+  `falando_nela_arquivo/data/raw`. O projeto antigo foi renomeado de
+  `falando_nela` para `falando_nela_arquivo` em `2026-08-03`, preservando o ID
+  de sua raiz `15QW3SAIFIw_bzRhlI7m2sVMTL9UKjnzB`, o conteúdo e a posição no
+  Meu Drive. O ID do raw deverá ser repetido no manifest e confirmado
   humanamente antes do primeiro download.
 - **RF-IMPORT-02:** o inventário G01
   [`inventario_arquivos.csv`](https://drive.google.com/file/d/12s9Rs4iLVEH9locUUqvSzrwFQh5ZJNL1/view)
@@ -109,6 +113,77 @@ refazer a coleta nem perder a proveniência já acumulada.
   exclusivamente técnicos: estados, tentativas, contagens, identidades,
   chaves, locators e hashes. Eles não serão expostos como corpus, derivado
   analítico ou interface de consulta científica.
+
+## Organização canônica do raw no Drive
+
+- **RF-DRIVE-ORG-01:** a pasta raw atual, ID
+  `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`, permanecerá imutável durante a
+  refundação. Sua raiz antiga agora se chama `falando_nela_arquivo`; a
+  organização será feita por cópia para uma nova pasta canônica versionada,
+  nunca por movimento ou reorganização in-place do raw.
+- **RF-DRIVE-ORG-02:** o destino operacional tem o nome `falando_nela` na
+  raiz do Meu Drive e foi criado pelo remote `raw-destination-rw` com escopo
+  `drive.file`. Seu ID canônico, confirmado por readback do mesmo cliente
+  OAuth em `2026-08-03`, é `17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq`; o remote
+  ficou enraizado nesse ID e a pasta começou vazia. A pasta
+  `falando_nela_refundacao`, ID
+  `1zt4au5VQxXj3W1QHCzMD_eg2M2De66nH`, é reserva e ficará intocada, fora da
+  origem, do destino e dos backups da operação. A raiz lógica publicada será
+  `data/raw/v1/`.
+- **RF-DRIVE-ORG-03:** origem e destino usarão remotes e credenciais distintos.
+  A origem exigirá `drive.readonly`; o destino usará o menor escopo gravável
+  compatível com uma pasta dedicada, `drive.file`. A configuração rclone será
+  cifrada, privada no filesystem e desbloqueada pelo Chaves do macOS via
+  `RCLONE_PASSWORD_COMMAND`; `RCLONE_CONFIG_PASS` será recusado. O programa
+  validará somente a projeção de `rclone config redacted`. Como o rclone 1.75
+  mascara `root_folder_id` nessa projeção, toda referência remota fixará
+  explicitamente o ID aprovado por override local, sem abrir a configuração
+  descriptografada. Tokens não entrarão em argumentos, manifests, logs, testes
+  ou Git.
+- **RF-DRIVE-ORG-03A:** o cliente OAuth pertence ao projeto Google Cloud
+  `falando-nela-pedblan`, com Drive API habilitada, tipo desktop e audiência
+  externa em teste. O JSON temporário baixado do Console será removido depois
+  de as credenciais serem importadas e verificadas na configuração cifrada.
+- **RF-DRIVE-ORG-04:** todo arquivo será copiado byte a byte para o mesmo
+  caminho relativo sob `data/raw/v1/<source>/<dataset>/`. A organização não
+  converterá JSONL, não aplicará gzip, não concatenará runs e não alterará
+  envelopes raw.
+- **RF-DRIVE-ORG-05:** corpus textual de plenários e comissões conservará a
+  periodicidade mensal `ano=YYYY/mes=MM/`. Listas, pautas, detalhes e respostas
+  de descoberta permanecerão em `metadata/`; candidatos audiovisuais
+  permanecerão em `transcription_queue/`.
+- **RF-DRIVE-ORG-06:** o contrato alcança, inicialmente, plenários e comissões
+  da Câmara e do Senado, incluindo discursos, apartes, notas taquigráficas,
+  eventos de CCJ/CCJC, pareceres de plenário ou comissão e os metadados
+  transversais `camara/parlamentares` e `senado/parlamentares`. Bases
+  metadata-only não ganharão partição mensal artificial.
+- **RF-DRIVE-ORG-07:** antes de copiar, um catálogo congelará origem, destino,
+  tamanho, hash disponível, categoria, periodicidade e decisão. Caminho não
+  classificável será bloqueado para revisão, não rearranjado por heurística.
+- **RF-DRIVE-ORG-07A:** a reconciliação G01 inventariará todos os arquivos antes
+  do filtro. Na baseline real, isso significa 2.891 arquivos: 2.887 JSONL
+  elegíveis e quatro itens não raw, dois notebooks e dois arquivos sem
+  extensão. Estes quatro receberão decisão explícita de exclusão e nunca serão
+  tratados como ausência da origem.
+- **RF-DRIVE-ORG-07B:** os dois itens sem extensão que o rclone apresenta com o
+  mesmo caminho serão distinguidos pelo ID estável do provedor antes da
+  reconciliação caminho a caminho. A baseline G01 usa `Untitled` e
+  `Untitled (1)`; nenhum sufixo será inferido silenciosamente. Quando a baseline
+  não contiver IDs e os objetos tiverem caminho visível, tamanho, hash e decisão
+  iguais, a reconciliação preservará todos os IDs em um grupo de equivalência
+  ligado ao conjunto de locators da baseline, sem fabricar uma correspondência
+  individual impossível de provar.
+- **RF-DRIVE-ORG-08:** a única mutação remota permitida será cópia imutável para
+  um destino ausente. `sync`, `move`, `delete`, `purge`, substituição e limpeza
+  da origem serão proibidos. A cópia não forçará operação server-side entre os
+  remotes: os bytes serão transferidos em streaming pelo cliente para manter
+  compatibilidade com o escopo mínimo do destino.
+- **RF-DRIVE-ORG-09:** a execução começará com dry-run e um lote sentinela
+  pequeno. Lotes posteriores só avançarão depois de reconciliar caminhos,
+  tamanhos e hashes do lote anterior.
+- **RF-DRIVE-ORG-10:** a cópia termina somente depois de catálogo de destino,
+  igualdade com a origem e retomada sem duplicação. A árvore antiga continuará
+  preservada; eventual retirada será outra tarefa com restore e aprovação.
 
 ## Amostra anual local de 1%
 
@@ -206,8 +281,9 @@ refazer a coleta nem perder a proveniência já acumulada.
   um arquivo `.py`, passará em `marimo check` e poderá executar em modo script
   com parâmetros e fixtures sem depender de cliques ou estado oculto.
 - **RF-CODE-05:** o primeiro recorte vertical implementará o estrato
-  `senado × plenario_discursos × discurso × substantive_year` para o primeiro
-  ano não vazio a partir de 2010, usando exatamente o algoritmo de 1% aprovado.
+  `senado × plenario_discursos × pronunciamento_texto × substantive_year` para
+  o primeiro ano não vazio a partir de 2010, usando exatamente o algoritmo de
+  1% aprovado.
 - **RF-CODE-06:** esse recorte deverá demonstrar, de ponta a ponta, leitura do
   raw, validação, materialização Parquet, consulta DuckDB, inspeção em marimo e
   backup restaurável.
@@ -233,7 +309,9 @@ refazer a coleta nem perder a proveniência já acumulada.
 - **RF-BACKUP-04:** um backup só será considerado válido depois de restaurado
   em diretório vazio e reconciliado por caminhos, tamanhos, contagens e hashes.
 - **RF-BACKUP-05:** credenciais e configuração do `rclone` ficarão fora do
-  repositório e dos manifests.
+  repositório e dos manifests. A configuração será cifrada e sua senha será
+  recuperada pelo gerenciador de credenciais do sistema, nunca armazenada em
+  variável de ambiente de valor secreto.
 
 ## Computação complementar no Google Cloud
 
