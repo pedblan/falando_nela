@@ -226,6 +226,16 @@ uv run python notebooks/primeiro_recorte_discursos.py
 - [ ] Confirmar que `git worktree list` não registra mais `falando_nela_refundacao` e preserva `falando_nela`.
 - [ ] Confirmar que a tag `legacy-colab-final`, os dados e os backups permanecem acessíveis após a remoção da worktree.
 
+## V09A — limpeza recuperável do legado
+
+- [x] Catalogar e reconciliar os dois alvos locais antes de movê-los para a Lixeira do macOS.
+- [x] Confirmar que os 52 notebooks rastreados permanecem no Git e estão marcados como consulta legada.
+- [x] Preservar 106 notebooks do Drive, validar JSON, caminhos, tamanhos e SHA-256.
+- [x] Enviar somente os dez IDs autorizados à Lixeira do Drive, sem esvaziá-la.
+- [x] Confirmar que a raiz canônica permanece disponível e que o raw conserva 2.887 objetos e 14.686.043.352 bytes.
+- [x] Confirmar que o hash da amostra R03 permanece `09ce1293e61ca8d8ef8691b35d87319c957e89bbc3bd109b239ae7623ed9b0cc`.
+- [ ] Confirmar o fast-forward do checkout canônico e a remoção registrada da worktree temporária.
+
 ## Bloqueios
 
 O gate corrente permanece aberto se ocorrer qualquer condição abaixo:

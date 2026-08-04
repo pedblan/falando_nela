@@ -58,6 +58,10 @@ refazer a coleta nem perder a proveniência já acumulada.
   mas não serão apagados pela tarefa de refundação. A eventual exclusão local
   exigirá tarefa própria, backup imutável completo, restauração verificada,
   inventário de dependências e aprovação humana explícita.
+- **RF-DATA-05A:** a limpeza R09, autorizada separadamente em `2026-08-03`,
+  poderá retirar cópias antigas já substituídas desde que use apenas Lixeiras
+  recuperáveis, preserve a árvore canônica reconciliada e registre alvos por
+  caminho ou ID. Essa autorização não permite esvaziar as Lixeiras.
 - **RF-DATA-06:** a migração deverá ser retomável e idempotente. Reexecutar a
   mesma operação com o mesmo `operation_id` não poderá duplicar, substituir ou
   reinterpretar registros já reconciliados.
@@ -360,6 +364,10 @@ refazer a coleta nem perder a proveniência já acumulada.
 - **RF-COMPAT-03:** notebooks e geradores Colab só poderão ser removidos em
   tarefa posterior, após inventário de referências e prova de que os caminhos
   substitutos cobrem o comportamento ainda necessário.
+- **RF-COMPAT-03A:** em R09, os notebooks rastreados não serão removidos: ficam
+  explicitamente classificados como material histórico de consulta. Notebooks
+  encontrados apenas nas raízes antigas do Drive serão copiados e reconciliados
+  numa biblioteca canônica antes da limpeza dessas raízes.
 - **RF-COMPAT-04:** a troca de `main` exigirá documentação local-first,
   instalação limpa, recorte vertical aprovado, restauração de backup e
   ausência de dependência operacional obrigatória do Colab.

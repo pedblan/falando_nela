@@ -5,8 +5,9 @@
 Contrato aprovado em `2026-08-03`; R01 e R02 foram concluídos e R02 foi
 integrado localmente em `main` a partir da branch
 `codex/refundacao-r02-foundation`. As etapas seguintes continuarão em branches
-e worktrees próprias. Nenhuma migração real, remoção ou operação paga foi
-autorizada por essa aprovação.
+e worktrees próprias. Autorizações posteriores ficam limitadas às tarefas que
+as registram; em R09, isso inclui a limpeza recuperável local e no Drive
+aprovada em `2026-08-03`. Nenhuma operação paga foi autorizada.
 
 ## Resultado principal
 
@@ -234,16 +235,18 @@ segurança e caminho documentado até o legado etiquetado.
 
 ## R09 — remoções posteriores e independentes
 
-- [ ] Abrir tarefa própria para caracterizar e remover notebooks e geradores Colab substituídos.
-- [ ] Abrir tarefa própria para inventariar e copiar o universo anterior a 2010 para arquivo imutável.
-- [ ] Restaurar e reconciliar o arquivo anterior a 2010 em diretório vazio.
-- [ ] Abrir tarefa própria para retirar cópias locais anteriores a 2010 após restore e aprovação humana.
-- [ ] Procurar referências restantes antes de cada remoção.
-- [ ] Atualizar specs, testes, documentação e empacotamento no mesmo ciclo de cada remoção.
+- [x] Abrir tarefa própria para caracterizar o legado local e manter os notebooks rastreados somente para consulta.
+- [x] Inventariar as cópias locais antigas e as dez raízes antigas autorizadas no Drive.
+- [x] Preservar e reconciliar os 106 notebooks do Drive em biblioteca de consulta.
+- [x] Retirar as duas árvores de dados locais para a Lixeira do macOS após catálogo completo.
+- [x] Enviar as dez raízes antigas do Drive à Lixeira, inclusive `falando_nela_arquivo`, sem esvaziá-la.
+- [x] Procurar referências restantes e revalidar a árvore raw canônica depois da limpeza.
+- [x] Atualizar specs e documentação no mesmo ciclo; nenhum notebook rastreado foi removido.
 
-R09 não faz parte do critério de conclusão da refundação. Ideias adicionais,
-novas bases, correções de coleta, mudança de schema, análise científica e
-publicação permanecem fora do escopo.
+R09 foi executado em tarefas próprias de limpeza local e remota. Os contratos e
+evidências estão em `r09_limpeza_local/` e `r09_limpeza_drive/`. Ideias
+adicionais, novas bases, correções de coleta, mudança de schema, análise
+científica e publicação permanecem fora do escopo.
 
 ## Fronteiras de custo e interrupção
 
