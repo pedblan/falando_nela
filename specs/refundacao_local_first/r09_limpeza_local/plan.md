@@ -7,8 +7,8 @@
 - [x] Confirmar ausência dos alvos e preservação de `data_samples/`.
 - [x] Executar testes e revisar o diff da tarefa local.
 - [x] Criar commit próprio para a limpeza local.
-- [ ] Avançar o checkout canônico por fast-forward.
-- [ ] Remover a worktree temporária somente depois da tarefa remota e da validação final.
+- [x] Avançar o checkout canônico por fast-forward.
+- [x] Remover a worktree temporária somente depois da tarefa remota e da validação final.
 
 **Gate:** um único checkout canônico contém o código validado, os notebooks
 continuam consultáveis, os dados antigos estão recuperáveis na Lixeira e
@@ -16,4 +16,5 @@ continuam consultáveis, os dados antigos estão recuperáveis na Lixeira e
 
 Evidência: `data_samples/operations/r09_local_cleanup_20260803/`. Os 856
 arquivos catalogados, somando 3.379.699.146 bytes, foram reencontrados na
-Lixeira com os mesmos hashes.
+Lixeira com os mesmos hashes. O checkout canônico avançou até o commit integrado
+`59dd729` e a worktree temporária foi removida pelo Git.

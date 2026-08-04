@@ -9,4 +9,4 @@
 - [x] Confirmar hash inalterado da amostra R03: `09ce1293e61ca8d8ef8691b35d87319c957e89bbc3bd109b239ae7623ed9b0cc`.
 - [x] Confirmar que `.idea/falando_nela.iml` continua como única alteração preexistente do usuário.
 - [x] Executar Ruff, pytest, `git diff --check` e validação JSON dos notebooks.
-- [ ] Confirmar que a worktree temporária foi removida com `git worktree remove`.
+- [x] Confirmar que a worktree temporária foi removida com `git worktree remove`.

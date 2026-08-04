@@ -226,8 +226,8 @@ bloqueia o uso local nem autoriza ampliar o job.
 - [ ] Publicar `main` e verificar o remote `pedblan/falando_nela`.
 - [ ] Atualizar o checkout canônico `falando_nela` por fast-forward até a `main` publicada.
 - [ ] Confirmar que `falando_nela` e `origin/main` apontam para o mesmo commit e passam na validação final.
-- [ ] Confirmar que a worktree `falando_nela_refundacao` não contém alterações ou commits exclusivos.
-- [ ] Remover `falando_nela_refundacao` com `git worktree remove` e verificar o registro de worktrees.
+- [x] Confirmar que a worktree `falando_nela_refundacao` não contém alterações ou commits exclusivos.
+- [x] Remover `falando_nela_refundacao` com `git worktree remove` e verificar o registro de worktrees.
 
 **Gate R08:** `main` local-first verificável, com mesmo nome e histórico do
 repositório, checkout canônico atualizado, worktree temporária removida com
