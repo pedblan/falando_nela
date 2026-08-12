@@ -16,8 +16,8 @@
 
 ## G01-B — bootstrap do state
 
-- [ ] Fazer readback de conta, projeto, billing, região e nomes imediatamente antes.
-- [ ] Revalidar os dois nomes globais de bucket e interromper se algum existir.
+- [x] Fazer readback de conta, projeto, billing, região e nomes imediatamente antes.
+- [x] Revalidar os dois nomes globais de bucket e interromper se algum existir.
 - [ ] Registrar estimativa menor que US$ 0,01 e obter aprovação do bootstrap.
 - [ ] Criar somente `falando-nela-pedblan-tfstate` pelo comando aprovado.
 - [ ] Habilitar versionamento e verificar todas as proteções no mesmo projeto.

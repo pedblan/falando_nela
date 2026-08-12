@@ -27,16 +27,26 @@ gcloud billing projects describe falando-nela-pedblan \
 gcloud storage buckets list --project=falando-nela-pedblan
 ```
 
-- [ ] Confirmar conta operadora esperada e `roles/owner` no projeto.
-- [ ] Confirmar `roles/billing.admin` na billing account vinculada.
-- [ ] Confirmar `falando-nela-pedblan` ACTIVE e billing habilitado.
-- [ ] Confirmar `southamerica-east1` e os dois nomes ainda inexistentes.
-- [ ] Registrar checksum da pasta de configurações gcloud e do ADC existente.
+- [x] Confirmar conta operadora esperada e `roles/owner` no projeto.
+- [x] Confirmar `roles/billing.admin` na billing account vinculada.
+- [x] Confirmar `falando-nela-pedblan` ACTIVE e billing habilitado.
+- [x] Confirmar `southamerica-east1` e os dois nomes ainda inexistentes.
+- [x] Registrar checksum da pasta de configurações gcloud e do ADC existente.
+
+Readback executado em `2026-08-11`: projeto e project number coincidiram com o
+contrato, billing estava habilitado e aberto, a conta operadora possuía os dois
+papéis exigidos e ambos os nomes globais retornaram `404`. Os digests da única
+configuração local do gcloud, do seletor ativo e do ADC permaneceram idênticos
+antes e depois. Identidade e billing account ID não foram versionados.
+
+Estimativa conservadora pré-aprovação do bootstrap: até `US$ 0,001`, cobrindo
+com folga as poucas operações de criação, atualização, leitura e escrita do
+primeiro state; o bucket nasce vazio. O gate de aprovação continua pendente.
 
 ## Gate G01-B — state
 
-- [ ] Revisar o comando de criação com project ID, região e nome literais.
-- [ ] Confirmar Standard, acesso uniforme, PAP enforced e soft delete de sete dias.
+- [x] Revisar o comando de criação com project ID, região e nome literais.
+- [x] Confirmar Standard, acesso uniforme, PAP enforced e soft delete de sete dias.
 - [ ] Confirmar versionamento antes de inicializar o backend.
 - [ ] Importar como `google_storage_bucket.tfstate` e obter plan sem recriação.
 - [ ] Confirmar state sob `opentofu/g01/default.tfstate` e locking funcional.
