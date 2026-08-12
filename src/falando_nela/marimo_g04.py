@@ -61,9 +61,7 @@ def load_g04_dataset(
     if source == "fixture":
         fixture_value = environment.get(FIXTURE_ENV, "").strip()
         if not fixture_value:
-            raise MarimoDatasetError(
-                f"{FIXTURE_ENV} é obrigatório quando {SOURCE_ENV}=fixture"
-            )
+            raise MarimoDatasetError(f"{FIXTURE_ENV} é obrigatório quando {SOURCE_ENV}=fixture")
         fixture_path = Path(fixture_value).expanduser()
         if not fixture_path.is_file():
             raise MarimoDatasetError(f"fixture G04 não encontrada: {fixture_path}")
@@ -157,9 +155,7 @@ def presentation_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
 
 def _validate_parquet_contract(parquet: Any, *, contract: GcpContract, pa: Any) -> None:
     metadata = parquet.schema_arrow.metadata or {}
-    observed_schema = metadata.get(b"falando_nela_schema", b"").decode(
-        "utf-8", errors="replace"
-    )
+    observed_schema = metadata.get(b"falando_nela_schema", b"").decode("utf-8", errors="replace")
     if observed_schema != contract.marimo.parquet_schema:
         raise MarimoDatasetError(
             "schema lógico do Parquet diverge do contrato G04: "
