@@ -19,6 +19,7 @@ def test_versioned_contract_freezes_g01_targets_and_sentinel() -> None:
     assert contract.region == "southamerica-east1"
     assert contract.state.bucket == "falando-nela-pedblan-tfstate"
     assert contract.data.bucket == "falando-nela-pedblan-data"
+    assert contract.migration.source_prefix == "v1"
     assert contract.state.versioning
     assert not contract.data.versioning
     assert contract.state.soft_delete_retention_seconds == 604_800
@@ -30,7 +31,7 @@ def test_versioned_contract_freezes_g01_targets_and_sentinel() -> None:
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("schema_version = 2", "schema_version = 3"),
+        ("schema_version = 4", "schema_version = 5"),
         ('project_id = "falando-nela-pedblan"', 'project_id = "eleicoes-2026-504713"'),
         ('region = "southamerica-east1"', 'region = "us-central1"'),
     ],
@@ -107,7 +108,10 @@ def test_gcs_cli_has_safe_defaults_and_explicit_target_arguments() -> None:
 def test_g02_contract_freezes_batches_restore_and_pre_cutover_authority() -> None:
     contract = load_gcp_contract(CONFIG_PATH)
 
-    assert contract.schema_version == 2
+    assert contract.schema_version == 4
+    assert contract.budget.currency_code == "BRL"
+    assert contract.budget.amount == 25
+    assert contract.budget.reference_ceiling_usd == 5
     assert contract.migration.authoritative_raw == "drive"
     assert contract.migration.batch_count == 38
     assert contract.migration.batch_max_files == 100

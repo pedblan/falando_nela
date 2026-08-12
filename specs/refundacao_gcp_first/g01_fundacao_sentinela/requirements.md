@@ -45,17 +45,24 @@ Drive→GCS com um lote imutável de três objetos e 78.822 bytes.
   soft delete de sete dias, sem versionamento, `force_destroy=false` e
   `prevent_destroy`.
 - **G01-IAC-06:** G01 gerenciará somente
-  `storage.googleapis.com`, `iam.googleapis.com`,
+  `storage.googleapis.com`, `cloudresourcemanager.googleapis.com`,
+  `iam.googleapis.com`,
   `iamcredentials.googleapis.com`, `cloudbilling.googleapis.com` e
   `billingbudgets.googleapis.com`, sempre com `disable_on_destroy=false`.
+  Cloud Resource Manager é a dependência mínima usada pelo provider para ler o
+  projeto enquanto habilita as outras APIs; ela não autoriza criar recursos
+  adicionais. Por circularidade de bootstrap, ela poderá ser habilitada por um
+  único comando `gcloud services enable` com projeto explícito e será importada
+  imediatamente em seu endereço `google_project_service` antes do novo plano.
 - **G01-IAC-07:** a conta `fn-migrator` receberá no bucket de dados somente
   `roles/storage.objectCreator` e `roles/storage.objectViewer`; não receberá
   permissão de exclusão, administração de bucket nem chave JSON.
 - **G01-IAC-08:** a conta operadora, fornecida fora do Git, receberá
   `roles/iam.serviceAccountTokenCreator` somente sobre `fn-migrator`.
-- **G01-IAC-09:** o budget mensal `falando-nela-gcp-first` terá limite de
-  US$ 5,00, escopo exclusivo no projeto e alertas de gasto atual em 50%, 90% e
-  100%, mais previsão em 100%.
+- **G01-IAC-09:** o budget mensal `falando-nela-gcp-first` terá valor de
+  R$ 25,00, moeda imutável da billing account e referência conservadora ao teto
+  aprovado de US$ 5,00; terá escopo exclusivo no projeto e alertas de gasto
+  atual em 50%, 90% e 100%, mais previsão em 100%.
 - **G01-IAC-10:** destinatários padrão por IAM permanecerão habilitados para
   Billing Admins e Owner do projeto; nenhum canal de e-mail pessoal será criado.
 
@@ -87,13 +94,19 @@ falando-nela gcs-migrate sentinel --through preflight|dry-run|copy \
   14.686.043.352 bytes da pasta raw canônica, sem ler conteúdo nem acessar GCS.
   Os dois objetos vazios aprovados terão o SHA-256 do conteúdo vazio derivado
   localmente quando o inventário Drive fornecer somente MD5.
+- **G01-CLI-01A:** o contrato declarará separadamente o prefixo físico `v1`
+  dentro da pasta raw do Drive. Inventário e cópia partirão desse prefixo, mas
+  os locators canônicos continuarão relativos a ele (`camara/...`, `senado/...`),
+  sem duplicar `v1` no destino `data/raw/v1`.
 - **G01-CLI-02:** `dry-run` executará preflight e confirmará o destino: na
   primeira execução ele deve estar vazio e produzir exatamente três marcadores
   de criação; uma retomada já íntegra produzirá três marcadores de igualdade.
   Qualquer outro estado bloqueará sem upload.
 - **G01-CLI-03:** `copy` reutilizará preflight e dry-run íntegros, copiará
   somente a sentinela, reconciliará tamanho, MD5 e SHA-256 e repetirá a cópia
-  comprovando zero nova geração.
+  comprovando zero nova geração. A prova será imediata e curta; G01 não fará
+  espera prolongada nem restauração do canário. A restauração amostral continua
+  obrigatória em G02.
 - **G01-CLI-04:** cada etapa usará `RecoverableOperation`, temporário e promoção
   atômica; artefato alterado invalidará a etapa descendente.
 - **G01-CLI-05:** a interface GCS existirá em módulo novo e não alterará o
@@ -123,7 +136,8 @@ validados na organização R03. A origem será a pasta raw de ID
 - **Amostra mínima:** três objetos, uma categoria estrutural por objeto.
 - **Máximo:** um apply aprovado e uma tentativa de upload; repetição apenas
   idempotente para comprovar zero escrita.
-- **Limite:** budget mensal de US$ 5,00; alerta não é hard cap.
+- **Limite:** budget mensal de R$ 25,00, referência conservadora ao teto de
+  US$ 5,00; alerta não é hard cap.
 - **Parada:** qualquer divergência de conta, projeto, região, nome, plano,
   inventário, hash, acesso ou custo bloqueia a etapa sem reparo automático.
 

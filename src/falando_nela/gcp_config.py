@@ -13,6 +13,7 @@ EXPECTED_REGION = "southamerica-east1"
 EXPECTED_STATE_BUCKET = "falando-nela-pedblan-tfstate"
 EXPECTED_DATA_BUCKET = "falando-nela-pedblan-data"
 EXPECTED_RAW_FOLDER_ID = "1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9"
+EXPECTED_SOURCE_PREFIX = "v1"
 EXPECTED_SOURCE_FILES = 2_887
 EXPECTED_SOURCE_BYTES = 14_686_043_352
 EXPECTED_SENTINEL_BYTES = 78_822
@@ -63,7 +64,9 @@ class MigratorConfig(StrictModel):
 
 class BudgetConfig(StrictModel):
     display_name: str
-    amount_usd: int = Field(gt=0)
+    currency_code: Literal["BRL"]
+    amount: int = Field(gt=0)
+    reference_ceiling_usd: int = Field(gt=0)
     current_spend_thresholds: tuple[float, ...]
     forecasted_spend_thresholds: tuple[float, ...]
     default_iam_recipients: bool
@@ -92,6 +95,7 @@ class SentinelConfig(StrictModel):
 class MigrationConfig(StrictModel):
     source_operational_root_folder_id: str
     source_raw_folder_id: str
+    source_prefix: str
     source_files: int = Field(gt=0)
     source_bytes: int = Field(gt=0)
     source_catalog_sha256: str
@@ -126,6 +130,7 @@ class MigrationConfig(StrictModel):
                 raise ValueError("hash de catálogo inválido")
         for locator in self.approved_empty_source_locators:
             _validate_relative_locator(locator)
+        _validate_relative_locator(self.source_prefix)
         categories = [item.category for item in self.sentinel]
         if sorted(categories) != ["metadata", "monthly_text", "transcription_queue"]:
             raise ValueError("sentinela deve conter exatamente as três categorias G01")
@@ -137,7 +142,7 @@ class MigrationConfig(StrictModel):
 
 
 class GcpContract(StrictModel):
-    schema_version: Literal[2]
+    schema_version: Literal[4]
     project_id: str
     project_number: str
     region: str
@@ -159,6 +164,10 @@ class GcpContract(StrictModel):
             "migration.source_raw_folder_id": (
                 self.migration.source_raw_folder_id,
                 EXPECTED_RAW_FOLDER_ID,
+            ),
+            "migration.source_prefix": (
+                self.migration.source_prefix,
+                EXPECTED_SOURCE_PREFIX,
             ),
             "migration.source_files": (self.migration.source_files, EXPECTED_SOURCE_FILES),
             "migration.source_bytes": (self.migration.source_bytes, EXPECTED_SOURCE_BYTES),
@@ -204,7 +213,9 @@ class GcpContract(StrictModel):
                 "fn-migrator",
             ),
             "budget.display_name": (self.budget.display_name, "falando-nela-gcp-first"),
-            "budget.amount_usd": (self.budget.amount_usd, 5),
+            "budget.currency_code": (self.budget.currency_code, "BRL"),
+            "budget.amount": (self.budget.amount, 25),
+            "budget.reference_ceiling_usd": (self.budget.reference_ceiling_usd, 5),
         }
         divergences = [key for key, (observed, wanted) in expected.items() if observed != wanted]
         if divergences:

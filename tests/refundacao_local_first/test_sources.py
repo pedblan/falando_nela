@@ -269,6 +269,38 @@ def test_rclone_source_can_inventory_all_files_for_g01_reconciliation(
     ]
 
 
+def test_rclone_source_can_expose_locators_relative_to_physical_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = tmp_path / "rclone.conf"
+    _write_encrypted_config(config)
+    payload = '[{"Path":"senado/run.jsonl","Size":10,"ID":"raw-id"}]'
+    commands: list[list[str]] = []
+
+    def listed(command, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(list(command))
+        return subprocess.CompletedProcess([], 0, payload, "")
+
+    monkeypatch.setattr(subprocess, "run", listed)
+    source = RcloneRawSource(
+        remote="raw-source-ro",
+        config_path=config,
+        prefix="v1",
+        expected_folder_id=SOURCE_FOLDER_ID,
+        executable="true",
+        config_snapshot=_snapshot(config),
+        include_all_files=True,
+        locators_relative_to_prefix=True,
+    )
+
+    objects = source.list_objects()
+
+    assert [item.locator for item in objects] == ["senado/run.jsonl"]
+    assert commands[0][2] == f"raw-source-ro,root_folder_id={SOURCE_FOLDER_ID}:v1"
+    assert source.descriptor()["prefix"] == "v1"
+    assert source.descriptor()["locators"] == "relative_to_prefix"
+
+
 def test_provider_identity_map_reconciles_duplicate_drive_paths(tmp_path: Path) -> None:
     baseline_csv = tmp_path / "g01.csv"
     baseline_csv.write_text(

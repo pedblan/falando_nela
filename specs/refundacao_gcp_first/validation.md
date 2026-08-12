@@ -2,15 +2,15 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-11`. Somente a investigação G00 foi executada;
-nenhum recurso GCP foi criado por esta refundação.
+Contrato aprovado em `2026-08-11`. G00 e G01 foram concluídos; a fundação GCP
+e os três objetos sentinela existem, enquanto o Drive permanece fonte oficial.
 
 ## Gates
 
 | Gate | Resultado | Evidência | Estado |
 |---|---|---|---|
 | G00 | contrato coerente | revisão humana e diff restrito | aprovado |
-| G01 | fundação e sentinela | plan IaC, readback, catálogo e reexecução | pendente |
+| G01 | fundação e sentinela | plan IaC, readback, catálogo e reexecução | aprovado |
 | G02 | raw integral no GCS | inventários, hashes, restore e gate humano | pendente |
 | G03 | Parquet em Cloud Run Job | paridade local/cloud, manifest e custo | pendente |
 | G04 | Marimo privado | check, script, autenticação e leitura GCS | pendente |
@@ -46,16 +46,21 @@ tofu -chdir=infra/gcp plan -var='project_id=falando-nela-pedblan' \
   -var='region=southamerica-east1'
 ```
 
-- [ ] Confirmar que o plan contém somente os recursos autorizados em G01.
-- [ ] Confirmar que state, credenciais e planos binários não estão no Git.
-- [ ] Confirmar acesso uniforme e prevenção de acesso público nos buckets.
-- [ ] Confirmar que IAM não concede Owner, Editor, chaves JSON ou `allUsers`.
-- [ ] Confirmar que a identidade migradora não pode excluir objetos.
-- [ ] Comparar o checksum da configuração `default` do gcloud antes e depois.
-- [ ] Executar dry-run do sentinela sem escrita.
-- [ ] Copiar somente locators congelados e reconciliar contagem, bytes e hashes.
-- [ ] Reexecutar e comprovar zero novo upload.
-- [ ] Registrar custo real e recursos persistentes.
+- [x] Confirmar que o plan contém somente os recursos autorizados em G01.
+- [x] Confirmar que state, credenciais e planos binários não estão no Git.
+- [x] Confirmar acesso uniforme e prevenção de acesso público nos buckets.
+- [x] Confirmar que IAM não concede Owner, Editor, chaves JSON ou `allUsers`.
+- [x] Confirmar que a identidade migradora não pode excluir objetos.
+- [x] Comparar o checksum da configuração `default` do gcloud antes e depois.
+- [x] Executar dry-run do sentinela sem escrita.
+- [x] Copiar somente locators congelados e reconciliar contagem, bytes e hashes.
+- [x] Reexecutar e comprovar zero novo upload.
+- [x] Registrar custo estimado e recursos persistentes.
+
+G01 encerrou com plan OpenTofu vazio, dois buckets privados, seis APIs
+gerenciadas, uma service account sem chave, IAM mínimo, budget mensal de
+R$ 25,00 e três sentinelas (78.822 bytes). A repetição marcou três igualdades e
+zero escrita; a estimativa do upload foi `US$ 0,000001`.
 
 ## G02 — migração integral
 

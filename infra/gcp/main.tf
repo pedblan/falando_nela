@@ -7,6 +7,7 @@ locals {
   required_services = toset([
     "billingbudgets.googleapis.com",
     "cloudbilling.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "storage.googleapis.com",
@@ -106,8 +107,8 @@ resource "google_billing_budget" "monthly" {
 
   amount {
     specified_amount {
-      currency_code = "USD"
-      units         = "5"
+      currency_code = "BRL"
+      units         = "25"
     }
   }
 

@@ -1,4 +1,4 @@
-schema_version = 2
+schema_version = 4
 project_id = "falando-nela-pedblan"
 project_number = "818569314985"
 region = "southamerica-east1"
@@ -23,7 +23,9 @@ service_account_id = "fn-migrator"
 
 [budget]
 display_name = "falando-nela-gcp-first"
-amount_usd = 5
+currency_code = "BRL"
+amount = 25
+reference_ceiling_usd = 5
 current_spend_thresholds = [0.5, 0.9, 1.0]
 forecasted_spend_thresholds = [1.0]
 default_iam_recipients = true
@@ -32,6 +34,7 @@ project_level_recipients = true
 [migration]
 source_operational_root_folder_id = "17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq"
 source_raw_folder_id = "1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9"
+source_prefix = "v1"
 source_files = 2887
 source_bytes = 14686043352
 source_catalog_sha256 = "6a8395a9fb60a999a97562b7f0c791ac766f161e01664ea549ad52bf36bb0930"

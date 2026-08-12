@@ -2,11 +2,10 @@
 
 ## Estado
 
-Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`, encerrando G00.
-A implementação local de G01 e G02 está disponível, mas seus gates remotos
-continuam pendentes: nenhum recurso, upload ou gasto foi executado. A execução
-de G02 permanece bloqueada até a conclusão integral de G01 e até as aprovações
-humanas registradas no contrato operacional.
+Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`. G00 e G01 estão
+concluídos: a fundação declarativa foi aplicada e três sentinelas verificados
+foram copiados ao GCS. G02 está implementado, mas sua execução remota depende
+dos próprios gates e aprovações humanas registrados no contrato operacional.
 
 ## Direção aprovada
 
@@ -44,8 +43,9 @@ specs não autoriza tratá-lo antecipadamente como cloud-first.
 
 ## Baseline observada
 
-Em `2026-08-11`, o projeto GCP estava ativo e com faturamento habilitado, sem
-buckets, datasets BigQuery ou contas de serviço. Os nomes globais
-`falando-nela-pedblan-data` e `falando-nela-pedblan-tfstate` retornaram `404`
-em consulta explícita ao projeto; a disponibilidade deve ser revalidada
-imediatamente antes de cada criação.
+Antes de G01, o projeto estava ativo e faturado, sem buckets, datasets BigQuery
+ou contas de serviço; os dois nomes planejados retornavam `404`. Depois de G01,
+existem somente os dois buckets previstos, a service account migradora sem
+chave, IAM mínimo, budget e seis APIs gerenciadas. O bucket de dados contém
+exatamente os três sentinelas aprovados; não há dataset BigQuery nem serviço de
+processamento criado por esta fase.

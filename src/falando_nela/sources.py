@@ -166,6 +166,7 @@ class RcloneRawSource:
         executable: str = "rclone",
         config_snapshot: RcloneConfigSnapshot | None = None,
         include_all_files: bool = False,
+        locators_relative_to_prefix: bool = False,
     ) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", remote):
             raise SourceError("nome de remote rclone inválido")
@@ -174,6 +175,7 @@ class RcloneRawSource:
         self.prefix = _safe_remote_prefix(prefix)
         self.expected_folder_id = expected_folder_id
         self.include_all_files = include_all_files
+        self.locators_relative_to_prefix = locators_relative_to_prefix
         pinned_rclone_remote_path(self.remote, self.expected_folder_id)
         self.executable = executable
         if shutil.which(self.executable) is None:
@@ -200,6 +202,9 @@ class RcloneRawSource:
             "root_folder_id": self.expected_folder_id,
             "scope": "drive.readonly",
             "listing": "all_files" if self.include_all_files else "raw_only",
+            "locators": (
+                "relative_to_prefix" if self.locators_relative_to_prefix else "root_relative"
+            ),
         }
 
     def list_objects(self, prefix: str | None = None) -> list[SourceObject]:
@@ -226,7 +231,11 @@ class RcloneRawSource:
             size = item.get("Size")
             if not isinstance(relative, str) or not isinstance(size, int):
                 raise SourceError("item inválido em rclone lsjson")
-            locator = _join_remote(selected_prefix, relative)
+            locator = (
+                _safe_remote_prefix(relative)
+                if self.locators_relative_to_prefix
+                else _join_remote(selected_prefix, relative)
+            )
             if not self.include_all_files and not _supported_raw_name(locator):
                 continue
             hashes = item.get("Hashes") if isinstance(item.get("Hashes"), dict) else {}
@@ -244,7 +253,12 @@ class RcloneRawSource:
     def iter_records(self, objects: Sequence[SourceObject]) -> Iterator[SourceRecord]:
         self.stream_calls += 1
         for source_object in sorted(objects, key=lambda item: item.locator):
-            command = self._command("cat", self._remote_path(source_object.locator))
+            physical_locator = (
+                _join_remote(self.prefix, source_object.locator)
+                if self.locators_relative_to_prefix
+                else source_object.locator
+            )
+            command = self._command("cat", self._remote_path(physical_locator))
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,

@@ -22,7 +22,7 @@ from falando_nela.gcs_migration import (
 )
 from falando_nela.operations import OperationError
 from falando_nela.raw import canonical_json_bytes, sha256_file
-from falando_nela.sources import SourceObject
+from falando_nela.sources import SourceError, SourceObject
 
 REPO_ROOT = Path(__file__).parents[2]
 CONFIG_PATH = REPO_ROOT / "config" / "gcp.toml"
@@ -213,6 +213,34 @@ def test_preflight_blocks_inventory_divergence(tmp_path: Path, mode: str) -> Non
 
     with pytest.raises(GcsMigrationError, match="inventário Drive divergiu"):
         reconcile_source_catalog(entries, objects)
+
+
+def test_preflight_persists_safe_source_failure_as_blocked(tmp_path: Path) -> None:
+    contract, catalog_path, entries = _fixture_contract_and_catalog(tmp_path)
+
+    class FailingSource(FakeSource):
+        def list_objects(self, prefix: str | None = None) -> list[SourceObject]:
+            raise SourceError("rclone lsjson falhou (exit 1); consulte o log local protegido")
+
+    with pytest.raises(SourceError, match="rclone lsjson falhou"):
+        _run(
+            tmp_path,
+            operation_id="source-failed",
+            contract=contract,
+            catalog_path=catalog_path,
+            source=FailingSource(_source_objects(entries)),
+            transport=FakeTransport(entries),
+            through="preflight",
+        )
+
+    manifest = json.loads(
+        (tmp_path / "data/operations/gcs_migration/source-failed/operation.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    preflight = next(item for item in manifest["stages"] if item["id"] == "preflight")
+    assert preflight["status"] == "blocked"
+    assert preflight["error"]["type"] == "SourceError"
 
 
 def test_copy_verifies_and_proves_idempotency(tmp_path: Path) -> None:
@@ -418,6 +446,7 @@ def test_rclone_receives_token_only_in_environment_and_cannot_mutate_bucket(
         config_path=config_path,
         source_remote="raw-source-ro",
         source_folder_id=RAW_FOLDER_ID,
+        source_prefix="v1",
         project_id="falando-nela-pedblan",
         project_number="818569314985",
         region="southamerica-east1",
@@ -445,6 +474,7 @@ def test_rclone_receives_token_only_in_environment_and_cannot_mutate_bucket(
     assert environment["CLOUDSDK_CORE_PROJECT"] == "falando-nela-pedblan"
     assert environment["GOOGLE_CLOUD_PROJECT"] == "falando-nela-pedblan"
     assert "gcstarget:falando-nela-pedblan-data/data/raw/v1" in command
+    assert f"raw-source-ro,root_folder_id={RAW_FOLDER_ID}:v1" in command
     assert {"--immutable", "--checksum", "--check-first", "--dry-run"} <= set(command)
     assert not {"sync", "move", "delete", "purge", "mkdir"} & set(command)
     assert TOKEN not in json.dumps(transport.descriptor())
