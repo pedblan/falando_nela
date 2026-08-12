@@ -39,21 +39,32 @@ Drive, bloqueiam rede externa e não exigem credenciais ou efeitos remotos.
 
 ## Evidência antes da cópia
 
-- [ ] Registrar identificador da operação, commit e configuração usada.
-- [ ] Confirmar projeto `falando-nela-pedblan`, bucket
+- [x] Registrar identificador da operação, commit e configuração usada.
+- [x] Confirmar projeto `falando-nela-pedblan`, bucket
   `falando-nela-pedblan-data` e prefixo `data/raw/v1` por readback explícito.
-- [ ] Confirmar origem Drive correta e credencial somente leitura.
-- [ ] Confirmar que o inventário atual corresponde à baseline de 2.887 objetos
+- [x] Confirmar origem Drive correta e credencial somente leitura.
+- [x] Confirmar que o inventário atual corresponde à baseline de 2.887 objetos
   e 14.686.043.352 bytes.
-- [ ] Confirmar no destino os três sentinelas íntegros e classificar todo o
+- [x] Confirmar no destino os três sentinelas íntegros e classificar todo o
   restante como ausente, igual, conflitante ou inesperado.
-- [ ] Resolver conflitos e surpresas sem overwrite antes de continuar.
-- [ ] Registrar plano de lotes, estimativa, teto de custo e condição de parada.
+- [x] Resolver conflitos e surpresas sem overwrite antes de continuar.
+- [x] Registrar plano de lotes, estimativa, teto de custo e condição de parada.
 - [ ] Registrar aprovação humana da cópia integral.
 
 **Aceite pré-cópia:** alvo e origem inequívocos, baseline reconciliada, nenhum
 conflito pendente e custo aprovado. Não se exige uma quantidade predeterminada
 de lotes ou um texto literal de comando.
+
+Evidência de `2026-08-11`: a operação recuperável
+`g02-full-20260811-v1`, vinculada à revisão `afebd26`, concluiu preflight e
+dry-run na primeira tentativa. O relatório contém três `=`, 2.884 `+` e zero
+`-`, `*` ou `!`; o GCS continua com somente os três sentinelas e 78.822 bytes.
+Os parâmetros correntes são lotes de até 100 arquivos ou 512 MiB, quatro
+transferências, um retry, uma low-level retry e amostra com objetos de até
+16 MiB. São parâmetros ajustáveis, mas qualquer alteração posterior produzirá
+outro digest de aprovação. Estimativa: US$ 0,30; teto proposto: US$ 1,00;
+condição de parada: conflito, overwrite, destino/origem divergente, escrita no
+Drive, credencial persistente ou custo acima do teto sem nova decisão.
 
 ## Evidência da migração
 

@@ -32,16 +32,23 @@ oficial desse raw. O Drive permanece intacto como arquivo de rollback.
 - [x] Confirmar a conclusão de G01 e a presença dos três sentinelas no GCS.
 - [x] Manter implementação e testes locais da migração e do corte.
 - [x] Definir requisitos e validação proporcionais ao risco de G02.
-- [ ] Abrir uma operação recuperável com identificador próprio.
-- [ ] Fazer readback do projeto, bucket, prefixo, identidade e origem Drive.
-- [ ] Inventariar a origem em modo somente leitura e comparar com a baseline.
-- [ ] Inventariar o destino e classificar objetos iguais, ausentes e conflitantes.
-- [ ] Produzir um plano de cópia em lotes adequados aos arquivos e ao ambiente.
-- [ ] Registrar estimativa de custo, comando ou procedimento e condição de parada.
+- [x] Abrir uma operação recuperável com identificador próprio.
+- [x] Fazer readback do projeto, bucket, prefixo, identidade e origem Drive.
+- [x] Inventariar a origem em modo somente leitura e comparar com a baseline.
+- [x] Inventariar o destino e classificar objetos iguais, ausentes e conflitantes.
+- [x] Produzir um plano de cópia em lotes adequados aos arquivos e ao ambiente.
+- [x] Registrar estimativa de custo, comando ou procedimento e condição de parada.
 - [ ] Obter aprovação humana para a cópia integral.
 
 **Decisão 1:** autorizar a cópia quando origem e destino estiverem identificados,
 não houver conflito ou surpresa sem explicação e o custo couber no orçamento.
+
+Preflight e dry-run `g02-full-20260811-v1` concluídos em `2026-08-11`, sob a
+revisão `afebd26`: 2.887 objetos e 14.686.043.352 bytes na origem, três
+sentinelas iguais no destino, 2.884 criações previstas, 38 lotes correntes e
+zero conflito, remoção ou erro. A estimativa conservadora é US$ 0,30 e o digest
+submetido à aprovação é
+`7c536e2ee91e79cf312891b40a726bcb1da663e852dbe810019409a718871e41`.
 
 ## G02-B — copiar e retomar
 
