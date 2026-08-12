@@ -3,8 +3,10 @@
 ## Estado
 
 Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`, encerrando G00.
-Nenhuma criação de recurso, habilitação de API, migração ou gasto foi executada
-por G00; esses efeitos continuam subordinados aos gates das fases seguintes.
+A implementação local de G01 foi encerrada no commit `4602f7e`, mas seus gates
+remotos continuam pendentes: nenhum recurso, upload ou gasto de G01 foi
+executado. O contrato operacional de G02 está proposto e permanece bloqueado
+até a conclusão integral de G01.
 
 ## Direção aprovada
 
@@ -37,6 +39,8 @@ specs não autoriza tratá-lo antecipadamente como cloud-first.
 - `validation.md`: evidências necessárias para cada gate.
 - `g01_fundacao_sentinela/`: contrato operacional da primeira fundação e do
   lote sentinela Drive→GCS.
+- `g02_migracao_integral_corte/`: contrato operacional da cópia integral,
+  reconciliação, restauração e corte humano da autoridade raw para o GCS.
 
 ## Baseline observada
 

@@ -44,7 +44,7 @@ default do `gcloud` inalterado e custo dentro do limite.
 
 ## G02 — migração integral e corte de armazenamento
 
-- [ ] Criar spec operacional própria para a cópia integral.
+- [x] Criar spec operacional própria para a cópia integral.
 - [ ] Congelar inventários de origem e destino sob novo `operation_id`.
 - [ ] Confirmar origem com 2.887 objetos e 14.686.043.352 bytes.
 - [ ] Preparar lotes limitados e relatório combinado de dry-run.
@@ -54,7 +54,7 @@ default do `gcloud` inalterado e custo dentro do limite.
 - [ ] Reexecutar a operação e comprovar zero duplicação ou substituição.
 - [ ] Restaurar uma amostra do GCS em diretório vazio e validar seus hashes.
 - [ ] Aprovar humanamente GCS como fonte oficial.
-- [ ] Reconfigurar o remote Drive apenas como arquivo read-only, sem excluir nada.
+- [ ] Confirmar o remote Drive como arquivo read-only de rollback, sem alterá-lo.
 
 **Gate G02:** raw integral reconciliado e restaurável no GCS; Drive intacto e
 preservado como rollback.
