@@ -86,6 +86,24 @@ class PipelineConfig(StrictModel):
         return self
 
 
+class MarimoConfig(StrictModel):
+    operation_id: str
+    parquet_locator: str
+    parquet_schema: str
+    expected_records: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_marimo(self) -> MarimoConfig:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", self.operation_id):
+            raise ValueError("operation_id G04 inválido")
+        _validate_relative_locator(self.parquet_locator)
+        if f"operation_id={self.operation_id}/" not in self.parquet_locator:
+            raise ValueError("locator G04 diverge do operation_id")
+        if not self.parquet_schema:
+            raise ValueError("schema G04 vazio")
+        return self
+
+
 class BudgetConfig(StrictModel):
     display_name: str
     currency_code: Literal["BRL"]
@@ -166,7 +184,7 @@ class MigrationConfig(StrictModel):
 
 
 class GcpContract(StrictModel):
-    schema_version: Literal[5]
+    schema_version: Literal[6]
     project_id: str
     project_number: str
     region: str
@@ -174,6 +192,7 @@ class GcpContract(StrictModel):
     data: DataConfig
     migrator: MigratorConfig
     pipeline: PipelineConfig
+    marimo: MarimoConfig
     budget: BudgetConfig
     migration: MigrationConfig
 
@@ -229,6 +248,17 @@ class GcpContract(StrictModel):
             "pipeline.memory": (self.pipeline.memory, "1Gi"),
             "pipeline.timeout_seconds": (self.pipeline.timeout_seconds, 600),
             "pipeline.max_cost_usd": (self.pipeline.max_cost_usd, Decimal("0.10")),
+            "marimo.operation_id": (self.marimo.operation_id, "g03-pilot-20260812-t120"),
+            "marimo.parquet_locator": (
+                self.marimo.parquet_locator,
+                "data/processed/v1/g03/senado/plenario_discursos/ano=2010/"
+                "operation_id=g03-pilot-20260812-t120/part-00000.parquet",
+            ),
+            "marimo.parquet_schema": (
+                self.marimo.parquet_schema,
+                "g03-senado-plenario-discursos-v1",
+            ),
+            "marimo.expected_records": (self.marimo.expected_records, 30),
             "budget.display_name": (self.budget.display_name, "falando-nela-gcp-first"),
             "budget.currency_code": (self.budget.currency_code, "BRL"),
             "budget.amount": (self.budget.amount, 25),

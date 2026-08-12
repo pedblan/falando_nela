@@ -114,3 +114,21 @@ variable "pipeline_revision" {
     error_message = "pipeline_revision inválida."
   }
 }
+
+variable "marimo_image" {
+  description = "Imagem OCI do app Marimo por digest."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition = (
+      var.marimo_image == null ||
+      can(regex(
+        "^southamerica-east1-docker[.]pkg[.]dev/falando-nela-pedblan/falando-nela/marimo-primeiro@sha256:[0-9a-f]{64}$",
+        var.marimo_image,
+      ))
+    )
+    error_message = "marimo_image deve ser uma imagem registrada por digest no repositório local."
+  }
+}

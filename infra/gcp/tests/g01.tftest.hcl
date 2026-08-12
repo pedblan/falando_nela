@@ -24,6 +24,14 @@ override_resource {
   }
 }
 
+override_resource {
+  target = google_service_account.marimo
+  values = {
+    name  = "projects/falando-nela-pedblan/serviceAccounts/fn-marimo@falando-nela-pedblan.iam.gserviceaccount.com"
+    email = "fn-marimo@falando-nela-pedblan.iam.gserviceaccount.com"
+  }
+}
+
 run "g01_contract" {
   command = plan
 
@@ -154,6 +162,10 @@ run "g03_contract" {
         google_storage_bucket_iam_member.builder_source_viewer.condition[0].expression,
         "/objects/operations/builds/g03/",
       ) &&
+      strcontains(
+        google_storage_bucket_iam_member.builder_source_viewer.condition[0].expression,
+        "/objects/operations/builds/g04/",
+      ) &&
       google_service_account_iam_member.cloud_build_builder_token_creator.role == "roles/iam.serviceAccountTokenCreator" &&
       google_artifact_registry_repository_iam_member.cloud_run_reader.role == "roles/artifactregistry.reader"
     )
@@ -186,5 +198,64 @@ run "g03_contract" {
       contains(google_cloud_run_v2_job.pipeline[0].template[0].template[0].containers[0].args, "--confirm-authoritative-raw=gcs")
     )
     error_message = "container G03 deve fixar recursos e autoridade GCS"
+  }
+}
+
+run "g04_contract" {
+  command = plan
+
+  variables {
+    project_id         = "falando-nela-pedblan"
+    project_number     = "818569314985"
+    region             = "southamerica-east1"
+    state_bucket       = "falando-nela-pedblan-tfstate"
+    data_bucket        = "falando-nela-pedblan-data"
+    billing_account_id = "000000-000000-000000"
+    operator_principal = "user:operador@example.invalid"
+    marimo_image       = "southamerica-east1-docker.pkg.dev/falando-nela-pedblan/falando-nela/marimo-primeiro@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+
+  assert {
+    condition = (
+      google_service_account.marimo.email == "fn-marimo@falando-nela-pedblan.iam.gserviceaccount.com"
+    )
+    error_message = "conta fn-marimo deve existir para o app G04"
+  }
+
+  assert {
+    condition = (
+      google_storage_bucket_iam_member.marimo_viewer.role == "roles/storage.objectViewer" &&
+      strcontains(
+        google_storage_bucket_iam_member.marimo_viewer.condition[0].expression,
+        "/objects/data/processed/v1/g03/senado/plenario_discursos/ano=2010/operation_id=g03-pilot-20260812-t120/",
+      )
+    )
+    error_message = "fn-marimo deve ler o recorte G03 aprovado sem prefixos abertos"
+  }
+
+  assert {
+    condition = (
+      google_cloud_run_v2_service.marimo[0].location == "southamerica-east1" &&
+      google_cloud_run_v2_service.marimo[0].template[0].scaling[0].min_instance_count == 0 &&
+      google_cloud_run_v2_service.marimo[0].template[0].scaling[0].max_instance_count == 1 &&
+      google_cloud_run_v2_service.marimo[0].template[0].containers[0].ports[0].container_port == 8080 &&
+      contains(
+        google_cloud_run_v2_service.marimo[0].template[0].containers[0].args,
+        "--headless",
+      ) &&
+      contains(
+        google_cloud_run_v2_service.marimo[0].template[0].containers[0].args,
+        "/app/notebooks/primeiro_recorte_discursos.py",
+      )
+    )
+    error_message = "serviço fn-marimo deve manter escala 0-1 e argumentos de execução"
+  }
+
+  assert {
+    condition = (
+      google_cloud_run_v2_service_iam_member.marimo_invoker[0].member == "user:operador@example.invalid" &&
+      google_cloud_run_v2_service_iam_member.marimo_invoker[0].role == "roles/run.invoker"
+    )
+    error_message = "apenas operador deve ter vínculo explícito de invocação no app G04"
   }
 }

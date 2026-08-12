@@ -20,6 +20,11 @@ locals {
     managed-by  = "opentofu"
     phase       = "g03"
   }
+  g04_labels = {
+    application = "falando-nela"
+    managed-by  = "opentofu"
+    phase       = "g04"
+  }
 }
 
 resource "google_project_service" "required" {
@@ -123,6 +128,35 @@ resource "google_service_account" "builder" {
   depends_on = [google_project_service.required["iam.googleapis.com"]]
 }
 
+resource "google_service_account" "marimo" {
+  project      = var.project_id
+  account_id   = "fn-marimo"
+  display_name = "Falando Nela Marimo reader"
+  description  = "Identidade sem chave do app Marimo de recorte público."
+
+  depends_on = [google_project_service.required["iam.googleapis.com"]]
+}
+
+resource "google_storage_bucket_iam_member" "marimo_viewer" {
+  bucket = google_storage_bucket.data.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.marimo.email}"
+
+  condition {
+    title       = "g04-read-g03-official"
+    description = "Leitura somente da saída oficial do corte G03."
+    expression = join(" || ", [
+      "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.data.name}/objects/data/processed/v1/g03/senado/plenario_discursos/ano=2010/operation_id=g03-pilot-20260812-t120/')",
+    ])
+  }
+}
+
+resource "google_service_account_iam_member" "operator_marimo_user" {
+  service_account_id = google_service_account.marimo.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = var.operator_principal
+}
+
 resource "google_artifact_registry_repository_iam_member" "builder_writer" {
   project    = var.project_id
   location   = google_artifact_registry_repository.pipeline.location
@@ -144,8 +178,13 @@ resource "google_storage_bucket_iam_member" "builder_source_viewer" {
 
   condition {
     title       = "g03-read-build-source"
-    description = "Leitura somente do pacote-fonte enviado para o build G03."
-    expression  = "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.data.name}/objects/operations/builds/g03/')"
+    description = "Leitura somente do pacote-fonte enviado para builds do recorte."
+    # Nota: o build G04 também usa um staging operacional distinto.
+    # Ambos os prefixes permanecem explicitamente por operação.
+    expression = join(" || ", [
+      "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.data.name}/objects/operations/builds/g03/')",
+      "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.data.name}/objects/operations/builds/g04/')",
+    ])
   }
 }
 
@@ -265,6 +304,70 @@ resource "google_cloud_run_v2_job" "pipeline" {
     google_storage_bucket_iam_member.pipeline_creator,
     google_storage_bucket_iam_member.pipeline_viewer,
   ]
+}
+
+resource "google_cloud_run_v2_service" "marimo" {
+  count = var.marimo_image == null ? 0 : 1
+
+  project             = var.project_id
+  location            = var.region
+  name                = "fn-marimo"
+  launch_stage        = "GA"
+  deletion_protection = true
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  labels              = local.g04_labels
+
+  template {
+    service_account = google_service_account.marimo.email
+    timeout         = "600s"
+
+    containers {
+      name  = "marimo-primeiro"
+      image = var.marimo_image
+      args = [
+        "run",
+        "/app/notebooks/primeiro_recorte_discursos.py",
+        "--host",
+        "0.0.0.0",
+        "-p",
+        "8080",
+        "--headless",
+      ]
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "1Gi"
+        }
+      }
+
+      ports {
+        container_port = 8080
+      }
+    }
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+  }
+
+  depends_on = [
+    google_project_service.required["run.googleapis.com"],
+    google_service_account.marimo,
+    google_storage_bucket_iam_member.marimo_viewer,
+    google_service_account_iam_member.operator_marimo_user,
+  ]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "marimo_invoker" {
+  count = var.marimo_image == null ? 0 : 1
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.marimo[0].name
+  role     = "roles/run.invoker"
+  member   = var.operator_principal
 }
 
 check "pipeline_job_inputs" {

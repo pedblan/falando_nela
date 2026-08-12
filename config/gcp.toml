@@ -1,4 +1,4 @@
-schema_version = 5
+schema_version = 6
 project_id = "falando-nela-pedblan"
 project_number = "818569314985"
 region = "southamerica-east1"
@@ -34,6 +34,12 @@ cpu = "1"
 memory = "1Gi"
 timeout_seconds = 600
 max_cost_usd = "0.10"
+
+[marimo]
+operation_id = "g03-pilot-20260812-t120"
+parquet_locator = "data/processed/v1/g03/senado/plenario_discursos/ano=2010/operation_id=g03-pilot-20260812-t120/part-00000.parquet"
+parquet_schema = "g03-senado-plenario-discursos-v1"
+expected_records = 30
 
 [budget]
 display_name = "falando-nela-gcp-first"

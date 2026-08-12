@@ -693,7 +693,7 @@ def _normalized_row(line: bytes) -> dict[str, Any]:
     }
 
 
-def _arrow_schema(pa: Any) -> Any:
+def g03_arrow_schema(pa: Any) -> Any:
     nullable_strings = (
         "checksum",
         "collected_at",
@@ -734,6 +734,10 @@ def _arrow_schema(pa: Any) -> Any:
         )
     )
     return pa.schema(fields)
+
+
+def _arrow_schema(pa: Any) -> Any:
+    return g03_arrow_schema(pa)
 
 
 def _record_identity(record: Mapping[str, Any]) -> str:

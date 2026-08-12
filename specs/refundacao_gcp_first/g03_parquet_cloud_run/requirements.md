@@ -89,6 +89,32 @@ estar visíveis: diff/plan, imagem candidata, estimativa abaixo de US$ 0,10,
 máximo de uma tentativa e condição de parada. Qualquer recurso ou gasto fora
 desse envelope exige nova decisão.
 
+## Modelo e esforço por requisito
+
+| ID | Modelo | Nível de esforço |
+| --- | --- | --- |
+| G03-INPUT-01 | GPT-5.3-Codex-Spark | Baixo |
+| G03-INPUT-02 | GPT-5.3-Codex-Spark | Médio |
+| G03-INPUT-03 | GPT-5.3-Codex-Spark | Baixo |
+| G03-INPUT-04 | GPT-5.3-Codex-Spark | Baixo |
+| G03-DATA-01 | GPT-5.3-Codex-Spark | Médio |
+| G03-DATA-02 | GPT-5.3-Codex-Spark | Médio |
+| G03-DATA-03 | GPT-5.3-Codex-Spark | Médio |
+| G03-DATA-04 | GPT-5.3-Codex-Spark | Médio |
+| G03-DATA-05 | GPT-5.3-Codex-Spark | Médio |
+| G03-DATA-06 | GPT-5.3-Codex-Spark | Médio |
+| G03-OPS-01 | GPT-5.3-Codex-Spark | Médio |
+| G03-OPS-02 | GPT-5.3-Codex-Spark | Médio |
+| G03-OPS-03 | GPT-5.3-Codex-Spark | Alto |
+| G03-OPS-04 | GPT-5.3-Codex-Spark | Alto |
+| G03-OPS-05 | GPT-5.3-Codex-Spark | Médio |
+| G03-RUN-01 | GPT-5.3-Codex-Spark | Médio |
+| G03-RUN-02 | GPT-5.3-Codex-Spark | Alto |
+| G03-RUN-03 | GPT-5.3-Codex-Spark | Médio |
+| G03-RUN-04 | GPT-5.3-Codex-Spark | Médio |
+| G03-RUN-05 | GPT-5.3-Codex-Spark | Médio |
+| G03-GATE-01 | GPT-5.3-Codex-Spark | Médio |
+
 ## Não objetivos
 
 - Processar outros anos, casas, datasets ou o corpus integral.

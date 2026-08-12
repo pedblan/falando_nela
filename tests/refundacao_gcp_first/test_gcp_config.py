@@ -33,7 +33,7 @@ def test_versioned_contract_freezes_g01_targets_and_sentinel() -> None:
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("schema_version = 5", "schema_version = 6"),
+        ("schema_version = 6", "schema_version = 7"),
         ('project_id = "falando-nela-pedblan"', 'project_id = "eleicoes-2026-504713"'),
         ('region = "southamerica-east1"', 'region = "us-central1"'),
     ],
@@ -110,7 +110,7 @@ def test_gcs_cli_has_safe_defaults_and_explicit_target_arguments() -> None:
 def test_g02_cutover_and_g03_pipeline_contract_are_frozen() -> None:
     contract = load_gcp_contract(CONFIG_PATH)
 
-    assert contract.schema_version == 5
+    assert contract.schema_version == 6
     assert contract.budget.currency_code == "BRL"
     assert contract.budget.amount == 25
     assert contract.budget.reference_ceiling_usd == 5
@@ -133,6 +133,10 @@ def test_g02_cutover_and_g03_pipeline_contract_are_frozen() -> None:
     assert contract.pipeline.memory == "1Gi"
     assert contract.pipeline.timeout_seconds == 600
     assert str(contract.pipeline.max_cost_usd) == "0.10"
+    assert contract.marimo.operation_id == "g03-pilot-20260812-t120"
+    assert contract.marimo.parquet_schema == "g03-senado-plenario-discursos-v1"
+    assert contract.marimo.expected_records == 30
+    assert contract.marimo.parquet_locator.endswith("/part-00000.parquet")
 
 
 def test_pipeline_confirmation_requires_literal_g03_targets() -> None:

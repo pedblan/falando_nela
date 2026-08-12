@@ -130,3 +130,28 @@ gcloud builds submit . \
   --gcs-source-staging-dir=gs://falando-nela-pedblan-data/operations/builds/g03/source \
   --substitutions="_REVISION=${REVISION},_IMAGE_URI=${IMAGE_URI}"
 ```
+
+## G04 — app privado Marimo para o recorte G03
+
+O app G04 usa uma imagem dedicada em `deploy/g04`. A imagem roda o notebook em
+`marimo run` com `host=0.0.0.0` e `port=8080`.
+
+```
+REVISION="$(git rev-parse HEAD)"
+IMAGE_URI="southamerica-east1-docker.pkg.dev/falando-nela-pedblan/falando-nela/marimo-primeiro"
+
+gcloud builds submit . \
+  --project=falando-nela-pedblan \
+  --region=southamerica-east1 \
+  --config=deploy/g04/cloudbuild.yaml \
+  --gcs-source-staging-dir=gs://falando-nela-pedblan-data/operations/builds/g04/source \
+  --substitutions="_REVISION=${REVISION},_IMAGE_URI=${IMAGE_URI}"
+```
+
+Após `marimo_image` apontar para a referência por digest em `pipeline`:
+
+1. `tofu -chdir=infra/gcp plan` com variável `marimo_image=<.../marimo-primeiro@sha256:...>`
+2. revisar o plano para: `fn-marimo`, IAM `roles/run.invoker` apenas para
+   operador e ausência de binding público;
+3. aprovar, aplicar e registrar operação de deploy;
+4. validar fumaça autenticada contra `fn-marimo` e URL confirmando 30 registros.

@@ -9,6 +9,8 @@ arquivo
 data
 data_samples
 notebooks
+!notebooks
+!notebooks/primeiro_recorte_discursos.py
 **/__pycache__
 *.pyc
 *.sqlite*
