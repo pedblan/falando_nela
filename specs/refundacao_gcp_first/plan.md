@@ -106,9 +106,9 @@ persistente nem permissão pública.
 - [x] Documentar deploy, execução, rollback, custos e diagnóstico.
 - [x] Confirmar que nenhuma operação oficial exige Colab ou Drive montado.
 - [x] Preservar referência às specs e à tag do legado.
-- [ ] Executar instalação limpa, lint, testes, IaC e caderno com fixtures.
-- [ ] Integrar a linha aprovada em `main` sem reescrever histórico.
-- [ ] Publicar e verificar `origin/main` no mesmo commit.
+- [x] Executar instalação limpa, lint, testes, IaC e caderno com fixtures.
+- [x] Integrar a linha aprovada em `main` sem reescrever histórico.
+- [x] Publicar e verificar `origin/main` no mesmo commit.
 
 **Gate G05:** caminho cloud-first documentado e reproduzível, com Drive apenas
 como arquivo e desenvolvimento local sem dependência de credenciais.

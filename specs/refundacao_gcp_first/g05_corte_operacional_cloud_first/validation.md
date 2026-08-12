@@ -83,10 +83,10 @@ disponível mais próxima, sem impacto material na cobertura.
 
 - [x] Revisar o diff por escopo, segredos, state, planos, caches e arquivos acidentais.
 - [x] Confirmar que o Drive não foi alterado e que nenhum recurso GCP foi criado, alterado ou removido.
-- [ ] Obter aprovação humana do commit candidato e da integração em `main`.
-- [ ] Integrar sem reescrever histórico e publicar `main` sem force-push.
-- [ ] Confirmar que `main` local e `origin/main` apontam para o mesmo commit.
-- [ ] Atualizar specs-raiz e G05 com o resultado final e pendências reais.
+- [x] Obter aprovação humana do commit candidato e da integração em `main`.
+- [x] Integrar sem reescrever histórico e publicar `main` sem force-push.
+- [x] Confirmar que `main` local e `origin/main` apontam para o mesmo commit.
+- [x] Atualizar specs-raiz e G05 com o resultado final e pendências reais.
 
 ## Matriz de modelo e esforço da validação
 

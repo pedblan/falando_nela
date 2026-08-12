@@ -39,9 +39,9 @@ resultado: o caminho cloud-first reproduzível integrado em `main`.
 - [x] Revisar o diff por escopo, segredos, state, caches e artefatos acidentais.
 - [x] Commitar o candidato e criar clone limpo local a partir do commit exato.
 - [x] Executar instalação, Ruff, pytest, doctor, Marimo e OpenTofu no clone limpo.
-- [ ] Apresentar evidências e obter o gate humano único para integrar e publicar `main`.
-- [ ] Integrar o candidato aprovado em `main` sem reescrever histórico e publicar no GitHub.
-- [ ] Verificar igualdade entre `main` e `origin/main` e fechar os checklists das specs.
+- [x] Apresentar evidências e obter o gate humano único para integrar e publicar `main`.
+- [x] Integrar o candidato aprovado em `main` sem reescrever histórico e publicar no GitHub.
+- [x] Verificar igualdade entre `main` e `origin/main` e fechar os checklists das specs.
 
 `[x]` exige evidência no repositório ou na execução; `[ ]` permanece pendente
 até que o critério literal seja cumprido. Checkboxes não autorizam push, merge
@@ -60,6 +60,16 @@ foi instalado e validado no clone limpo
 alto e foi executada com GPT-5 em esforço alto, a alternativa disponível mais
 próxima. A única falha da primeira passagem foi formatação mecânica; a correção
 isolada originou esse novo candidato antes da repetição integral dos checks.
+
+Evidência de P12 em `2026-08-12`: aprovação humana recebida para integrar
+`0eb5412` em `main` (mensagem explícita do usuário).
+
+Evidência de P13 em `2026-08-12`: integração e publicação concluídas com merge
+`--ff-only` e push em `main` no commit
+`0eb5412778710a6d0a1148ec16073f1232524e39`.
+
+Evidência de P14 em `2026-08-12`: após o push, `main` local e `origin/main`
+apontam para `0eb5412778710a6d0a1148ec16073f1232524e39`.
 
 ## Sequência de execução
 

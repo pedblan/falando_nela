@@ -2,9 +2,8 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-11`. G00–G04 foram concluídos; o GCS é a fonte
-raw oficial e o primeiro app Marimo privado foi validado em `2026-08-12`. G05
-está especificado e permanece pendente.
+Contrato aprovado em `2026-08-11`. G00–G05 foram concluídos; o GCS é a fonte
+raw oficial e o primeiro app Marimo privado foi validado em `2026-08-12`.
 
 ## Gates
 
@@ -15,7 +14,7 @@ está especificado e permanece pendente.
 | G02 | raw integral no GCS | inventários, hashes, restore e gate humano | aprovado |
 | G03 | Parquet em Cloud Run Job | imagem/digest, manifesto e rerun sem rewrite | aprovado |
 | G04 | Marimo privado | imagem por digest, IAM privado e smoke GCS com 30 registros | aprovado |
-| G05 | corte cloud-first | clone limpo, docs, testes e remote | pendente |
+| G05 | corte cloud-first | clone limpo, docs, testes e remote | aprovado |
 
 ## G00 — contrato
 
@@ -142,6 +141,10 @@ registros, filtros reativos e plano OpenTofu posterior sem drift.
 - [x] Procurar dependências operacionais restantes de Colab e Drive montado.
 - [x] Confirmar que specs históricas continuam acessíveis e rotuladas.
 - [x] Revisar diff por segredos, state, outputs, caches e mudanças alheias.
+
+Evidência de conclusão em `2026-08-12`: aprovação humana em `main`, merge
+`--ff-only`, push e sincronização entre `main` local e remota em
+`0eb5412778710a6d0a1148ec16073f1232524e39`.
 
 ## Custos e interrupção
 
