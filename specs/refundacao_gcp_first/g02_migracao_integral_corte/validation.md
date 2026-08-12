@@ -120,18 +120,22 @@ catálogo final, e o diretório temporário foi removido somente após a emissã
 
 - [x] Consolidar inventários, checksums, idempotência, restauração, preservação
   do Drive, incidentes e custo em uma síntese revisável.
-- [ ] Registrar aprovação humana explícita para GCS como autoridade raw.
-- [ ] Executar o corte como ação separada, ligada à operação aprovada.
-- [ ] Confirmar `authoritative_raw = "gcs"` na configuração versionada.
-- [ ] Fazer readback da evidência create-only publicada no GCS.
-- [ ] Confirmar que o Drive continua disponível somente para leitura e rollback.
-- [ ] Confirmar que G02 não antecipou processamento, app Marimo ou o corte G05.
+- [x] Registrar aprovação humana explícita para GCS como autoridade raw.
+- [x] Executar o corte como ação separada, ligada à operação aprovada.
+- [x] Confirmar `authoritative_raw = "gcs"` na configuração versionada.
+- [x] Fazer readback da evidência create-only publicada no GCS.
+- [x] Confirmar que o Drive continua disponível somente para leitura e rollback.
+- [x] Confirmar que G02 não antecipou processamento, app Marimo ou o corte G05.
 
 O manifesto candidato ao corte foi publicado create-only em
 `manifests/migrations/g02/g02-full-20260811-v1/migration-complete.json`, geração
 `1786505426515430`, e relido com o mesmo SHA-256 local e remoto:
 `230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
-Antes da segunda aprovação, `authoritative_raw` permanece `drive`.
+O corte final foi publicado em
+`manifests/migrations/g02/g02-full-20260811-v1/cutover.json`, geração
+`1786530130887793`, e relido com o mesmo `SHA-256` de payload
+`35e68992b94de2671775e99b3eb73b3a24334dcfa7d4ae1a98fa45b5377f6b95`.
+`authoritative_raw` está `gcs` em `config/gcp.toml`.
 
 ## Critério de conclusão
 

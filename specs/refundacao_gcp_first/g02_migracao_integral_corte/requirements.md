@@ -111,8 +111,8 @@ para G03 e fases seguintes; o Drive permanece arquivo de rollback.
   `230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
 - [x] Aprovação da cópia integral (`G02-GATE-01`) vinculada ao plano e ao teto
   de custo aceitos.
-- [ ] Corte de autoridade (`G02-GATE-02` a `G02-GATE-04`) pendente de aprovação
-  humana explícita, execução separada e readback.
+- [x] Corte de autoridade (`G02-GATE-02` a `G02-GATE-04`) concluído com
+  aprovação humana explícita, execução separada e readback.
 
 ## Margem operacional
 

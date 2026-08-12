@@ -3,10 +3,9 @@
 ## Estado
 
 A cópia integral, a reconciliação, a prova de idempotência e a restauração
-amostral estão concluídas. O Drive permanece como autoridade raw até a segunda
-decisão humana, ainda pendente. G02 conserva apenas duas decisões humanas
-obrigatórias: a primeira autorizou a cópia; a segunda autorizará ou não a
-mudança de autoridade para o GCS.
+amostral estão concluídas. O corte foi aprovado e aplicado. O Drive permanece
+presente apenas como rollback em modo somente leitura após a segunda decisão
+humana.
 
 ## Resultado
 
@@ -91,13 +90,13 @@ incidente, e a estimativa registrada permaneceu em US$ 0,30.
 ## G02-D — aprovar e executar o corte
 
 - [x] Apresentar o relatório de integridade, restauração, idempotência e custo.
-- [ ] Obter aprovação humana explícita para tornar o GCS a autoridade raw.
-- [ ] Executar o corte separadamente da cópia e registrar sua proveniência.
-- [ ] Atualizar `authoritative_raw = "gcs"` na configuração versionada.
-- [ ] Publicar e reler uma evidência de corte no GCS sem substituir artefato
+- [x] Obter aprovação humana explícita para tornar o GCS a autoridade raw.
+- [x] Executar o corte separadamente da cópia e registrar sua proveniência.
+- [x] Atualizar `authoritative_raw = "gcs"` na configuração versionada.
+- [x] Publicar e reler uma evidência de corte no GCS sem substituir artefato
   existente.
-- [ ] Confirmar que o Drive segue disponível somente para leitura e rollback.
-- [ ] Revisar o diff e encerrar G02 sem antecipar processamento, Marimo ou G05.
+- [x] Confirmar que o Drive segue disponível somente para leitura e rollback.
+- [x] Revisar o diff e encerrar G02 sem antecipar processamento, Marimo ou G05.
 
 **Decisão 2:** autorizar o corte somente depois das provas de integridade e
 restauração. A aprovação vale para o corte desta baseline e não para mudanças
@@ -106,6 +105,9 @@ posteriores no corpus.
 O candidato ao corte é a operação `g02-full-20260811-v1`. Seu manifesto local
 e o objeto create-only relido no GCS têm SHA-256
 `230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
+O corte foi publicado em `manifests/migrations/g02/g02-full-20260811-v1/cutover.json`
+com geração `1786530130887793` e readback local gravado em
+`cutover-readback.json`.
 
 ## Limites de esforço e custo
 

@@ -54,12 +54,15 @@ default do `gcloud` inalterado e custo dentro do limite.
 - [x] Relistar GCS e reconciliar locator, tamanho e hashes de todos os objetos.
 - [x] Reexecutar a operação e comprovar zero duplicação ou substituição.
 - [x] Restaurar uma amostra do GCS em diretório vazio e validar seus hashes.
-- [ ] Aprovar humanamente GCS como fonte oficial.
-- [ ] Confirmar o remote Drive como arquivo read-only de rollback, sem alterá-lo.
+- [x] Aprovar humanamente GCS como fonte oficial.
+- [x] Confirmar o remote Drive como arquivo read-only de rollback, sem alterá-lo.
 
-Evidência parcial: operação `g02-full-20260811-v1`, manifesto de migração
+Evidência: operação `g02-full-20260811-v1`, manifesto de migração
 SHA-256 `230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
-O corte e a confirmação final do Drive como rollback continuam pendentes.
+Corte aplicado com `authoritative_raw = "gcs"` em `config/gcp.toml` por
+`g02-full-20260811-v1` (`cutover.json` em
+`manifests/migrations/g02/g02-full-20260811-v1`, geração
+`1786530130887793`).
 
 **Gate G02:** raw integral reconciliado e restaurável no GCS; Drive intacto e
 preservado como rollback.
