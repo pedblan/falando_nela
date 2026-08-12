@@ -35,6 +35,8 @@ specs não autoriza tratá-lo antecipadamente como cloud-first.
 - `tech-stack.md`: recursos, ferramentas e topologia escolhidos;
 - `plan.md`: sequência de unidades de trabalho e gates;
 - `validation.md`: evidências necessárias para cada gate.
+- `g01_fundacao_sentinela/`: contrato operacional da primeira fundação e do
+  lote sentinela Drive→GCS.
 
 ## Baseline observada
 

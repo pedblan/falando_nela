@@ -19,6 +19,13 @@ from falando_nela.drive_organizer import (
     plan_drive_organization,
     reconcile_drive_inventory,
 )
+from falando_nela.gcp_config import GcpConfigError, load_gcp_contract
+from falando_nela.gcs_migration import (
+    GcloudImpersonatedTokenProvider,
+    GcsMigrationError,
+    RcloneGcsTransport,
+    execute_gcs_sentinel,
+)
 from falando_nela.operations import OperationError
 from falando_nela.sample_import import (
     PILOT_PREFIX,
@@ -113,6 +120,29 @@ def build_parser() -> argparse.ArgumentParser:
     sample_pilot.add_argument("--data-root", type=Path)
     sample_pilot.add_argument("--repo-root", type=Path, default=Path.cwd())
     sample_pilot.add_argument("--json", action="store_true", dest="as_json")
+    gcs_migrate = subcommands.add_parser(
+        "gcs-migrate", help="prepara a migração imutável e recuperável para GCS"
+    )
+    gcs_commands = gcs_migrate.add_subparsers(dest="gcs_command", required=True)
+    gcs_sentinel = gcs_commands.add_parser(
+        "sentinel", help="reconcilia, ensaia ou copia a sentinela G01"
+    )
+    gcs_sentinel.add_argument(
+        "--through", choices=("preflight", "dry-run", "copy"), default="preflight"
+    )
+    gcs_sentinel.add_argument("--operation-id", required=True)
+    gcs_sentinel.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    gcs_sentinel.add_argument("--source-catalog", type=Path, required=True)
+    gcs_sentinel.add_argument("--rclone-config", type=Path, required=True)
+    gcs_sentinel.add_argument("--source-remote", default="raw-source-ro")
+    gcs_sentinel.add_argument("--source-folder-id", required=True)
+    gcs_sentinel.add_argument("--confirm-source-folder-id", required=True)
+    gcs_sentinel.add_argument("--confirm-project-id", required=True)
+    gcs_sentinel.add_argument("--confirm-bucket", required=True)
+    gcs_sentinel.add_argument("--operator-account", required=True)
+    gcs_sentinel.add_argument("--data-root", type=Path)
+    gcs_sentinel.add_argument("--repo-root", type=Path, default=Path.cwd())
+    gcs_sentinel.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -337,6 +367,64 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_human_sample_pilot(payload)
         return 0
+    if args.command == "gcs-migrate" and args.gcs_command == "sentinel":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            contract = load_gcp_contract(args.gcp_config)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            access_token = GcloudImpersonatedTokenProvider(
+                project_id=contract.project_id,
+                service_account=contract.migrator_email,
+                operator_account=args.operator_account,
+            )
+            transport = RcloneGcsTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                project_id=contract.project_id,
+                project_number=contract.project_number,
+                region=contract.region,
+                bucket=contract.data.bucket,
+                raw_prefix=contract.data.raw_prefix,
+                access_token=access_token,
+            )
+            payload = execute_gcs_sentinel(
+                source=source,
+                transport=transport,
+                contract=contract,
+                source_catalog_path=args.source_catalog,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                confirmed_project_id=args.confirm_project_id,
+                confirmed_bucket=args.confirm_bucket,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                through=args.through,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            GcpConfigError,
+            GcsMigrationError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha na sentinela GCS: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_gcs_sentinel(payload)
+        return 0
     return 2
 
 
@@ -393,3 +481,11 @@ def _print_human_sample_pilot(payload: dict[str, object]) -> None:
     print(f"- população: {payload['population']}", file=sys.stderr)
     print(f"- selecionados: {payload['selected_count']}", file=sys.stderr)
     print(f"- manifesto: {payload['sample_manifest_path']}", file=sys.stderr)
+
+
+def _print_human_gcs_sentinel(payload: dict[str, object]) -> None:
+    print(f"Sentinela GCS: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- limite executado: {payload['through']}", file=sys.stderr)
+    print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)
+    print(f"- artefato: {payload['artifact_path']}", file=sys.stderr)

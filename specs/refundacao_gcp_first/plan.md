@@ -26,10 +26,10 @@ remoto executado.
 
 ## G01 — fundação GCP e sentinela
 
-- [ ] Criar spec operacional própria para bootstrap e sentinela.
-- [ ] Registrar `config/gcp.toml` com projeto, região, buckets e prefixos.
-- [ ] Adicionar `infra/gcp/`, versões, lockfile e ignores de estado.
-- [ ] Revalidar disponibilidade dos dois nomes globais de bucket.
+- [x] Criar spec operacional própria para bootstrap e sentinela.
+- [x] Registrar `config/gcp.toml` com projeto, região, buckets e prefixos.
+- [x] Adicionar `infra/gcp/`, versões, lockfile e ignores de estado.
+- [x] Revalidar disponibilidade dos dois nomes globais de bucket.
 - [ ] Estimar custo e aprovar o bootstrap do bucket de estado.
 - [ ] Criar e verificar o bucket de estado por comando explícito e único.
 - [ ] Executar `tofu init`, `fmt`, `validate` e `plan` sem apply implícito.
