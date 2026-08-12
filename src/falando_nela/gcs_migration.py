@@ -146,6 +146,9 @@ class RcloneGcsTransport:
         bucket: str,
         raw_prefix: str,
         access_token: Callable[[], str],
+        transfers: int = 4,
+        retries: int = 1,
+        low_level_retries: int = 1,
         executable: str = "rclone",
     ) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", source_remote):
@@ -162,6 +165,15 @@ class RcloneGcsTransport:
         self.bucket = bucket
         self.raw_prefix = raw_prefix.strip("/")
         self.access_token = access_token
+        if not 1 <= transfers <= 16:
+            raise GcsMigrationError("transfers deve ficar entre 1 e 16")
+        if not 1 <= retries <= 5:
+            raise GcsMigrationError("retries deve ficar entre 1 e 5")
+        if not 1 <= low_level_retries <= 10:
+            raise GcsMigrationError("low-level-retries deve ficar entre 1 e 10")
+        self.transfers = transfers
+        self.retries = retries
+        self.low_level_retries = low_level_retries
         self.executable = executable
         if shutil.which(executable) is None:
             raise GcsMigrationError("rclone não está instalado ou não está no PATH")
@@ -179,6 +191,9 @@ class RcloneGcsTransport:
             "source_folder_id": self.source_folder_id,
             "source_prefix": self.source_prefix,
             "authentication": "short_lived_impersonated_token",
+            "transfers": str(self.transfers),
+            "retries": str(self.retries),
+            "low_level_retries": str(self.low_level_retries),
         }
 
     def destination_inventory(self) -> list[SourceObject]:
@@ -241,11 +256,11 @@ class RcloneGcsTransport:
             "--checksum",
             "--check-first",
             "--retries",
-            "1",
+            str(self.retries),
             "--low-level-retries",
-            "1",
+            str(self.low_level_retries),
             "--transfers",
-            "4",
+            str(self.transfers),
             "--combined",
             str(combined_path),
             "--config",

@@ -403,6 +403,8 @@ def select_restore_sample(
     approved_empty_locators: Sequence[str],
     max_object_bytes: int,
 ) -> list[CatalogEntry]:
+    if max_object_bytes <= 0:
+        raise GcsFullMigrationError("limite da amostra de restauração deve ser positivo")
     selected = {item.source_locator: item for item in sentinel}
     by_source_locator = {item.source_locator: item for item in entries}
     for locator in approved_empty_locators:
@@ -411,15 +413,23 @@ def select_restore_sample(
         except KeyError as exc:
             raise GcsFullMigrationError(f"objeto vazio aprovado ausente: {locator}") from exc
     groups: dict[tuple[str, str], list[CatalogEntry]] = {}
+    eligible: list[CatalogEntry] = []
     for entry in entries:
         source, dataset = _source_dataset(entry)
         if 0 < entry.size_bytes <= max_object_bytes and re.fullmatch(
             r"[0-9a-f]{64}", entry.provider_hashes.get("sha256", "")
         ):
+            eligible.append(entry)
             groups.setdefault((source, dataset), []).append(entry)
+    if not eligible:
+        raise GcsFullMigrationError("baseline não contém objeto restaurável dentro do limite")
     for key in sorted(groups):
         candidate = min(groups[key], key=lambda item: item.destination_locator)
         selected[candidate.source_locator] = candidate
+    smallest = min(eligible, key=lambda item: (item.size_bytes, item.destination_locator))
+    largest = max(eligible, key=lambda item: (item.size_bytes, item.destination_locator))
+    selected[smallest.source_locator] = smallest
+    selected[largest.source_locator] = largest
     return sorted(selected.values(), key=lambda item: item.destination_locator)
 
 
@@ -429,10 +439,11 @@ def execute_gcs_full(
     transport: FullGcsTransport,
     contract: GcpContract,
     source_catalog_path: Path,
-    source_batch_plan_path: Path,
+    source_batch_plan_path: Path | None,
     g01_operation_root: Path,
     data_root: Path,
     operation_id: str,
+    implementation_revision: str,
     confirmed_project_id: str,
     confirmed_bucket: str,
     confirmed_source_folder_id: str,
@@ -441,9 +452,12 @@ def execute_gcs_full(
     approved_max_cost_usd: str | None = None,
     batch_max_files: int = 100,
     batch_max_bytes: int = 512 * 1024 * 1024,
+    restore_sample_max_bytes: int | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     _validate_operation_id(operation_id)
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:+/-]{0,199}", implementation_revision):
+        raise GcsFullMigrationError("revisão da implementação G02 é inválida")
     if through not in COPY_THROUGH:
         raise GcsFullMigrationError(f"through inválido: {through}")
     contract.confirm_targets(
@@ -453,11 +467,15 @@ def execute_gcs_full(
     )
     if contract.migration.authoritative_raw != "drive":
         raise GcsFullMigrationError("G02 já foi cortada ou a autoridade raw não é Drive")
-    if (
-        batch_max_files != contract.migration.batch_max_files
-        or batch_max_bytes != contract.migration.batch_max_bytes
-    ):
-        raise GcsFullMigrationError("limites de lote divergem da configuração G02")
+    if batch_max_files <= 0 or batch_max_bytes <= 0:
+        raise GcsFullMigrationError("limites de lote devem ser positivos")
+    effective_restore_max_bytes = (
+        contract.migration.restore_sample_max_object_bytes
+        if restore_sample_max_bytes is None
+        else restore_sample_max_bytes
+    )
+    if effective_restore_max_bytes <= 0:
+        raise GcsFullMigrationError("limite da amostra de restauração deve ser positivo")
     descriptor = source.descriptor()
     if descriptor.get("scope") != "drive.readonly":
         raise GcsFullMigrationError("origem G02 deve usar scope drive.readonly")
@@ -473,7 +491,11 @@ def execute_gcs_full(
 
     resolved_root = data_root.expanduser().resolve(strict=True)
     resolved_catalog = source_catalog_path.expanduser().resolve(strict=True)
-    resolved_batch_plan = source_batch_plan_path.expanduser().resolve(strict=True)
+    resolved_batch_plan = (
+        source_batch_plan_path.expanduser().resolve(strict=True)
+        if source_batch_plan_path is not None
+        else None
+    )
     resolved_g01_root = g01_operation_root.expanduser().resolve(strict=True)
     if not resolved_g01_root.is_relative_to(resolved_root):
         raise GcsFullMigrationError("operação G01 deve estar sob a raiz de dados")
@@ -485,8 +507,14 @@ def execute_gcs_full(
         batch_max_files=batch_max_files,
         batch_max_bytes=batch_max_bytes,
     )
-    _validate_frozen_batch_plan(resolved_batch_plan, generated_plan, contract)
-    _validate_restore_contract(catalog, sentinel, contract)
+    if resolved_batch_plan is not None:
+        _validate_source_batch_plan(resolved_batch_plan, catalog, contract)
+    _validate_restore_sample(
+        catalog,
+        sentinel,
+        contract,
+        max_object_bytes=effective_restore_max_bytes,
+    )
     g01_evidence = validate_g01_completion(resolved_g01_root, contract)
 
     operation_root = resolved_root / "operations" / "gcs_migration" / operation_id
@@ -497,17 +525,21 @@ def execute_gcs_full(
         "region": contract.region,
         "bucket": contract.data.bucket,
         "raw_prefix": contract.data.raw_prefix,
+        "implementation_revision": implementation_revision,
         "source": descriptor,
         "transport": transport_descriptor,
         "source_catalog": str(resolved_catalog),
         "source_catalog_file_sha256": sha256_file(resolved_catalog),
         "source_catalog_logical_sha256": contract.migration.source_catalog_sha256,
-        "source_batch_plan": str(resolved_batch_plan),
-        "source_batch_plan_sha256": sha256_file(resolved_batch_plan),
+        "source_batch_plan": str(resolved_batch_plan) if resolved_batch_plan else None,
+        "source_batch_plan_sha256": (
+            sha256_file(resolved_batch_plan) if resolved_batch_plan else None
+        ),
         "g01_operation_root": str(resolved_g01_root),
         "g01_evidence_sha256": g01_evidence["manifest_sha256"],
         "batch_max_files": batch_max_files,
         "batch_max_bytes": batch_max_bytes,
+        "restore_sample_max_bytes": effective_restore_max_bytes,
         "through_contract": list(COPY_THROUGH),
         "estimated_cost_usd": format(ESTIMATED_G02_COST_USD, "f"),
     }
@@ -520,7 +552,9 @@ def execute_gcs_full(
             {
                 "contract": contract.model_dump(mode="json"),
                 "catalog_sha256": sha256_file(resolved_catalog),
-                "batch_plan_sha256": sha256_file(resolved_batch_plan),
+                "batch_plan_sha256": (
+                    sha256_file(resolved_batch_plan) if resolved_batch_plan else None
+                ),
                 "g01_manifest_sha256": g01_evidence["manifest_sha256"],
             }
         ),
@@ -591,6 +625,7 @@ def execute_gcs_full(
             approval_payload = {
                 "project_id": contract.project_id,
                 "bucket": contract.data.bucket,
+                "implementation_revision": implementation_revision,
                 "source_folder_id": contract.migration.source_raw_folder_id,
                 "catalog_sha256": sha256_file(resolved_catalog),
                 "execution_plan_sha256": sha256_file(paths["execution_plan"]),
@@ -598,6 +633,10 @@ def execute_gcs_full(
                 "files": len(catalog),
                 "bytes": sum(item.size_bytes for item in catalog),
                 "batches": len(generated_plan["batches"]),
+                "batch_max_files": batch_max_files,
+                "batch_max_bytes": batch_max_bytes,
+                "restore_sample_max_bytes": effective_restore_max_bytes,
+                "transport": transport_descriptor,
                 "estimated_cost_usd": format(ESTIMATED_G02_COST_USD, "f"),
             }
             atomic_write_json(
@@ -628,6 +667,10 @@ def execute_gcs_full(
         _emit(progress_callback, operation_id, "copy", "running")
         try:
             progress = _load_copy_progress(paths["copy_progress"])
+            progress["approval"] = {
+                "plan_sha256": approved_plan_sha256,
+                "max_cost_usd": str(approved_max_cost_usd),
+            }
             entry_by_destination = {item.destination_locator: item for item in catalog}
             attempt = int(operation.stage("copy")["attempts"])
             previous_result_ambiguous = any(
@@ -750,7 +793,7 @@ def execute_gcs_full(
                 catalog,
                 sentinel,
                 approved_empty_locators=contract.migration.approved_empty_source_locators,
-                max_object_bytes=contract.migration.restore_sample_max_object_bytes,
+                max_object_bytes=effective_restore_max_bytes,
             )
             restored: list[dict[str, Any]] = []
             for entry in sample:
@@ -783,6 +826,12 @@ def execute_gcs_full(
                     "status": "completed",
                     "files": len(restored),
                     "bytes": sum(item["size_bytes"] for item in restored),
+                    "selection": {
+                        "strategy": (
+                            "sentinels+known_empty+source_dataset+smallest+largest_within_limit"
+                        ),
+                        "max_object_bytes": effective_restore_max_bytes,
+                    },
                     "objects": restored,
                     "temporary_directory_removed": True,
                 },
@@ -802,6 +851,9 @@ def execute_gcs_full(
             "migration-complete.json"
         )
         try:
+            copy_progress = _load_json_object(paths["copy_progress"], "progresso G02")
+            restore_summary = _load_json_object(paths["restore"], "restauração G02")
+            dry_run_summary = _load_json_object(paths["dry_run"], "dry-run G02")
             migration_complete = {
                 "schema_version": 1,
                 "status": "migration_complete",
@@ -817,6 +869,19 @@ def execute_gcs_full(
                 "restore_sha256": sha256_file(paths["restore"]),
                 "files": contract.migration.source_files,
                 "bytes": contract.migration.source_bytes,
+                "approval": copy_progress.get("approval"),
+                "estimated_cost_usd": dry_run_summary["estimated_cost_usd"],
+                "operational_parameters": {
+                    "batches": len(generated_plan["batches"]),
+                    "batch_max_files": batch_max_files,
+                    "batch_max_bytes": batch_max_bytes,
+                    "transport": transport_descriptor,
+                },
+                "restore": {
+                    "files": restore_summary["files"],
+                    "bytes": restore_summary["bytes"],
+                    "selection": restore_summary["selection"],
+                },
                 "remote_locator": remote_locator,
             }
             atomic_write_json(paths["migration_complete"], migration_complete)
@@ -1192,8 +1257,8 @@ def _copy_batch(
     )
 
 
-def _validate_frozen_batch_plan(
-    path: Path, generated: Mapping[str, Any], contract: GcpContract
+def _validate_source_batch_plan(
+    path: Path, catalog: Sequence[CatalogEntry], contract: GcpContract
 ) -> None:
     if sha256_file(path) != contract.migration.source_batch_plan_file_sha256:
         raise GcsFullMigrationError("arquivo do plano histórico de lotes divergiu")
@@ -1201,43 +1266,43 @@ def _validate_frozen_batch_plan(
         frozen = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise GcsFullMigrationError("plano histórico de lotes é inválido") from exc
-    keys = (
-        "files",
-        "bytes",
-        "sentinel",
-        "batch_max_files",
-        "batch_max_bytes",
-        "batches",
-    )
-    if any(frozen.get(key) != generated.get(key) for key in keys):
-        raise GcsFullMigrationError("lotes gerados divergem do plano histórico congelado")
-    if len(generated["batches"]) != contract.migration.batch_count:
-        raise GcsFullMigrationError("quantidade de lotes diverge da configuração G02")
-    oversized = [
-        item
-        for item in generated["batches"]
-        if int(item["bytes"]) > contract.migration.batch_max_bytes
-    ]
-    if len(oversized) != contract.migration.oversized_batch_count or any(
-        int(item["files"]) != 1 for item in oversized
+    try:
+        locators = [str(item) for item in frozen["sentinel"]["destination_locators"]]
+        for batch in frozen["batches"]:
+            locators.extend(str(item) for item in batch["destination_locators"])
+        files = int(frozen["files"])
+        size_bytes = int(frozen["bytes"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise GcsFullMigrationError("plano histórico de lotes é inválido") from exc
+    expected = {item.destination_locator for item in catalog}
+    if (
+        files != len(catalog)
+        or size_bytes != sum(item.size_bytes for item in catalog)
+        or len(locators) != len(set(locators))
+        or set(locators) != expected
     ):
-        raise GcsFullMigrationError("exceções de objetos grandes divergiram do contrato")
+        raise GcsFullMigrationError("plano histórico não representa a baseline integral")
 
 
-def _validate_restore_contract(
-    catalog: Sequence[CatalogEntry], sentinel: Sequence[CatalogEntry], contract: GcpContract
+def _validate_restore_sample(
+    catalog: Sequence[CatalogEntry],
+    sentinel: Sequence[CatalogEntry],
+    contract: GcpContract,
+    *,
+    max_object_bytes: int,
 ) -> None:
     sample = select_restore_sample(
         catalog,
         sentinel,
         approved_empty_locators=contract.migration.approved_empty_source_locators,
-        max_object_bytes=contract.migration.restore_sample_max_object_bytes,
+        max_object_bytes=max_object_bytes,
     )
-    if (
-        len(sample) != contract.migration.restore_sample_files
-        or sum(item.size_bytes for item in sample) != contract.migration.restore_sample_bytes
-    ):
-        raise GcsFullMigrationError("amostra de restauração diverge da configuração G02")
+    required = {
+        *(item.source_locator for item in sentinel),
+        *contract.migration.approved_empty_source_locators,
+    }
+    if not required.issubset({item.source_locator for item in sample}):
+        raise GcsFullMigrationError("amostra não cobre sentinelas e vazios aprovados")
 
 
 def _verify_destination_subset(
@@ -1364,7 +1429,7 @@ def _require_copy_approval(
     if (
         not ceiling.is_finite()
         or ceiling < estimated
-        or ceiling > Decimal(contract.migration.max_cost_usd)
+        or ceiling > Decimal(contract.budget.reference_ceiling_usd)
     ):
         raise GcsFullMigrationError("teto de custo aprovado está fora do contrato G02")
 

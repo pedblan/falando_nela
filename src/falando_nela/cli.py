@@ -157,9 +157,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="preflight",
     )
     gcs_full.add_argument("--operation-id", required=True)
+    gcs_full.add_argument("--implementation-revision", required=True)
     gcs_full.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
     gcs_full.add_argument("--source-catalog", type=Path, required=True)
-    gcs_full.add_argument("--source-batch-plan", type=Path, required=True)
+    gcs_full.add_argument("--source-batch-plan", type=Path)
     gcs_full.add_argument("--g01-operation-root", type=Path, required=True)
     gcs_full.add_argument("--rclone-config", type=Path, required=True)
     gcs_full.add_argument("--source-remote", default="raw-source-ro")
@@ -172,6 +173,10 @@ def build_parser() -> argparse.ArgumentParser:
     gcs_full.add_argument("--approve-max-cost-usd")
     gcs_full.add_argument("--batch-max-files", type=int, default=100)
     gcs_full.add_argument("--batch-max-bytes", type=int, default=512 * 1024 * 1024)
+    gcs_full.add_argument("--restore-sample-max-bytes", type=int)
+    gcs_full.add_argument("--transfers", type=int, default=4)
+    gcs_full.add_argument("--retries", type=int, default=1)
+    gcs_full.add_argument("--low-level-retries", type=int, default=1)
     gcs_full.add_argument("--data-root", type=Path)
     gcs_full.add_argument("--repo-root", type=Path, default=Path.cwd())
     gcs_full.add_argument("--json", action="store_true", dest="as_json")
@@ -501,6 +506,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 bucket=contract.data.bucket,
                 raw_prefix=contract.data.raw_prefix,
                 access_token=access_token,
+                transfers=args.transfers,
+                retries=args.retries,
+                low_level_retries=args.low_level_retries,
             )
             object_store = GcsJsonApi(
                 project_id=contract.project_id,
@@ -518,6 +526,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 g01_operation_root=args.g01_operation_root,
                 data_root=settings.data_root,
                 operation_id=args.operation_id,
+                implementation_revision=args.implementation_revision,
                 confirmed_project_id=args.confirm_project_id,
                 confirmed_bucket=args.confirm_bucket,
                 confirmed_source_folder_id=args.confirm_source_folder_id,
@@ -526,6 +535,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 approved_max_cost_usd=args.approve_max_cost_usd,
                 batch_max_files=args.batch_max_files,
                 batch_max_bytes=args.batch_max_bytes,
+                restore_sample_max_bytes=args.restore_sample_max_bytes,
                 progress_callback=_print_progress,
             )
         except (

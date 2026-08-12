@@ -1,222 +1,133 @@
-# Requisitos operacionais — G02 migração integral e corte de armazenamento
+# Requisitos — G02 migração integral e corte do raw
 
-## Estado
+## Objetivo
 
-Contrato implementado e validado localmente em `2026-08-11`. A implementação
-não autoriza upload, alteração de infraestrutura nem corte. G02 só pode
-executar remotamente depois da conclusão integral e documentada dos gates
-G01-B, G01-C e G01-D.
+Migrar sem transformação a baseline raw aprovada do Google Drive para o bucket
+GCS da refundação, com evidência suficiente para confiar no destino e restaurar
+dados. Depois de uma decisão humana própria, o GCS passa a ser a autoridade raw
+para G03 e fases seguintes; o Drive permanece arquivo de rollback.
 
-## Acompanhamento
+## Baseline e destinos
 
-- [x] Implementar localmente G02-PRE-04, G02-BASE, G02-CLI, G02-COPY e G02-VER.
-- [x] Implementar o corte protegido de G02-GATE-03 sem executá-lo remotamente.
-- [ ] Comprovar G02-PRE-01–03 no ambiente remoto e obter G02-GATE-01.
-- [ ] Executar e comprovar G02-GATE-02–05.
+- **G02-DATA-01:** a origem é a pasta raw canônica do Drive, ID
+  `1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9`, acessada em modo somente leitura.
+- **G02-DATA-02:** a referência de G02 é o catálogo pós-limpeza com 2.887
+  objetos, 14.686.043.352 bytes e digest lógico
+  `6a8395a9fb60a999a97562b7f0c791ac766f161e01664ea549ad52bf36bb0930`.
+- **G02-DATA-03:** um inventário atual deverá confirmar essa baseline antes da
+  cópia. Diferença de locator, conteúdo ou tamanho deverá ser explicada e
+  resolvida; G02 não fará recoleta nem aceitará silenciosamente uma nova
+  baseline.
+- **G02-DATA-04:** o destino é
+  `gs://falando-nela-pedblan-data/data/raw/v1/`, no projeto explícito
+  `falando-nela-pedblan`. O locator relativo e o conteúdo serão preservados.
+- **G02-DATA-05:** os três objetos enviados em G01 contam como parte da
+  baseline e deverão ser reconhecidos como iguais, não recopiados.
+- **G02-DATA-06:** arquivos vazios já documentados na baseline são válidos; a
+  validação usará o hash conhecido do conteúdo vazio sem criar uma regra geral
+  para aceitar outros casos inesperados.
 
-## Resultado principal
+## Segurança e preservação
 
-Copiar a baseline raw canônica do Google Drive para
-`gs://falando-nela-pedblan-data/data/raw/v1/` em lotes imutáveis e retomáveis,
-reconciliar os 2.887 objetos e 14.686.043.352 bytes, demonstrar restauração e
-idempotência e, somente após aprovação humana própria, declarar o GCS como
-fonte oficial de dados raw. O Drive permanecerá intacto e disponível como
-arquivo somente leitura para rollback.
+- **G02-SAFE-01:** nenhuma etapa poderá escrever, mover ou excluir conteúdo no
+  Drive. A credencial da origem terá escopo somente leitura.
+- **G02-SAFE-02:** a cópia criará somente objetos ausentes. Objeto existente
+  diferente é conflito e nunca será substituído, apagado ou versionado para
+  “corrigir” a migração.
+- **G02-SAFE-03:** projeto, bucket, prefixo e pasta de origem serão explícitos
+  na operação; o projeto default do `gcloud` não decidirá o alvo.
+- **G02-SAFE-04:** serão usadas credenciais curtas ou identidade anexada, sem
+  chave JSON nova. Tokens, contas pessoais e configuração rclone não entrarão
+  em manifests, logs ou Git.
+- **G02-SAFE-05:** logs e relatórios registrarão locators, hashes, contagens,
+  estados e erros redigidos, sem copiar o conteúdo parlamentar integral.
 
-## Pré-condições e bloqueios
+## Execução recuperável
 
-- **G02-PRE-01:** G01 deverá ter encerrado seus três gates remotos, com plano
-  OpenTofu vazio, três sentinelas íntegros no GCS e evidência de que o projeto
-  `default` do `gcloud`, o ADC e o Drive permaneceram inalterados.
-- **G02-PRE-02:** antes de qualquer acesso remoto, o operador confirmará conta,
-  project ID `falando-nela-pedblan`, região `southamerica-east1`, bucket
-  `falando-nela-pedblan-data`, prefixo `data/raw/v1` e pasta Drive raw de ID
-  `1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9`.
-- **G02-PRE-03:** o destino inicial conterá exatamente os três objetos
-  sentinela aprovados em G01, com os mesmos tamanhos, hashes e gerações, e
-  nenhum outro objeto sob o prefixo raw.
-- **G02-PRE-04:** a implementação aceitará somente os dois objetos vazios
-  aprovados, normalizará seu SHA-256 e recusará qualquer zero adicional. Essa
-  compatibilidade deverá passar nos testes locais antes do preflight de G02.
-- **G02-PRE-05:** qualquer divergência de infraestrutura, permissões, baseline,
-  hashes, custo ou pré-condição bloqueará G02 sem reparo remoto automático.
+- **G02-OPS-01:** cada execução terá identificador e evidências persistidas que
+  permitam distinguir planejamento, progresso, verificação e corte.
+- **G02-OPS-02:** a cópia será dividida em lotes retomáveis. Quantidade,
+  tamanho, ordem e concorrência poderão ser escolhidos ou ajustados conforme os
+  arquivos, limites da ferramenta e estabilidade observada.
+- **G02-OPS-03:** a retomada consultará o estado do destino, pulará objetos já
+  íntegros e trabalhará somente nos ausentes. Resultado remoto ambíguo será
+  reconciliado antes de nova escrita.
+- **G02-OPS-04:** retries serão limitados e justificáveis. Não é necessária
+  aprovação humana por lote nem por ajuste operacional dentro dos limites
+  desta spec.
+- **G02-OPS-05:** antes da cópia integral haverá um dry-run ou prova equivalente
+  que mostre objetos iguais, ausentes, conflitantes e inesperados, junto da
+  estimativa de custo.
+- **G02-OPS-06:** a operação produzirá um relatório auditável, mas nomes de
+  arquivos e formato interno dos artefatos são escolhas da implementação.
 
-## Baseline congelada
+## Integridade e restauração
 
-| Evidência | Valor exigido |
-|---|---|
-| Catálogo histórico | `data_samples/operations/organize_drive/r03-drive-copy-batched-20260803/copy-catalog.jsonl` |
-| SHA-256 do arquivo de catálogo | `cabe9aae5071d25bdae6459b99064d2ed37110ffaed0c30b95867dd798d22319` |
-| SHA-256 lógico pós-limpeza | `6a8395a9fb60a999a97562b7f0c791ac766f161e01664ea549ad52bf36bb0930` |
-| Plano histórico de lotes | `data_samples/operations/organize_drive/r03-drive-copy-batched-20260803/copy-execution-plan.json` |
-| SHA-256 do arquivo de plano | `ef933d8cbe89ff5d1110c5e743fddfd2cb314711b31c9eed7dbb60fc1a56606b` |
-| Arquivos | 2.887 |
-| Bytes | 14.686.043.352 |
-| Metadata | 70 arquivos; 7.474.785.101 bytes |
-| Monthly text | 2.811 arquivos; 7.193.005.043 bytes |
-| Transcription queue | 6 arquivos; 18.253.208 bytes |
+- **G02-VER-01:** a verificação final exigirá o conjunto completo esperado no
+  GCS, com os mesmos locators e bytes e sem objetos inesperados sob o prefixo.
+- **G02-VER-02:** todo checksum comparável disponível deverá coincidir. Quando
+  origem e GCS não oferecerem o mesmo algoritmo, a evidência poderá combinar
+  metadados do inventário, checksum do transporte e restauração por conteúdo.
+- **G02-VER-03:** uma segunda verificação ou reexecução deverá demonstrar que o
+  estado íntegro produz zero nova escrita e preserva as gerações existentes.
+- **G02-VER-04:** será restaurada em diretório vazio uma amostra representativa
+  escolhida antes do download. Ela cobrirá categorias e casos relevantes da
+  baseline, incluindo pelo menos um arquivo grande, um pequeno e os vazios
+  conhecidos.
+- **G02-VER-05:** o tamanho exato da amostra não é contratual. Ela será grande
+  o bastante para cobrir os casos relevantes e pequena o bastante para manter
+  a validação rápida e barata; locator, bytes e hash do conteúdo deverão
+  coincidir em todos os itens selecionados.
+- **G02-VER-06:** incidentes recuperados podem ser aceitos se a causa, a ação e
+  o readback final ficarem registrados e nenhum requisito de integridade for
+  relaxado.
 
-- **G02-BASE-01:** a execução copiará apenas objetos presentes nessa baseline;
-  conteúdo surgido depois dela exigirá uma atualização temporal futura.
-- **G02-BASE-02:** o preflight reconciliará a baseline com a pasta raw do Drive
-  por locator, tamanho e hashes disponíveis, sem escrever em nenhum sistema.
-- **G02-BASE-03:** os dois objetos vazios abaixo são parte legítima da baseline:
-  `camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl`
-  e
-  `camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl`.
-  Ambos têm MD5 `d41d8cd98f00b204e9800998ecf8427e`; para a reconciliação,
-  seu SHA-256 esperado será normalizado para
-  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
-- **G02-BASE-04:** SHA-256 ausente em objeto não vazio, outro zero byte não
-  aprovado ou qualquer diferença de locator, tamanho ou MD5 bloqueará a etapa.
+## Decisões humanas e corte
 
-## Interface e artefatos recuperáveis
+- **G02-GATE-01:** uma pessoa aprovará a cópia integral após revisar origem,
+  destino, inventários, conflitos, método e estimativa. Essa é a única
+  aprovação necessária durante a transferência, salvo mudança material de
+  escopo, risco ou custo.
+- **G02-GATE-02:** presença dos dados no GCS não muda automaticamente a fonte
+  oficial. Outra aprovação humana revisará reconciliação, idempotência,
+  restauração, preservação do Drive e custo observado.
+- **G02-GATE-03:** o corte será uma ação separada e recuperável: atualizará
+  `authoritative_raw = "gcs"` e registrará no GCS uma evidência create-only
+  associada à operação aprovada.
+- **G02-GATE-04:** até a aprovação e o readback do corte, o Drive continua
+  sendo a fonte oficial. Depois do corte, permanece arquivo read-only; o
+  comportamento geral do executável só muda em G05.
 
-```text
-falando-nela gcs-migrate full \
-  --through preflight|dry-run|copy|verify|idempotency|restore \
-  --operation-id ID --gcp-config config/gcp.toml \
-  --source-catalog CAMINHO --source-batch-plan CAMINHO \
-  --g01-operation-root CAMINHO \
-  --rclone-config CAMINHO --source-remote raw-source-ro \
-  --source-folder-id 1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9 \
-  --confirm-source-folder-id 1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9 \
-  --confirm-project-id falando-nela-pedblan \
-  --confirm-bucket falando-nela-pedblan-data \
-  --operator-account CONTA \
-  [--approve-plan-sha256 SHA256 --approve-max-cost-usd 1.00] \
-  --batch-max-files 100 --batch-max-bytes 536870912
-```
+## Margem operacional
 
-- **G02-CLI-01:** cada etapa usará `RecoverableOperation`, arquivos temporários
-  e promoção atômica; mudança em configuração ou artefato ascendente invalidará
-  etapas descendentes.
-- **G02-CLI-02:** a operação persistirá sob um `operation_id` novo e não
-  reutilizará os artefatos mutáveis de G01 ou da cópia histórica R03.
-- **G02-CLI-03:** manifests registrarão apenas parâmetros não secretos,
-  digests, comandos redigidos, decisões, estados e evidências. Conta pessoal,
-  access token, ADC e conteúdo do arquivo rclone não serão serializados.
-- **G02-CLI-04:** resultado remoto ambíguo será reconciliado antes de nova
-  tentativa. A ferramenta nunca presumirá falha nem repetirá escrita às cegas.
-- **G02-CLI-05:** nenhuma etapa executará `sync`, `move`, delete, overwrite,
-  criação de bucket, alteração de IAM ou mudança do projeto `default`.
-- **G02-CLI-06:** `copy` e etapas posteriores exigirão o digest de aprovação
-  produzido pelo dry-run e um teto aprovado entre a estimativa registrada e
-  US$ 1,00. Ausência ou divergência bloqueará antes da escrita.
-- **G02-CLI-07:** inventário, restauração e manifests usarão a API JSON do GCS
-  com bucket congelado e project ID explícito no contrato do cliente; o token
-  curto existirá somente no header da requisição e nunca em argumento ou
-  artefato. Como o bucket não usa Requester Pays, a implementação não enviará
-  `userProject` nem exigirá `serviceusage.services.use` da migradora, conforme
-  o contrato oficial de
-  [Requester Pays](https://docs.cloud.google.com/storage/docs/requester-pays).
+Sem alterar esta spec, o operador pode mudar:
 
-## Dry-run, lotes e cópia
+- quantidade e tamanho dos lotes;
+- ordem de transferência e paralelismo seguro;
+- limites de retry e timeout;
+- ferramenta ou comando usados pela implementação existente;
+- formato e nomes dos artefatos auxiliares;
+- composição e tamanho da amostra de restauração.
 
-- **G02-COPY-01:** o dry-run combinado deverá produzir exatamente três
-  igualdades para os sentinelas e 2.884 criações pendentes; remoção, diferença,
-  conflito ou objeto inesperado bloqueará o upload.
-- **G02-COPY-02:** os 2.884 objetos pendentes serão divididos
-  deterministamente em 38 lotes, com máximo de 100 arquivos e alvo de
-  536.870.912 bytes. Um único arquivo maior que o alvo formará lote isolado e
-  não será fragmentado.
-- **G02-COPY-03:** os quatro lotes excepcionalmente grandes serão congelados:
+Essas escolhas devem apenas ficar registradas e preservar os requisitos de
+destino explícito, origem read-only, create-only, retomada, integridade, custo e
+auditoria. Mudança em qualquer desses invariantes exige revisão antes de seguir.
 
-| Lote | Locator | Bytes |
-|---|---|---:|
-| `batch-0008` | `data/raw/v1/camara/plenario_apartes/metadata/prod-camara-plenario-apartes-baseline.jsonl` | 2.152.427.540 |
-| `batch-0021` | `data/raw/v1/senado/ccj_notas/metadata/prod-historico-senado-ccj.jsonl` | 1.306.048.420 |
-| `batch-0022` | `data/raw/v1/senado/ccj_notas/metadata/prod-senado-ccj-baseline.jsonl` | 1.259.261.628 |
-| `batch-0023` | `data/raw/v1/senado/ccj_notas/metadata/prod-senado-ccj-complemento-ate-2024.jsonl` | 1.011.872.949 |
+## Custo e condição de parada
 
-- **G02-COPY-04:** lotes serão executados sequencialmente; dentro de um lote,
-  rclone usará `copy`, `--immutable`, `--checksum`, `--check-first`, uma
-  tentativa, uma low-level retry e no máximo quatro transferências.
-- **G02-COPY-05:** retomada recalculará o conjunto exato, ausente e conflitante;
-  copiará somente ausentes e recusará substituir um objeto existente.
-- **G02-COPY-06:** a origem será um remote com scope `drive.readonly`, por
-  padrão `raw-source-ro`, fixado pelo ID raw; o
-  destino usará credencial curta por impersonação de `fn-migrator` e project
-  number versionado, sem depender do projeto ativo do `gcloud`.
-
-## Reconciliação, restauração e idempotência
-
-- **G02-VER-01:** a reconciliação final relistará o GCS no projeto explícito e
-  exigirá exatamente 2.887 locators e 14.686.043.352 bytes, sem faltantes,
-  surpresas ou conflitos.
-- **G02-VER-02:** por objeto, o manifest final registrará locator de origem e
-  destino, bytes, MD5 e SHA-256 esperados, MD5 e CRC32C observados no GCS,
-  generation, metageneration, storage class e estado da verificação.
-- **G02-VER-03:** a validação aproveitará MD5 e CRC32C fornecidos pelo GCS e não
-  fará download integral dos 14,7 GB apenas para recalcular SHA-256. SHA-256
-  será confirmado por restauração independente da amostra, conforme o modelo
-  oficial de [validação de dados do Cloud Storage](https://docs.cloud.google.com/storage/docs/data-validation).
-- **G02-VER-04:** a amostra determinística será a união dos três sentinelas,
-  dois objetos vazios e o primeiro objeto não vazio, com até 16 MiB e SHA-256,
-  de cada par distinto `(source, dataset)`. A baseline atual resulta em 16
-  objetos únicos e 13.966.298 bytes.
-- **G02-VER-05:** a restauração ocorrerá em diretório temporário novo, fora do
-  repositório e de `data/`, preferencialmente fixando a generation; tamanho e
-  SHA-256 de todos os 16 objetos deverão coincidir.
-- **G02-VER-06:** a reexecução integral fará preflight, dry-run e reconciliação,
-  produzirá zero upload e manterá todas as generations GCS inalteradas.
-- **G02-VER-07:** antes do gate de corte, o catálogo e a evidência final serão
-  selados localmente e, com `ifGenerationMatch=0`, em
-  `manifests/migrations/g02/<operation_id>/migration-complete.json`.
-
-## Gates humanos e corte
-
-- **G02-GATE-01:** antes da cópia, uma pessoa aprovará project ID, identidade,
-  origem, destino, catálogo, contagem, bytes, 38 lotes, quatro exceções,
-  comando redigido, estimativa e limite de custo.
-- **G02-GATE-02:** conter uma cópia íntegra no GCS não muda por si só a fonte
-  oficial; uma segunda aprovação humana examinará a reconciliação, a
-  idempotência, a restauração, o custo e a integridade do Drive.
-- **G02-GATE-03:** após G02-GATE-02, um comando `gcs-migrate cutover` separado
-  atualizará a configuração versionada para `authoritative_raw = "gcs"` e
-  publicará, com a precondição `ifGenerationMatch=0`, um manifest create-only em
-  `manifests/migrations/g02/<operation_id>/cutover.json`, conforme as
-  [precondições de requisição do Cloud Storage](https://docs.cloud.google.com/storage/docs/request-preconditions).
-
-```text
-falando-nela gcs-migrate cutover \
-  --operation-root CAMINHO --gcp-config config/gcp.toml \
-  --confirm-source-folder-id 1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9 \
-  --confirm-project-id falando-nela-pedblan \
-  --confirm-bucket falando-nela-pedblan-data \
-  --operator-account CONTA \
-  --approve-migration-manifest-sha256 SHA256 \
-  --confirm-authoritative-raw gcs
-```
-- **G02-GATE-04:** o corte não habilitará ainda o executável cloud-first; essa
-  mudança operacional pertence a G05. Em G02 muda somente a autoridade dos
-  dados raw para as fases G03 e seguintes.
-- **G02-GATE-05:** o Drive não será reconfigurado, movido nem apagado. O
-  readback final apenas comprovará que o remote usado continua read-only e que
-  a pasta raw preserva a baseline.
-
-## Custo e interrupção
-
-- **Hipótese:** 14.686.043.352 bytes correspondem a aproximadamente 13,68 GiB;
-  em Standard regional, a estimativa de armazenamento é cerca de US$ 0,27/mês.
-  As 2.887 escritas Class A custam aproximadamente US$ 0,02, e a entrada de
-  dados no GCS é gratuita segundo a
-  [tabela oficial](https://cloud.google.com/storage/pricing).
-- **Amostra mínima paga:** uma tentativa por objeto ausente e uma restauração
-  de 13.966.298 bytes; a reexecução idempotente deverá produzir zero escrita.
-- **Máximo de G02:** estimativa conservadora de US$ 1,00, subordinada ao budget
-  já aprovado de US$ 5,00 e excluído consumo anterior do projeto.
-- **Parada:** falta de margem no budget, estimativa acima de US$ 1,00, operação
-  não prevista, repetição paga, checksum divergente ou resultado ambíguo não
-  reconciliável exige interrupção e nova aprovação.
+- A migração usará o budget já criado em G01; não criará infraestrutura nova.
+- O planejamento registrará uma estimativa e um teto operacional. A referência
+  inicial é até US$ 1,00 para G02 dentro do limite global de US$ 5,00.
+- Estimativa acima da referência poderá ser aceita com justificativa humana,
+  desde que não comprometa o limite global.
+- Conflito de conteúdo, risco de overwrite, destino incerto, escrita no Drive,
+  credencial persistente ou custo sem margem bloqueiam a operação.
 
 ## Fora do escopo
 
-- executar preflight, dry-run, upload, restauração ou corte no ambiente remoto
-  durante a implementação local;
-- alterar IaC, APIs, bucket, IAM, budget, service accounts ou lifecycle;
-- transformar raw em Parquet, executar Cloud Run, BigQuery ou Marimo;
-- consultar fontes parlamentares ou incorporar conteúdo posterior à baseline;
-- apagar, mover, reorganizar ou tornar gravável qualquer conteúdo do Drive;
-- excluir, sobrescrever ou versionar objetos GCS existentes;
-- tornar o executável de produção cloud-first antes de G05.
+- nova coleta, atualização temporal ou mudança de schema;
+- IaC, IAM, lifecycle ou novos recursos GCP;
+- processamento Parquet, Cloud Run, BigQuery ou Marimo;
+- remoção, reorganização ou reconfiguração do Drive;
+- limpeza de objetos GCS conflitantes;
+- corte operacional cloud-first de G05.

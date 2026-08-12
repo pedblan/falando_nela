@@ -1,101 +1,107 @@
-# Validação operacional — G02 migração integral e corte de armazenamento
+# Validação — G02 migração integral e corte do raw
 
-## Evidência documental congelada
+## Princípio
 
-- [x] Confirmar que o catálogo histórico tem 2.887 linhas e 14.686.043.352 bytes.
-- [x] Confirmar SHA-256 do arquivo de catálogo igual a `cabe9aae5071d25bdae6459b99064d2ed37110ffaed0c30b95867dd798d22319`.
-- [x] Confirmar digest lógico pós-limpeza igual a `6a8395a9fb60a999a97562b7f0c791ac766f161e01664ea549ad52bf36bb0930`.
-- [x] Confirmar SHA-256 do plano histórico igual a `ef933d8cbe89ff5d1110c5e743fddfd2cb314711b31c9eed7dbb60fc1a56606b`.
-- [x] Confirmar distribuição de 70 metadata, 2.811 monthly text e 6 transcription queue.
-- [x] Confirmar exatamente dois objetos vazios, ambos com o MD5 do conteúdo vazio.
-- [x] Confirmar 2.884 pendentes, três sentinelas e 38 lotes no plano histórico.
-- [x] Confirmar quatro lotes acima de 512 MiB, cada qual com um único objeto.
-- [x] Confirmar a amostra determinística com 16 objetos e 13.966.298 bytes.
+G02 será aceito pelas provas do resultado, não pela repetição literal de um
+roteiro. Comandos, nomes de artefatos e quantidade de lotes podem variar. Uma
+evidência automatizada pode substituir uma conferência manual equivalente se
+for legível e permanecer associada ao identificador da operação.
 
-## Validação local da implementação
+## Contrato e implementação local
 
-- [x] Confirmar que todo passo acionável deste plano usa checkbox CommonMark.
-- [x] Recusar G02 quando qualquer gate de G01 estiver incompleto.
-- [x] Recusar projeto, bucket, prefixo, source remote ou folder ID divergente.
-- [x] Recusar dependência do projeto ativo do `gcloud` em toda chamada GCP.
-- [x] Aceitar somente os dois zeros aprovados e normalizar seu SHA-256.
-- [x] Recusar SHA-256 ausente em objeto não vazio e zero inesperado.
-- [x] Produzir 38 lotes determinísticos e isolar os quatro objetos grandes.
-- [x] Testar dry-run exato, faltante, surpresa, diferença, remoção e erro.
-- [x] Testar cópia parcial, retomada, conflito e resultado remoto ambíguo.
-- [x] Testar invalidação descendente quando input ou artefato mudar.
-- [x] Testar reconciliação de bytes, MD5, CRC32C e generations.
-- [x] Testar reexecução com zero chamada mutável e generations idênticas.
-- [x] Testar seleção determinística dos 16 objetos de restauração.
-- [x] Testar `cutover` ausente, não aprovado, repetido e com manifest conflitante.
-- [x] Confirmar ausência de token, conta pessoal, ADC e config rclone em artefatos.
-- [x] Confirmar ausência de `sync`, `move`, delete, overwrite e mutação de IaC/IAM.
-- [x] Executar lock, lint, formatação, testes unitários e integração local relevante.
-- [x] Revisar diff por caches, credenciais, dados raw e mudanças fora do escopo.
+- [x] Confirmar que `plan.md`, `requirements.md` e este documento descrevem o
+  mesmo objetivo, baseline, destino e dois pontos de decisão humana.
+- [x] Confirmar que as specs não fixam quantidade de lotes, concorrência,
+  retries, formato de relatório ou tamanho exato da amostra.
+- [x] Confirmar que ajustes operacionais seguros podem ocorrer sem nova
+  aprovação a cada lote.
+- [x] Executar os testes locais de configuração, migração, retomada,
+  reconciliação, restauração e corte.
+- [x] Confirmar que testes locais e CI não dependem de GCP ou Drive reais.
+- [x] Revisar código e logs para impedir overwrite, mutação do Drive e exposição
+  de credenciais.
 
-## Readback anterior a qualquer acesso remoto
+Validação local sugerida:
 
 ```bash
-gcloud projects describe falando-nela-pedblan \
-  --project=falando-nela-pedblan
-gcloud storage buckets describe gs://falando-nela-pedblan-data \
-  --project=falando-nela-pedblan
-gcloud storage ls 'gs://falando-nela-pedblan-data/data/raw/v1/**' \
-  --project=falando-nela-pedblan
+uv run pytest \
+  tests/refundacao_gcp_first/test_gcp_config.py \
+  tests/refundacao_gcp_first/test_gcs_migration.py \
+  tests/refundacao_gcp_first/test_gcs_full_migration.py
 ```
 
-- [ ] Registrar conta ativa esperada sem persisti-la no repositório.
-- [ ] Confirmar projeto ACTIVE, billing habilitado e região `southamerica-east1`.
-- [ ] Confirmar bucket privado, Standard, PAP enforced e acesso uniforme.
-- [ ] Confirmar permissões da migradora limitadas a criar e visualizar objetos.
-- [ ] Confirmar prefixo com exatamente três sentinelas e nenhuma surpresa.
-- [ ] Registrar checksums das configurações locais do gcloud e do ADC existente.
+Comandos equivalentes do ambiente são aceitáveis; não é preciso executar a
+suíte completa se as mudanças e o risco permanecerem restritos a G02.
 
-## Gate G02-B — preflight e dry-run
+Resultado em `2026-08-11`: os 50 testes direcionados e os 317 testes da suíte
+completa passaram em ambiente local. Os testes G02 usam doubles para GCS e
+Drive, bloqueiam rede externa e não exigem credenciais ou efeitos remotos.
 
-- [ ] Confirmar source catalog e config pelos digests congelados.
-- [ ] Confirmar a origem Drive por locator, tamanho e hashes disponíveis.
-- [ ] Confirmar contagem e bytes por categoria e no total.
-- [ ] Confirmar os dois zeros e nenhuma outra exceção de integridade.
-- [ ] Confirmar 38 lotes, máximo de 100 arquivos e quatro singletons grandes.
-- [ ] Confirmar três `=`, 2.884 `+` e zero outro marcador no dry-run.
-- [ ] Confirmar comando sem segredo, uma tentativa e quatro transferências.
-- [ ] Atualizar a estimativa com a tabela vigente do Cloud Storage.
-- [ ] Obter aprovação humana registrada antes de emitir token ou copiar.
+## Evidência antes da cópia
 
-## Gate G02-C — cópia e integridade
+- [ ] Registrar identificador da operação, commit e configuração usada.
+- [ ] Confirmar projeto `falando-nela-pedblan`, bucket
+  `falando-nela-pedblan-data` e prefixo `data/raw/v1` por readback explícito.
+- [ ] Confirmar origem Drive correta e credencial somente leitura.
+- [ ] Confirmar que o inventário atual corresponde à baseline de 2.887 objetos
+  e 14.686.043.352 bytes.
+- [ ] Confirmar no destino os três sentinelas íntegros e classificar todo o
+  restante como ausente, igual, conflitante ou inesperado.
+- [ ] Resolver conflitos e surpresas sem overwrite antes de continuar.
+- [ ] Registrar plano de lotes, estimativa, teto de custo e condição de parada.
+- [ ] Registrar aprovação humana da cópia integral.
 
-- [ ] Confirmar uma tentativa por objeto ausente e execução sequencial dos lotes.
-- [ ] Confirmar artefato de progresso e reconciliação para cada lote.
-- [ ] Confirmar que toda incerteza remota foi resolvida por readback.
-- [ ] Confirmar 2.887 locators, 14.686.043.352 bytes e zero surpresa no GCS.
-- [ ] Comparar tamanho e MD5 dos 2.887 objetos.
-- [ ] Registrar CRC32C e generation de todos os objetos.
-- [ ] Confirmar SHA-256 lógico e do manifest final.
-- [ ] Publicar `migration-complete.json` com `ifGenerationMatch=0` e verificar
-  sua generation.
-- [ ] Reexecutar e comprovar zero escrita e nenhuma nova generation.
-- [ ] Restaurar 16 objetos em diretório temporário vazio e fora do repositório.
-- [ ] Comparar tamanho e SHA-256 de toda a amostra restaurada.
-- [ ] Reconciliar o Drive e comprovar que a baseline continua intacta.
-- [ ] Confirmar checksums de gcloud/ADC idênticos ao snapshot inicial.
-- [ ] Confirmar custo observado menor ou igual ao aprovado.
+**Aceite pré-cópia:** alvo e origem inequívocos, baseline reconciliada, nenhum
+conflito pendente e custo aprovado. Não se exige uma quantidade predeterminada
+de lotes ou um texto literal de comando.
 
-## Gate G02-D — corte
+## Evidência da migração
 
-- [ ] Revisar humanamente o catálogo final, restauração, idempotência e custo.
-- [ ] Registrar aprovação explícita de GCS como fonte oficial raw.
-- [ ] Confirmar novamente identidade, project ID, bucket, prefixo e operation ID.
-- [ ] Publicar `cutover.json` com `ifGenerationMatch=0`.
-- [ ] Fazer readback da generation exata do manifest de corte.
+- [ ] Demonstrar que somente objetos ausentes foram criados.
+- [ ] Manter progresso suficiente para retomar depois de ao menos uma parada
+  simulada ou real, sem recópia do que já estiver íntegro.
+- [ ] Registrar ajustes relevantes de lote, concorrência ou retry e seus motivos.
+- [ ] Confirmar ao final todos os locators e bytes esperados e zero surpresa.
+- [ ] Confirmar checksums comparáveis de todos os objetos e explicar qualquer
+  método complementar usado quando os algoritmos diferirem.
+- [ ] Demonstrar por reexecução ou verificação equivalente zero nova escrita e
+  preservação das gerações existentes.
+- [ ] Confirmar por inventário final que o Drive permaneceu inalterado.
+- [ ] Registrar custo observado e eventuais incidentes resolvidos.
+
+**Aceite da migração:** baseline completa no GCS, nenhum objeto substituído,
+retomada e idempotência demonstradas e Drive intacto.
+
+## Evidência de restauração
+
+- [ ] Registrar antes do download a amostra e a razão de sua composição.
+- [ ] Incluir categorias distintas e pelo menos um arquivo grande, um pequeno e
+  os vazios conhecidos.
+- [ ] Restaurar em diretório vazio fora do repositório e de `data/`.
+- [ ] Comparar locator, bytes e hash do conteúdo de todos os itens restaurados.
+- [ ] Excluir o diretório temporário somente depois de registrar o resultado,
+  ou preservá-lo fora do repositório até a aprovação do corte.
+
+**Aceite da restauração:** cobertura representativa e correspondência integral
+da amostra. Não há número fixo de arquivos ou bytes se os casos relevantes
+estiverem cobertos.
+
+## Evidência do corte
+
+- [ ] Consolidar inventários, checksums, idempotência, restauração, preservação
+  do Drive, incidentes e custo em uma síntese revisável.
+- [ ] Registrar aprovação humana explícita para GCS como autoridade raw.
+- [ ] Executar o corte como ação separada, ligada à operação aprovada.
 - [ ] Confirmar `authoritative_raw = "gcs"` na configuração versionada.
-- [ ] Confirmar que nenhuma configuração local ou remota do Drive foi alterada.
-- [ ] Confirmar que o executável ainda não foi antecipado para o corte G05.
+- [ ] Fazer readback da evidência create-only publicada no GCS.
+- [ ] Confirmar que o Drive continua disponível somente para leitura e rollback.
+- [ ] Confirmar que G02 não antecipou processamento, app Marimo ou o corte G05.
 
 ## Critério de conclusão
 
-G02 termina somente quando todos os objetos da baseline estão reconciliados no
-GCS, a reexecução não cria generations, a amostra é restaurada por conteúdo, o
-Drive permanece intacto, o custo está dentro do aprovado e o gate humano de
-corte está registrado. Até esse último gate, a fonte oficial continua sendo o
-Drive, mesmo que a cópia integral já exista.
+G02 termina quando a baseline estiver integralmente reconciliada no GCS, a
+retomada e a ausência de nova escrita forem demonstradas, uma amostra
+representativa for restaurada por conteúdo, o Drive permanecer intacto, o
+custo estiver aprovado e o corte para `authoritative_raw = "gcs"` tiver
+aprovação e readback. Até o último passo, o Drive continua sendo a fonte
+oficial, mesmo que a cópia já esteja completa.

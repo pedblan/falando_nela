@@ -22,13 +22,6 @@ EXPECTED_EMPTY_SOURCE_LOCATORS = (
     "camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl",
     "camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl",
 )
-EXPECTED_BATCH_COUNT = 38
-EXPECTED_BATCH_MAX_FILES = 100
-EXPECTED_BATCH_MAX_BYTES = 512 * 1024 * 1024
-EXPECTED_OVERSIZED_BATCH_COUNT = 4
-EXPECTED_RESTORE_SAMPLE_MAX_OBJECT_BYTES = 16 * 1024 * 1024
-EXPECTED_RESTORE_SAMPLE_FILES = 16
-EXPECTED_RESTORE_SAMPLE_BYTES = 13_966_298
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 MD5_PATTERN = re.compile(r"[0-9a-f]{32}")
 
@@ -179,35 +172,6 @@ class GcpContract(StrictModel):
                 self.migration.approved_empty_source_locators,
                 EXPECTED_EMPTY_SOURCE_LOCATORS,
             ),
-            "migration.batch_count": (
-                self.migration.batch_count,
-                EXPECTED_BATCH_COUNT,
-            ),
-            "migration.batch_max_files": (
-                self.migration.batch_max_files,
-                EXPECTED_BATCH_MAX_FILES,
-            ),
-            "migration.batch_max_bytes": (
-                self.migration.batch_max_bytes,
-                EXPECTED_BATCH_MAX_BYTES,
-            ),
-            "migration.oversized_batch_count": (
-                self.migration.oversized_batch_count,
-                EXPECTED_OVERSIZED_BATCH_COUNT,
-            ),
-            "migration.restore_sample_max_object_bytes": (
-                self.migration.restore_sample_max_object_bytes,
-                EXPECTED_RESTORE_SAMPLE_MAX_OBJECT_BYTES,
-            ),
-            "migration.restore_sample_files": (
-                self.migration.restore_sample_files,
-                EXPECTED_RESTORE_SAMPLE_FILES,
-            ),
-            "migration.restore_sample_bytes": (
-                self.migration.restore_sample_bytes,
-                EXPECTED_RESTORE_SAMPLE_BYTES,
-            ),
-            "migration.max_cost_usd": (self.migration.max_cost_usd, 1),
             "migrator.service_account_id": (
                 self.migrator.service_account_id,
                 "fn-migrator",

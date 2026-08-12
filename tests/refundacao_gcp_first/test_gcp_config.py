@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -105,7 +106,7 @@ def test_gcs_cli_has_safe_defaults_and_explicit_target_arguments() -> None:
     assert args.operator_account == "operator@example.invalid"
 
 
-def test_g02_contract_freezes_batches_restore_and_pre_cutover_authority() -> None:
+def test_g02_contract_keeps_current_defaults_and_pre_cutover_authority() -> None:
     contract = load_gcp_contract(CONFIG_PATH)
 
     assert contract.schema_version == 4
@@ -122,6 +123,30 @@ def test_g02_contract_freezes_batches_restore_and_pre_cutover_authority() -> Non
     assert len(contract.migration.approved_empty_source_locators) == 2
 
 
+def test_g02_contract_accepts_safe_operational_adjustments(tmp_path: Path) -> None:
+    candidate = tmp_path / "gcp.toml"
+    content = CONFIG_PATH.read_text(encoding="utf-8")
+    replacements = {
+        "batch_count = 38": "batch_count = 57",
+        "batch_max_files = 100": "batch_max_files = 50",
+        "batch_max_bytes = 536870912": "batch_max_bytes = 268435456",
+        "oversized_batch_count = 4": "oversized_batch_count = 7",
+        "restore_sample_max_object_bytes = 16777216": ("restore_sample_max_object_bytes = 8388608"),
+        "restore_sample_files = 16": "restore_sample_files = 18",
+        "restore_sample_bytes = 13966298": "restore_sample_bytes = 15000000",
+        "max_cost_usd = 1": "max_cost_usd = 2",
+    }
+    for old, new in replacements.items():
+        content = content.replace(old, new)
+    candidate.write_text(content, encoding="utf-8")
+
+    contract = load_gcp_contract(candidate)
+
+    assert contract.migration.batch_max_files == 50
+    assert contract.migration.restore_sample_max_object_bytes == 8 * 1024 * 1024
+    assert contract.migration.max_cost_usd == 2
+
+
 def test_full_and_cutover_cli_require_explicit_targets_and_approvals() -> None:
     full = build_parser().parse_args(
         [
@@ -129,6 +154,8 @@ def test_full_and_cutover_cli_require_explicit_targets_and_approvals() -> None:
             "full",
             "--operation-id",
             "g02-test",
+            "--implementation-revision",
+            "test-revision",
             "--source-catalog",
             "catalog.jsonl",
             "--source-batch-plan",
@@ -176,6 +203,69 @@ def test_full_and_cutover_cli_require_explicit_targets_and_approvals() -> None:
     assert full.approve_plan_sha256 is None
     assert cutover.confirm_authoritative_raw == "gcs"
     assert cutover.approve_migration_manifest_sha256 == "a" * 64
+
+
+def test_full_cli_allows_plan_and_runtime_tuning_without_frozen_batch_file() -> None:
+    full = build_parser().parse_args(
+        [
+            "gcs-migrate",
+            "full",
+            "--operation-id",
+            "g02-flex",
+            "--implementation-revision",
+            "test-revision",
+            "--source-catalog",
+            "catalog.jsonl",
+            "--g01-operation-root",
+            "g01",
+            "--rclone-config",
+            "rclone.conf",
+            "--source-folder-id",
+            "raw",
+            "--confirm-source-folder-id",
+            "raw",
+            "--confirm-project-id",
+            "falando-nela-pedblan",
+            "--confirm-bucket",
+            "falando-nela-pedblan-data",
+            "--operator-account",
+            "operator@example.invalid",
+            "--batch-max-files",
+            "50",
+            "--batch-max-bytes",
+            "268435456",
+            "--restore-sample-max-bytes",
+            "8388608",
+            "--transfers",
+            "8",
+            "--retries",
+            "2",
+            "--low-level-retries",
+            "3",
+        ]
+    )
+
+    assert full.source_batch_plan is None
+    assert full.batch_max_files == 50
+    assert full.restore_sample_max_bytes == 8 * 1024 * 1024
+    assert (full.transfers, full.retries, full.low_level_retries) == (8, 2, 3)
+
+
+def test_full_cli_wires_revision_only_to_integral_migration() -> None:
+    tree = ast.parse((REPO_ROOT / "src/falando_nela/cli.py").read_text(encoding="utf-8"))
+
+    def keywords(function_name: str) -> set[str]:
+        call = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == function_name
+        )
+        return {item.arg for item in call.keywords if item.arg is not None}
+
+    assert "implementation_revision" in keywords("execute_gcs_full")
+    assert "implementation_revision" not in keywords("execute_gcs_sentinel")
 
 
 def test_iac_never_uses_gcloud_default_or_implicit_project() -> None:

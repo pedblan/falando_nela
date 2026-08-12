@@ -1,68 +1,103 @@
-# Plano operacional — G02 migração integral e corte de armazenamento
+# Plano operacional — G02 migração integral e corte do raw
 
-## G02-A — contrato e preparação local
+## Estado
 
-- [x] Criar branch própria a partir do commit local de G01.
-- [x] Congelar catálogo, digests, contagem, bytes e distribuição da baseline.
-- [x] Registrar os dois objetos vazios e sua normalização de SHA-256.
-- [x] Congelar 38 lotes, limites e quatro exceções de objeto grande.
-- [x] Definir gates, custo, amostra de restauração e política de parada.
-- [x] Corrigir a incompatibilidade de zero byte antes de habilitar o pipeline full.
-- [ ] Confirmar conclusão documentada de G01-B, G01-C e G01-D.
-- [x] Implementar `gcs-migrate full` e `gcs-migrate cutover`.
-- [x] Cobrir preflight, lotes, retomada, reconciliação, restauração e corte.
-- [x] Executar validações locais sem acesso remoto ou credencial.
+Spec pronta para execução. G01 está concluído, e a implementação local de
+migração já existe. Nenhum item deste documento autoriza por si só upload ou
+corte remoto: G02 conserva apenas duas decisões humanas obrigatórias, uma antes
+da cópia integral e outra antes da mudança de autoridade para o GCS.
 
-**Gate G02-A:** contrato aprovado, G01 integralmente concluído, implementação
-local validada e nenhum efeito remoto novo produzido por G02.
+## Resultado
 
-## G02-B — preflight e dry-run integral
+Copiar a baseline raw canônica do Drive para
+`gs://falando-nela-pedblan-data/data/raw/v1/`, provar que a cópia é íntegra,
+retomável e restaurável e, com aprovação explícita, tornar o GCS a fonte
+oficial desse raw. O Drive permanece intacto como arquivo de rollback.
 
-- [ ] Criar um `operation_id` novo e registrar os inputs por digest.
-- [ ] Fazer readback explícito de conta, projeto, região, bucket e prefixo.
-- [ ] Confirmar que o destino contém exatamente os três sentinelas de G01.
-- [ ] Reconciliar o Drive com 2.887 objetos e 14.686.043.352 bytes.
-- [ ] Confirmar os dois zeros aprovados e recusar qualquer caso adicional.
-- [ ] Gerar deterministicamente 38 lotes para os 2.884 objetos pendentes.
-- [ ] Confirmar os quatro objetos grandes em lotes isolados.
-- [ ] Executar dry-run combinado com três `=` e 2.884 `+`.
-- [ ] Confirmar zero marcador de remoção, diferença, erro ou surpresa.
-- [ ] Registrar comando redigido e estimativa atualizada menor ou igual a US$ 1,00.
-- [ ] Obter aprovação humana de identidade, baseline, lotes, comando e custo.
+## Como usar este plano
 
-**Gate G02-B:** origem e destino congelados, dry-run exato, aprovação humana
-registrada e nenhuma escrita de dados executada.
+- Os checkboxes acompanham resultados observáveis, não uma sequência rígida de
+  comandos.
+- Tamanho e quantidade de lotes, concorrência, retries, formato dos relatórios
+  e tamanho exato da amostra podem ser ajustados durante a operação.
+- Ajustes operacionais não exigem reescrever a spec quando preservam os
+  requisitos, ficam registrados no relatório e não elevam materialmente risco
+  ou custo.
+- Divergência de conteúdo, possibilidade de sobrescrita, mudança de projeto ou
+  origem, custo fora do orçamento ou necessidade de escrever no Drive exigem
+  interrupção e nova decisão.
 
-## G02-C — cópia recuperável e reconciliação
+## G02-A — preparar e autorizar a cópia
 
-- [ ] Gerar token curto por impersonação de `fn-migrator` sem persistência.
-- [ ] Executar sequencialmente os 38 lotes, uma tentativa por objeto ausente.
-- [ ] Após cada lote, reconciliar estados exato, ausente e conflitante.
-- [ ] Resolver resultado ambíguo por readback antes de qualquer retomada.
-- [ ] Relistar o prefixo no projeto explícito após o último lote.
-- [ ] Confirmar 2.887 objetos, 14.686.043.352 bytes e zero surpresa.
-- [ ] Comparar locator, tamanho e MD5 de todos os objetos.
-- [ ] Registrar CRC32C, generation, metageneration e storage class do GCS.
-- [ ] Selar o catálogo e o manifest final por SHA-256, local e remotamente.
-- [ ] Reexecutar a operação e comprovar zero upload e generations idênticas.
-- [ ] Restaurar a amostra de 16 objetos e 13.966.298 bytes em diretório novo.
-- [ ] Comparar tamanho e SHA-256 dos 16 objetos restaurados.
-- [ ] Reconciliar novamente o Drive e confirmar a baseline intacta.
-- [ ] Registrar custo observado, erros, retomadas e recursos persistentes.
+- [x] Confirmar a conclusão de G01 e a presença dos três sentinelas no GCS.
+- [x] Manter implementação e testes locais da migração e do corte.
+- [x] Definir requisitos e validação proporcionais ao risco de G02.
+- [ ] Abrir uma operação recuperável com identificador próprio.
+- [ ] Fazer readback do projeto, bucket, prefixo, identidade e origem Drive.
+- [ ] Inventariar a origem em modo somente leitura e comparar com a baseline.
+- [ ] Inventariar o destino e classificar objetos iguais, ausentes e conflitantes.
+- [ ] Produzir um plano de cópia em lotes adequados aos arquivos e ao ambiente.
+- [ ] Registrar estimativa de custo, comando ou procedimento e condição de parada.
+- [ ] Obter aprovação humana para a cópia integral.
 
-**Gate G02-C:** cópia integral, idempotente e restaurável no GCS; Drive
-inalterado; GCS ainda não declarado fonte oficial.
+**Decisão 1:** autorizar a cópia quando origem e destino estiverem identificados,
+não houver conflito ou surpresa sem explicação e o custo couber no orçamento.
 
-## G02-D — aprovação e corte da autoridade raw
+## G02-B — copiar e retomar
 
-- [ ] Apresentar reconciliação, generations, restauração e custo para revisão.
-- [ ] Obter aprovação humana explícita para tornar GCS a fonte oficial raw.
-- [ ] Executar separadamente `gcs-migrate cutover` com confirmações literais.
-- [ ] Atualizar a configuração versionada para `authoritative_raw = "gcs"`.
-- [ ] Publicar `cutover.json` com precondição create-only e verificar readback.
-- [ ] Confirmar o remote Drive read-only e a baseline remota inalterados.
-- [ ] Registrar o Drive como arquivo de rollback, sem alterar sua configuração.
-- [ ] Revisar diff, manifests e documentação, excluindo segredos e dados raw.
+- [ ] Copiar somente objetos ausentes, sem transformar paths ou conteúdo.
+- [ ] Registrar progresso suficiente para retomar sem repetir lotes já íntegros.
+- [ ] Em falha ou resultado ambíguo, consultar o destino e continuar do estado
+  observado.
+- [ ] Ajustar lotes, concorrência ou retries quando necessário, sem nova
+  aprovação, desde que os requisitos e o limite de custo continuem atendidos.
+- [ ] Encerrar a cópia com todos os objetos esperados presentes e nenhum
+  conflito, overwrite ou mutação do Drive.
 
-**Gate G02-D:** GCS é a fonte oficial da baseline raw para G03 e fases
-seguintes; Drive permanece arquivo read-only e o executável só muda em G05.
+## G02-C — provar integridade e restauração
+
+- [ ] Reconciliar inventários completos de origem e destino por locator e bytes.
+- [ ] Comparar checksums disponíveis e investigar toda divergência.
+- [ ] Demonstrar idempotência por nova verificação ou reexecução sem escrita.
+- [ ] Restaurar em diretório vazio uma amostra representativa, incluindo casos
+  pequenos, grandes, vazios e categorias distintas da baseline.
+- [ ] Comparar tamanho e hash do conteúdo restaurado com a origem esperada.
+- [ ] Confirmar novamente que o Drive e as configurações locais permaneceram
+  inalterados.
+- [ ] Consolidar evidências, incidentes resolvidos e custo observado em um
+  relatório curto de conclusão da migração.
+
+## G02-D — aprovar e executar o corte
+
+- [ ] Apresentar o relatório de integridade, restauração, idempotência e custo.
+- [ ] Obter aprovação humana explícita para tornar o GCS a autoridade raw.
+- [ ] Executar o corte separadamente da cópia e registrar sua proveniência.
+- [ ] Atualizar `authoritative_raw = "gcs"` na configuração versionada.
+- [ ] Publicar e reler uma evidência de corte no GCS sem substituir artefato
+  existente.
+- [ ] Confirmar que o Drive segue disponível somente para leitura e rollback.
+- [ ] Revisar o diff e encerrar G02 sem antecipar processamento, Marimo ou G05.
+
+**Decisão 2:** autorizar o corte somente depois das provas de integridade e
+restauração. A aprovação vale para o corte desta baseline e não para mudanças
+posteriores no corpus.
+
+## Limites de esforço e custo
+
+- A operação deve permanecer dentro do budget da refundação, hoje com
+  referência conservadora total de US$ 5,00.
+- A expectativa de G02 é inferior a US$ 1,00; ultrapassar essa expectativa
+  exige apenas uma justificativa antes de continuar, desde que o budget total
+  permaneça protegido.
+- Não repetir uma operação paga sem primeiro reconciliar o estado remoto.
+- Três falhas equivalentes sem hipótese nova encerram a tentativa para
+  diagnóstico; não impedem retomar G02 depois da correção.
+
+## Fora do escopo
+
+- alterar IaC, IAM, buckets, APIs ou o budget de G01;
+- transformar raw em Parquet ou executar Cloud Run e Marimo;
+- consultar fontes parlamentares ou incorporar atualização temporal;
+- mover, apagar, reorganizar ou tornar gravável o Drive;
+- excluir ou substituir objetos existentes no GCS;
+- mudar o executável inteiro para cloud-first antes de G05.

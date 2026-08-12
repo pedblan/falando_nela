@@ -360,6 +360,10 @@ def _run_full(
     through: str,
     approved_plan_sha256: str | None = None,
     approved_max_cost_usd: str | None = None,
+    batch_max_files: int | None = None,
+    batch_max_bytes: int | None = None,
+    restore_sample_max_bytes: int | None = None,
+    include_historical_batch_plan: bool = True,
 ) -> dict[str, Any]:
     contract, catalog, batches, g01_root, data_root, _entries, source, transport = fixture
     return execute_gcs_full(
@@ -367,18 +371,20 @@ def _run_full(
         transport=transport,
         contract=contract,
         source_catalog_path=catalog,
-        source_batch_plan_path=batches,
+        source_batch_plan_path=batches if include_historical_batch_plan else None,
         g01_operation_root=g01_root,
         data_root=data_root,
         operation_id=operation_id,
+        implementation_revision="test-revision",
         confirmed_project_id=contract.project_id,
         confirmed_bucket=contract.data.bucket,
         confirmed_source_folder_id=RAW_FOLDER_ID,
         through=through,
         approved_plan_sha256=approved_plan_sha256,
         approved_max_cost_usd=approved_max_cost_usd,
-        batch_max_files=contract.migration.batch_max_files,
-        batch_max_bytes=contract.migration.batch_max_bytes,
+        batch_max_files=batch_max_files or contract.migration.batch_max_files,
+        batch_max_bytes=batch_max_bytes or contract.migration.batch_max_bytes,
+        restore_sample_max_bytes=restore_sample_max_bytes,
     )
 
 
@@ -412,11 +418,16 @@ def test_full_pipeline_copies_verifies_restores_and_seals(tmp_path: Path) -> Non
     )
     assert restore["files"] == contract.migration.restore_sample_files
     assert restore["bytes"] == contract.migration.restore_sample_bytes
+    assert "largest_within_limit" in restore["selection"]["strategy"]
     assert restore["temporary_directory_removed"] is True
     migration_complete = Path(payload["artifact_path"])
     assert migration_complete.is_file()
     remote_locator = "manifests/migrations/g02/g02-ok/migration-complete.json"
     assert transport.remote_bytes[remote_locator] == migration_complete.read_bytes()
+    completion = json.loads(migration_complete.read_text(encoding="utf-8"))
+    assert completion["approval"]["plan_sha256"] == dry_run["approval_sha256"]
+    assert completion["approval"]["max_cost_usd"] == "1.00"
+    assert completion["operational_parameters"]["batches"] >= 1
     manifest_text = Path(payload["manifest_path"]).read_text(encoding="utf-8")
     assert TOKEN not in manifest_text
     assert "operator@example.invalid" not in manifest_text
@@ -455,6 +466,44 @@ def test_copy_requires_exact_human_approval_and_cost_ceiling(tmp_path: Path) -> 
             approved_max_cost_usd="NaN",
         )
     assert all(dry_run for dry_run, _locators in fixture[-1].copy_calls)
+
+
+def test_pipeline_accepts_adjusted_batches_restore_limit_and_cost_ceiling(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    options = {
+        "batch_max_files": 1,
+        "batch_max_bytes": 50,
+        "restore_sample_max_bytes": 50,
+        "include_historical_batch_plan": False,
+    }
+    dry = _run_full(
+        fixture,
+        operation_id="flexible",
+        through="dry-run",
+        **options,
+    )
+    operation_root = Path(dry["artifact_path"]).parent
+    approval = json.loads(Path(dry["artifact_path"]).read_text(encoding="utf-8"))["approval_sha256"]
+
+    result = _run_full(
+        fixture,
+        operation_id="flexible",
+        through="restore",
+        approved_plan_sha256=approval,
+        approved_max_cost_usd="2.00",
+        **options,
+    )
+
+    execution_plan = json.loads(
+        (operation_root / "copy-execution-plan.json").read_text(encoding="utf-8")
+    )
+    restore = json.loads((operation_root / "restore.json").read_text(encoding="utf-8"))
+    assert result["status"] == "completed"
+    assert len(execution_plan["batches"]) == 3
+    assert restore["files"] >= 5
+    assert restore["bytes"] <= sum(item.size_bytes for item in fixture[5])
 
 
 def test_preflight_blocks_incomplete_g01_and_unexpected_destination(tmp_path: Path) -> None:
@@ -770,7 +819,7 @@ def test_gcs_json_api_declares_project_and_create_only_precondition() -> None:
     assert TOKEN not in json.dumps(api.descriptor())
 
 
-def test_real_catalog_normalizes_zeros_and_reproduces_frozen_plan() -> None:
+def test_real_catalog_normalizes_zeros_and_defaults_reproduce_historical_plan() -> None:
     if not CATALOG_PATH.exists() or not BATCH_PLAN_PATH.exists():
         pytest.skip("evidência operacional ignorada pelo Git não está presente")
     contract = load_gcp_contract(CONFIG_PATH)
@@ -795,5 +844,12 @@ def test_real_catalog_normalizes_zeros_and_reproduces_frozen_plan() -> None:
     assert all(item.provider_hashes == {"md5": EMPTY_MD5, "sha256": EMPTY_SHA256} for item in zeros)
     assert plan["batches"] == frozen["batches"]
     assert len(plan["batches"]) == 38
-    assert len(sample) == 16
-    assert sum(item.size_bytes for item in sample) == 13_966_298
+    selected = {item.source_locator for item in sample}
+    required = {
+        *(item.source_locator for item in sentinel),
+        *contract.migration.approved_empty_source_locators,
+    }
+    assert required <= selected
+    assert max(item.size_bytes for item in sample) <= (
+        contract.migration.restore_sample_max_object_bytes
+    )

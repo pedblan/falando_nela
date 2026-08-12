@@ -453,6 +453,9 @@ def test_rclone_receives_token_only_in_environment_and_cannot_mutate_bucket(
         bucket="falando-nela-pedblan-data",
         raw_prefix="data/raw/v1",
         access_token=lambda: TOKEN,
+        transfers=8,
+        retries=2,
+        low_level_retries=3,
         executable="rclone",
     )
     files_from = tmp_path / "files.bin"
@@ -476,6 +479,9 @@ def test_rclone_receives_token_only_in_environment_and_cannot_mutate_bucket(
     assert "gcstarget:falando-nela-pedblan-data/data/raw/v1" in command
     assert f"raw-source-ro,root_folder_id={RAW_FOLDER_ID}:v1" in command
     assert {"--immutable", "--checksum", "--check-first", "--dry-run"} <= set(command)
+    assert command[command.index("--transfers") + 1] == "8"
+    assert command[command.index("--retries") + 1] == "2"
+    assert command[command.index("--low-level-retries") + 1] == "3"
     assert not {"sync", "move", "delete", "purge", "mkdir"} & set(command)
     assert TOKEN not in json.dumps(transport.descriptor())
 
