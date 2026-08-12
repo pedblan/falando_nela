@@ -38,7 +38,7 @@ resultado: o caminho cloud-first reproduzível integrado em `main`.
 - [x] Executar testes direcionados de defaults, divergências de alvo e fixture sem credenciais.
 - [x] Revisar o diff por escopo, segredos, state, caches e artefatos acidentais.
 - [x] Commitar o candidato e criar clone limpo local a partir do commit exato.
-- [ ] Executar instalação, Ruff, pytest, doctor, Marimo e OpenTofu no clone limpo.
+- [x] Executar instalação, Ruff, pytest, doctor, Marimo e OpenTofu no clone limpo.
 - [ ] Apresentar evidências e obter o gate humano único para integrar e publicar `main`.
 - [ ] Integrar o candidato aprovado em `main` sem reescrever histórico e publicar no GitHub.
 - [ ] Verificar igualdade entre `main` e `origin/main` e fechar os checklists das specs.
@@ -47,11 +47,19 @@ resultado: o caminho cloud-first reproduzível integrado em `main`.
 até que o critério literal seja cumprido. Checkboxes não autorizam push, merge
 ou qualquer efeito remoto.
 
-Evidência de P10 em `2026-08-12`: o candidato foi consolidado em um commit da
-branch dedicada e clonado localmente a partir do SHA-1 exato; o SHA-1 e o
-caminho efêmero do clone são registrados no handoff da tarefa. P10 previa
+Evidência de P10 em `2026-08-12`: o candidato inicial `45ac289` foi consolidado
+na branch dedicada e clonado localmente a partir do SHA-1 exato. A validação
+P11 encontrou somente divergência mecânica de formato e produziu o sucessor
+`ebfde7a`, que foi novamente clonado antes da repetição integral. P10 previa
 GPT-5.6-Codex em esforço alto e foi executada com GPT-5 em esforço alto, a
 alternativa disponível mais próxima, sem impacto material na operação Git.
+
+Evidência de P11 em `2026-08-12`: o candidato `ebfde7a6ea4be20d6a4ecbdafa5b1df599f08ab9`
+foi instalado e validado no clone limpo
+`/tmp/falando-nela-g05-p11.ZA7Y4k/repo`. P11 previa GPT-5.6-Codex em esforço
+alto e foi executada com GPT-5 em esforço alto, a alternativa disponível mais
+próxima. A única falha da primeira passagem foi formatação mecânica; a correção
+isolada originou esse novo candidato antes da repetição integral dos checks.
 
 ## Sequência de execução
 

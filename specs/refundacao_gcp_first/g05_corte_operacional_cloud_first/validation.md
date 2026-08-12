@@ -57,15 +57,27 @@ diff, segredos, estado e artefatos. Não houve achados bloqueantes.
 ## Clone limpo
 
 - [x] Criar clone local limpo a partir do commit candidato e registrar o SHA-1 do commit.
-- [ ] Executar instalação congelada, Ruff, formatação e suíte completa.
-- [ ] Executar `falando-nela doctor --json` sem erro.
-- [ ] Executar `marimo check` e o teste do caderno com fixture sem ADC.
-- [ ] Executar `tofu fmt -check`, `init -backend=false`, `validate` e `test` sem apply.
-- [ ] Confirmar que nenhum teste acessou GCP, Drive ou fonte parlamentar.
+- [x] Executar instalação congelada, Ruff, formatação e suíte completa.
+- [x] Executar `falando-nela doctor --json` sem erro.
+- [x] Executar `marimo check` e o teste do caderno com fixture sem ADC.
+- [x] Executar `tofu fmt -check`, `init -backend=false`, `validate` e `test` sem apply.
+- [x] Confirmar que nenhum teste acessou GCP, Drive ou fonte parlamentar.
 
-Evidência de P10 em `2026-08-12`: o clone local foi criado sem rede a partir do
-commit candidato exato. O SHA-1 e o caminho efêmero são registrados no handoff;
-as verificações dentro do clone permanecem pendentes para P11.
+Evidência de P10 em `2026-08-12`: o clone local inicial foi criado sem rede a
+partir do candidato `45ac289`; após a correção mecânica encontrada em P11, o
+sucessor `ebfde7a` foi clonado em `/tmp/falando-nela-g05-p11.ZA7Y4k/repo`.
+
+Evidência de P11 em `2026-08-12`: o clone limpo do candidato
+`ebfde7a6ea4be20d6a4ecbdafa5b1df599f08ab9` resolveu 105 dependências e
+instalou 104 pacotes pelo lockfile. Ruff passou; 88 arquivos estavam formatados;
+a suíte terminou com 346 testes aprovados e dois pulados. `doctor --json`
+retornou `status=ok` com `data_samples/` absoluto e não criou a raiz ausente.
+`marimo check` passou, seguido por dez testes do G04 com ADC removido e sockets
+bloqueados. OpenTofu 1.12.5 passou em `fmt`, `init -backend=false`, `validate` e
+três testes com provider Google simulado, sem `apply` ou chamada à API GCP.
+Nenhum teste acessou GCP, Drive ou fonte parlamentar. P11 previa GPT-5.6-Codex
+em esforço alto e foi executada com GPT-5 em esforço alto, a alternativa
+disponível mais próxima, sem impacto material na cobertura.
 
 ## Revisão e integração
 
@@ -114,7 +126,7 @@ uv sync --locked --all-groups
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest -q
-uv run falando-nela doctor --json
+FALANDO_NELA_DATA_ROOT="$PWD/data_samples" uv run falando-nela doctor --json
 uv run --locked --group cloud --group notebooks \
   marimo check notebooks/primeiro_recorte_discursos.py
 tofu -chdir=infra/gcp fmt -check -recursive

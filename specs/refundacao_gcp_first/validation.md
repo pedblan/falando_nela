@@ -135,7 +135,7 @@ registros, filtros reativos e plano OpenTofu posterior sem drift.
 ## G05 — regressão e corte
 
 - [x] Criar requirements, plano e validação próprios para G05.
-- [ ] Executar lockfile, Ruff, formatação e suíte completa em clone limpo.
+- [x] Executar lockfile, Ruff, formatação e suíte completa em clone limpo.
 - [x] Executar testes e caderno com fixtures sem ADC ou rede.
 - [x] Confirmar que produção recusa projeto, região ou bucket divergentes.
 - [x] Confirmar documentação de deploy, execução, custo e rollback.
