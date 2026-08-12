@@ -20,6 +20,13 @@ from falando_nela.drive_organizer import (
     reconcile_drive_inventory,
 )
 from falando_nela.gcp_config import GcpConfigError, load_gcp_contract
+from falando_nela.gcs_full_migration import (
+    GcsFullMigrationError,
+    GcsJsonApi,
+    RcloneG02Transport,
+    execute_gcs_cutover,
+    execute_gcs_full,
+)
 from falando_nela.gcs_migration import (
     GcloudImpersonatedTokenProvider,
     GcsMigrationError,
@@ -143,6 +150,43 @@ def build_parser() -> argparse.ArgumentParser:
     gcs_sentinel.add_argument("--data-root", type=Path)
     gcs_sentinel.add_argument("--repo-root", type=Path, default=Path.cwd())
     gcs_sentinel.add_argument("--json", action="store_true", dest="as_json")
+    gcs_full = gcs_commands.add_parser("full", help="executa a migração integral recuperável G02")
+    gcs_full.add_argument(
+        "--through",
+        choices=("preflight", "dry-run", "copy", "verify", "idempotency", "restore"),
+        default="preflight",
+    )
+    gcs_full.add_argument("--operation-id", required=True)
+    gcs_full.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    gcs_full.add_argument("--source-catalog", type=Path, required=True)
+    gcs_full.add_argument("--source-batch-plan", type=Path, required=True)
+    gcs_full.add_argument("--g01-operation-root", type=Path, required=True)
+    gcs_full.add_argument("--rclone-config", type=Path, required=True)
+    gcs_full.add_argument("--source-remote", default="raw-source-ro")
+    gcs_full.add_argument("--source-folder-id", required=True)
+    gcs_full.add_argument("--confirm-source-folder-id", required=True)
+    gcs_full.add_argument("--confirm-project-id", required=True)
+    gcs_full.add_argument("--confirm-bucket", required=True)
+    gcs_full.add_argument("--operator-account", required=True)
+    gcs_full.add_argument("--approve-plan-sha256")
+    gcs_full.add_argument("--approve-max-cost-usd")
+    gcs_full.add_argument("--batch-max-files", type=int, default=100)
+    gcs_full.add_argument("--batch-max-bytes", type=int, default=512 * 1024 * 1024)
+    gcs_full.add_argument("--data-root", type=Path)
+    gcs_full.add_argument("--repo-root", type=Path, default=Path.cwd())
+    gcs_full.add_argument("--json", action="store_true", dest="as_json")
+    gcs_cutover = gcs_commands.add_parser(
+        "cutover", help="declara GCS como autoridade raw após aprovação G02"
+    )
+    gcs_cutover.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    gcs_cutover.add_argument("--operation-root", type=Path, required=True)
+    gcs_cutover.add_argument("--confirm-source-folder-id", required=True)
+    gcs_cutover.add_argument("--confirm-project-id", required=True)
+    gcs_cutover.add_argument("--confirm-bucket", required=True)
+    gcs_cutover.add_argument("--operator-account", required=True)
+    gcs_cutover.add_argument("--approve-migration-manifest-sha256", required=True)
+    gcs_cutover.add_argument("--confirm-authoritative-raw", required=True)
+    gcs_cutover.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -425,6 +469,116 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_human_gcs_sentinel(payload)
         return 0
+    if args.command == "gcs-migrate" and args.gcs_command == "full":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            contract = load_gcp_contract(args.gcp_config)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            access_token = GcloudImpersonatedTokenProvider(
+                project_id=contract.project_id,
+                service_account=contract.migrator_email,
+                operator_account=args.operator_account,
+            )
+            copy_transport = RcloneGcsTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                project_id=contract.project_id,
+                project_number=contract.project_number,
+                region=contract.region,
+                bucket=contract.data.bucket,
+                raw_prefix=contract.data.raw_prefix,
+                access_token=access_token,
+            )
+            object_store = GcsJsonApi(
+                project_id=contract.project_id,
+                bucket=contract.data.bucket,
+                access_token=access_token,
+            )
+            payload = execute_gcs_full(
+                source=source,
+                transport=RcloneG02Transport(
+                    copy_transport=copy_transport, object_store=object_store
+                ),
+                contract=contract,
+                source_catalog_path=args.source_catalog,
+                source_batch_plan_path=args.source_batch_plan,
+                g01_operation_root=args.g01_operation_root,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                confirmed_project_id=args.confirm_project_id,
+                confirmed_bucket=args.confirm_bucket,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                through=args.through,
+                approved_plan_sha256=args.approve_plan_sha256,
+                approved_max_cost_usd=args.approve_max_cost_usd,
+                batch_max_files=args.batch_max_files,
+                batch_max_bytes=args.batch_max_bytes,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            GcpConfigError,
+            GcsMigrationError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha na migração integral GCS: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_gcs_full(payload)
+        return 0
+    if args.command == "gcs-migrate" and args.gcs_command == "cutover":
+        try:
+            contract = load_gcp_contract(args.gcp_config)
+            access_token = GcloudImpersonatedTokenProvider(
+                project_id=contract.project_id,
+                service_account=contract.migrator_email,
+                operator_account=args.operator_account,
+            )
+            store = GcsJsonApi(
+                project_id=contract.project_id,
+                bucket=contract.data.bucket,
+                access_token=access_token,
+            )
+            payload = execute_gcs_cutover(
+                store=store,
+                contract=contract,
+                gcp_config_path=args.gcp_config,
+                operation_root=args.operation_root,
+                confirmed_project_id=args.confirm_project_id,
+                confirmed_bucket=args.confirm_bucket,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                approved_migration_manifest_sha256=(args.approve_migration_manifest_sha256),
+                confirmed_authoritative_raw=args.confirm_authoritative_raw,
+            )
+        except (
+            GcpConfigError,
+            GcsFullMigrationError,
+            GcsMigrationError,
+            OSError,
+            OperationError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha no corte G02: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_gcs_cutover(payload)
+        return 0
     return 2
 
 
@@ -489,3 +643,18 @@ def _print_human_gcs_sentinel(payload: dict[str, object]) -> None:
     print(f"- limite executado: {payload['through']}", file=sys.stderr)
     print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)
     print(f"- artefato: {payload['artifact_path']}", file=sys.stderr)
+
+
+def _print_human_gcs_full(payload: dict[str, object]) -> None:
+    print(f"Migração integral GCS: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- limite executado: {payload['through']}", file=sys.stderr)
+    print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)
+    print(f"- artefato: {payload['artifact_path']}", file=sys.stderr)
+
+
+def _print_human_gcs_cutover(payload: dict[str, object]) -> None:
+    print(f"Corte G02: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- autoridade raw: {payload['authoritative_raw']}", file=sys.stderr)
+    print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)

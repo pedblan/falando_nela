@@ -6,6 +6,7 @@
 - [x] Confirmar projeto e região idênticos em config, código, IaC e specs.
 - [x] Recusar config ausente, schema desconhecido e identificador divergente.
 - [x] Confirmar os três sentinelas, tamanhos, SHA-256 e soma de 78.822 bytes.
+- [x] Aceitar somente os dois zeros aprovados e derivar seu SHA-256 vazio.
 - [x] Testar preflight com inventário exato, ausência, surpresa e mismatch.
 - [x] Testar dry-run com `+`, destino preexistente igual e destino conflitante.
 - [x] Testar cópia, erro ambíguo reconciliável e erro ambíguo bloqueado.

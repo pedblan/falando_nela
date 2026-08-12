@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 project_id = "falando-nela-pedblan"
 project_number = "818569314985"
 region = "southamerica-east1"
@@ -36,6 +36,20 @@ source_files = 2887
 source_bytes = 14686043352
 source_catalog_sha256 = "6a8395a9fb60a999a97562b7f0c791ac766f161e01664ea549ad52bf36bb0930"
 source_catalog_file_sha256 = "cabe9aae5071d25bdae6459b99064d2ed37110ffaed0c30b95867dd798d22319"
+source_batch_plan_file_sha256 = "ef933d8cbe89ff5d1110c5e743fddfd2cb314711b31c9eed7dbb60fc1a56606b"
+authoritative_raw = "drive"
+approved_empty_source_locators = [
+  "camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl",
+  "camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl",
+]
+batch_count = 38
+batch_max_files = 100
+batch_max_bytes = 536870912
+oversized_batch_count = 4
+restore_sample_max_object_bytes = 16777216
+restore_sample_files = 16
+restore_sample_bytes = 13966298
+max_cost_usd = 1
 
 [[migration.sentinel]]
 category = "metadata"

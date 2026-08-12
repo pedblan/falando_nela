@@ -2,10 +2,17 @@
 
 ## Estado
 
-Contrato proposto para revisão em `2026-08-11`. A produção destas specs não
-autoriza implementação, upload, alteração de infraestrutura nem corte. G02 só
-pode executar depois da conclusão integral e documentada dos gates G01-B,
-G01-C e G01-D.
+Contrato implementado e validado localmente em `2026-08-11`. A implementação
+não autoriza upload, alteração de infraestrutura nem corte. G02 só pode
+executar remotamente depois da conclusão integral e documentada dos gates
+G01-B, G01-C e G01-D.
+
+## Acompanhamento
+
+- [x] Implementar localmente G02-PRE-04, G02-BASE, G02-CLI, G02-COPY e G02-VER.
+- [x] Implementar o corte protegido de G02-GATE-03 sem executá-lo remotamente.
+- [ ] Comprovar G02-PRE-01–03 no ambiente remoto e obter G02-GATE-01.
+- [ ] Executar e comprovar G02-GATE-02–05.
 
 ## Resultado principal
 
@@ -28,10 +35,9 @@ arquivo somente leitura para rollback.
 - **G02-PRE-03:** o destino inicial conterá exatamente os três objetos
   sentinela aprovados em G01, com os mesmos tamanhos, hashes e gerações, e
   nenhum outro objeto sob o prefixo raw.
-- **G02-PRE-04:** a implementação de G01 rejeita atualmente objetos com zero
-  byte; essa incompatibilidade deverá ser corrigida e validada em tarefa
-  própria antes do preflight de G02. A spec não autoriza corrigir G01 durante a
-  migração integral.
+- **G02-PRE-04:** a implementação aceitará somente os dois objetos vazios
+  aprovados, normalizará seu SHA-256 e recusará qualquer zero adicional. Essa
+  compatibilidade deverá passar nos testes locais antes do preflight de G02.
 - **G02-PRE-05:** qualquer divergência de infraestrutura, permissões, baseline,
   hashes, custo ou pré-condição bloqueará G02 sem reparo remoto automático.
 
@@ -70,13 +76,15 @@ arquivo somente leitura para rollback.
 falando-nela gcs-migrate full \
   --through preflight|dry-run|copy|verify|idempotency|restore \
   --operation-id ID --gcp-config config/gcp.toml \
-  --source-catalog CAMINHO --g01-operation-root CAMINHO \
-  --rclone-config CAMINHO --source-remote drive.readonly \
+  --source-catalog CAMINHO --source-batch-plan CAMINHO \
+  --g01-operation-root CAMINHO \
+  --rclone-config CAMINHO --source-remote raw-source-ro \
   --source-folder-id 1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9 \
   --confirm-source-folder-id 1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9 \
   --confirm-project-id falando-nela-pedblan \
   --confirm-bucket falando-nela-pedblan-data \
   --operator-account CONTA \
+  [--approve-plan-sha256 SHA256 --approve-max-cost-usd 1.00] \
   --batch-max-files 100 --batch-max-bytes 536870912
 ```
 
@@ -92,6 +100,16 @@ falando-nela gcs-migrate full \
   tentativa. A ferramenta nunca presumirá falha nem repetirá escrita às cegas.
 - **G02-CLI-05:** nenhuma etapa executará `sync`, `move`, delete, overwrite,
   criação de bucket, alteração de IAM ou mudança do projeto `default`.
+- **G02-CLI-06:** `copy` e etapas posteriores exigirão o digest de aprovação
+  produzido pelo dry-run e um teto aprovado entre a estimativa registrada e
+  US$ 1,00. Ausência ou divergência bloqueará antes da escrita.
+- **G02-CLI-07:** inventário, restauração e manifests usarão a API JSON do GCS
+  com bucket congelado e project ID explícito no contrato do cliente; o token
+  curto existirá somente no header da requisição e nunca em argumento ou
+  artefato. Como o bucket não usa Requester Pays, a implementação não enviará
+  `userProject` nem exigirá `serviceusage.services.use` da migradora, conforme
+  o contrato oficial de
+  [Requester Pays](https://docs.cloud.google.com/storage/docs/requester-pays).
 
 ## Dry-run, lotes e cópia
 
@@ -116,7 +134,8 @@ falando-nela gcs-migrate full \
   tentativa, uma low-level retry e no máximo quatro transferências.
 - **G02-COPY-05:** retomada recalculará o conjunto exato, ausente e conflitante;
   copiará somente ausentes e recusará substituir um objeto existente.
-- **G02-COPY-06:** a origem será o remote `drive.readonly` fixado pelo ID raw; o
+- **G02-COPY-06:** a origem será um remote com scope `drive.readonly`, por
+  padrão `raw-source-ro`, fixado pelo ID raw; o
   destino usará credencial curta por impersonação de `fn-migrator` e project
   number versionado, sem depender do projeto ativo do `gcloud`.
 
@@ -158,6 +177,17 @@ falando-nela gcs-migrate full \
   publicará, com a precondição `ifGenerationMatch=0`, um manifest create-only em
   `manifests/migrations/g02/<operation_id>/cutover.json`, conforme as
   [precondições de requisição do Cloud Storage](https://docs.cloud.google.com/storage/docs/request-preconditions).
+
+```text
+falando-nela gcs-migrate cutover \
+  --operation-root CAMINHO --gcp-config config/gcp.toml \
+  --confirm-source-folder-id 1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9 \
+  --confirm-project-id falando-nela-pedblan \
+  --confirm-bucket falando-nela-pedblan-data \
+  --operator-account CONTA \
+  --approve-migration-manifest-sha256 SHA256 \
+  --confirm-authoritative-raw gcs
+```
 - **G02-GATE-04:** o corte não habilitará ainda o executável cloud-first; essa
   mudança operacional pertence a G05. Em G02 muda somente a autoridade dos
   dados raw para as fases G03 e seguintes.
@@ -182,8 +212,8 @@ falando-nela gcs-migrate full \
 
 ## Fora do escopo
 
-- implementar G02 durante esta tarefa de especificação;
-- corrigir a incompatibilidade de zero byte de G01 dentro de G02;
+- executar preflight, dry-run, upload, restauração ou corte no ambiente remoto
+  durante a implementação local;
 - alterar IaC, APIs, bucket, IAM, budget, service accounts ou lifecycle;
 - transformar raw em Parquet, executar Cloud Run, BigQuery ou Marimo;
 - consultar fontes parlamentares ou incorporar conteúdo posterior à baseline;

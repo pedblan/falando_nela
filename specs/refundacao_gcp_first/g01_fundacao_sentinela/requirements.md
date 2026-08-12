@@ -85,6 +85,8 @@ falando-nela gcs-migrate sentinel --through preflight|dry-run|copy \
 
 - **G01-CLI-01:** `preflight` reconciliará por metadados os 2.887 objetos e
   14.686.043.352 bytes da pasta raw canônica, sem ler conteúdo nem acessar GCS.
+  Os dois objetos vazios aprovados terão o SHA-256 do conteúdo vazio derivado
+  localmente quando o inventário Drive fornecer somente MD5.
 - **G01-CLI-02:** `dry-run` executará preflight e confirmará o destino: na
   primeira execução ele deve estar vazio e produzir exatamente três marcadores
   de criação; uma retomada já íntegra produzirá três marcadores de igualdade.

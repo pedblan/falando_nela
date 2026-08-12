@@ -11,11 +11,13 @@ import pytest
 
 from falando_nela.gcp_config import GcpContract, SentinelConfig, load_gcp_contract
 from falando_nela.gcs_migration import (
+    EMPTY_MD5,
     CatalogEntry,
     GcloudImpersonatedTokenProvider,
     GcsMigrationError,
     RcloneGcsTransport,
     execute_gcs_sentinel,
+    load_source_catalog,
     reconcile_source_catalog,
 )
 from falando_nela.operations import OperationError
@@ -470,9 +472,11 @@ def test_failed_token_generation_redacts_subprocess_output(
 
 
 def test_implementation_has_no_global_auth_or_destructive_gcp_commands() -> None:
-    implementation = (REPO_ROOT / "src/falando_nela/gcs_migration.py").read_text(
+    implementation = (REPO_ROOT / "src/falando_nela/gcs_migration.py").read_text(encoding="utf-8")
+    implementation += (REPO_ROOT / "src/falando_nela/gcs_full_migration.py").read_text(
         encoding="utf-8"
-    ) + (REPO_ROOT / "src/falando_nela/cli.py").read_text(encoding="utf-8")
+    )
+    implementation += (REPO_ROOT / "src/falando_nela/cli.py").read_text(encoding="utf-8")
 
     assert "application-default login" not in implementation
     assert "gcloud config set project" not in implementation
@@ -495,3 +499,40 @@ def test_real_catalog_hash_and_frozen_sentinels_match_when_local_evidence_exists
     assert hashlib.sha256(catalog.read_bytes()).hexdigest() == (
         "cabe9aae5071d25bdae6459b99064d2ed37110ffaed0c30b95867dd798d22319"
     )
+
+
+@pytest.mark.parametrize("mode", ["unapproved_zero", "nonempty_without_sha256"])
+def test_catalog_rejects_incomplete_or_unapproved_hashes(tmp_path: Path, mode: str) -> None:
+    contract, _catalog_path, entries = _fixture_contract_and_catalog(tmp_path)
+    invalid = (
+        CatalogEntry(
+            category="monthly_text",
+            source_locator="camara/outro/ano=2000/mes=01/vazio.jsonl",
+            destination_locator="data/raw/v1/camara/outro/ano=2000/mes=01/vazio.jsonl",
+            size_bytes=0,
+            provider_hashes={"md5": EMPTY_MD5},
+        )
+        if mode == "unapproved_zero"
+        else CatalogEntry(
+            category="monthly_text",
+            source_locator="camara/outro/ano=2000/mes=01/incompleto.jsonl",
+            destination_locator="data/raw/v1/camara/outro/ano=2000/mes=01/incompleto.jsonl",
+            size_bytes=10,
+            provider_hashes={"md5": "a" * 32},
+        )
+    )
+    catalog_path = tmp_path / "catalog-with-zero.jsonl"
+    catalog_entries = [*entries, invalid]
+    catalog_path.write_bytes(
+        b"".join(canonical_json_bytes(item.as_dict()) + b"\n" for item in catalog_entries)
+    )
+    migration = contract.migration.model_copy(
+        update={
+            "source_files": len(catalog_entries),
+            "source_bytes": sum(item.size_bytes for item in catalog_entries),
+            "source_catalog_file_sha256": sha256_file(catalog_path),
+        }
+    )
+
+    with pytest.raises(GcsMigrationError, match="catálogo de origem é inválido"):
+        load_source_catalog(catalog_path, contract.model_copy(update={"migration": migration}))

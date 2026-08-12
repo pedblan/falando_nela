@@ -7,11 +7,11 @@
 - [x] Registrar os dois objetos vazios e sua normalização de SHA-256.
 - [x] Congelar 38 lotes, limites e quatro exceções de objeto grande.
 - [x] Definir gates, custo, amostra de restauração e política de parada.
-- [ ] Corrigir em tarefa própria a incompatibilidade de zero byte de G01.
+- [x] Corrigir a incompatibilidade de zero byte antes de habilitar o pipeline full.
 - [ ] Confirmar conclusão documentada de G01-B, G01-C e G01-D.
-- [ ] Implementar `gcs-migrate full` e `gcs-migrate cutover`.
-- [ ] Cobrir preflight, lotes, retomada, reconciliação, restauração e corte.
-- [ ] Executar validações locais sem acesso remoto ou credencial.
+- [x] Implementar `gcs-migrate full` e `gcs-migrate cutover`.
+- [x] Cobrir preflight, lotes, retomada, reconciliação, restauração e corte.
+- [x] Executar validações locais sem acesso remoto ou credencial.
 
 **Gate G02-A:** contrato aprovado, G01 integralmente concluído, implementação
 local validada e nenhum efeito remoto novo produzido por G02.

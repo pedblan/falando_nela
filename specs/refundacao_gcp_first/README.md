@@ -3,10 +3,10 @@
 ## Estado
 
 Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`, encerrando G00.
-A implementação local de G01 foi encerrada no commit `4602f7e`, mas seus gates
-remotos continuam pendentes: nenhum recurso, upload ou gasto de G01 foi
-executado. O contrato operacional de G02 está proposto e permanece bloqueado
-até a conclusão integral de G01.
+A implementação local de G01 e G02 está disponível, mas seus gates remotos
+continuam pendentes: nenhum recurso, upload ou gasto foi executado. A execução
+de G02 permanece bloqueada até a conclusão integral de G01 e até as aprovações
+humanas registradas no contrato operacional.
 
 ## Direção aprovada
 

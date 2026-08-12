@@ -16,12 +16,24 @@ EXPECTED_RAW_FOLDER_ID = "1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9"
 EXPECTED_SOURCE_FILES = 2_887
 EXPECTED_SOURCE_BYTES = 14_686_043_352
 EXPECTED_SENTINEL_BYTES = 78_822
+EXPECTED_BATCH_PLAN_FILE_SHA256 = "ef933d8cbe89ff5d1110c5e743fddfd2cb314711b31c9eed7dbb60fc1a56606b"
+EXPECTED_EMPTY_SOURCE_LOCATORS = (
+    "camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl",
+    "camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl",
+)
+EXPECTED_BATCH_COUNT = 38
+EXPECTED_BATCH_MAX_FILES = 100
+EXPECTED_BATCH_MAX_BYTES = 512 * 1024 * 1024
+EXPECTED_OVERSIZED_BATCH_COUNT = 4
+EXPECTED_RESTORE_SAMPLE_MAX_OBJECT_BYTES = 16 * 1024 * 1024
+EXPECTED_RESTORE_SAMPLE_FILES = 16
+EXPECTED_RESTORE_SAMPLE_BYTES = 13_966_298
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 MD5_PATTERN = re.compile(r"[0-9a-f]{32}")
 
 
 class GcpConfigError(ValueError):
-    """A configuração GCP diverge do contrato G01."""
+    """A configuração GCP diverge do contrato versionado."""
 
 
 class StrictModel(BaseModel):
@@ -84,6 +96,17 @@ class MigrationConfig(StrictModel):
     source_bytes: int = Field(gt=0)
     source_catalog_sha256: str
     source_catalog_file_sha256: str
+    source_batch_plan_file_sha256: str
+    authoritative_raw: Literal["drive", "gcs"]
+    approved_empty_source_locators: tuple[str, ...]
+    batch_count: int = Field(gt=0)
+    batch_max_files: int = Field(gt=0)
+    batch_max_bytes: int = Field(gt=0)
+    oversized_batch_count: int = Field(ge=0)
+    restore_sample_max_object_bytes: int = Field(gt=0)
+    restore_sample_files: int = Field(gt=0)
+    restore_sample_bytes: int = Field(gt=0)
+    max_cost_usd: int = Field(gt=0)
     sentinel: tuple[SentinelConfig, ...]
 
     @model_validator(mode="after")
@@ -94,9 +117,15 @@ class MigrationConfig(StrictModel):
         ):
             if not re.fullmatch(r"[A-Za-z0-9_-]+", folder_id):
                 raise ValueError("ID de pasta Drive inválido")
-        for digest in (self.source_catalog_sha256, self.source_catalog_file_sha256):
+        for digest in (
+            self.source_catalog_sha256,
+            self.source_catalog_file_sha256,
+            self.source_batch_plan_file_sha256,
+        ):
             if not SHA256_PATTERN.fullmatch(digest):
                 raise ValueError("hash de catálogo inválido")
+        for locator in self.approved_empty_source_locators:
+            _validate_relative_locator(locator)
         categories = [item.category for item in self.sentinel]
         if sorted(categories) != ["metadata", "monthly_text", "transcription_queue"]:
             raise ValueError("sentinela deve conter exatamente as três categorias G01")
@@ -108,7 +137,7 @@ class MigrationConfig(StrictModel):
 
 
 class GcpContract(StrictModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     project_id: str
     project_number: str
     region: str
@@ -133,6 +162,43 @@ class GcpContract(StrictModel):
             ),
             "migration.source_files": (self.migration.source_files, EXPECTED_SOURCE_FILES),
             "migration.source_bytes": (self.migration.source_bytes, EXPECTED_SOURCE_BYTES),
+            "migration.source_batch_plan_file_sha256": (
+                self.migration.source_batch_plan_file_sha256,
+                EXPECTED_BATCH_PLAN_FILE_SHA256,
+            ),
+            "migration.approved_empty_source_locators": (
+                self.migration.approved_empty_source_locators,
+                EXPECTED_EMPTY_SOURCE_LOCATORS,
+            ),
+            "migration.batch_count": (
+                self.migration.batch_count,
+                EXPECTED_BATCH_COUNT,
+            ),
+            "migration.batch_max_files": (
+                self.migration.batch_max_files,
+                EXPECTED_BATCH_MAX_FILES,
+            ),
+            "migration.batch_max_bytes": (
+                self.migration.batch_max_bytes,
+                EXPECTED_BATCH_MAX_BYTES,
+            ),
+            "migration.oversized_batch_count": (
+                self.migration.oversized_batch_count,
+                EXPECTED_OVERSIZED_BATCH_COUNT,
+            ),
+            "migration.restore_sample_max_object_bytes": (
+                self.migration.restore_sample_max_object_bytes,
+                EXPECTED_RESTORE_SAMPLE_MAX_OBJECT_BYTES,
+            ),
+            "migration.restore_sample_files": (
+                self.migration.restore_sample_files,
+                EXPECTED_RESTORE_SAMPLE_FILES,
+            ),
+            "migration.restore_sample_bytes": (
+                self.migration.restore_sample_bytes,
+                EXPECTED_RESTORE_SAMPLE_BYTES,
+            ),
+            "migration.max_cost_usd": (self.migration.max_cost_usd, 1),
             "migrator.service_account_id": (
                 self.migrator.service_account_id,
                 "fn-migrator",
@@ -142,7 +208,7 @@ class GcpContract(StrictModel):
         }
         divergences = [key for key, (observed, wanted) in expected.items() if observed != wanted]
         if divergences:
-            raise ValueError(f"configuração G01 divergiu: {', '.join(divergences)}")
+            raise ValueError(f"configuração GCP divergiu: {', '.join(divergences)}")
         if self.state.soft_delete_retention_seconds != 604_800 or not self.state.versioning:
             raise ValueError("proteção do state divergiu do contrato G01")
         if self.data.soft_delete_retention_seconds != 604_800 or self.data.versioning:
@@ -190,7 +256,7 @@ def load_gcp_contract(path: Path) -> GcpContract:
     try:
         return GcpContract.model_validate(payload)
     except ValueError as exc:
-        raise GcpConfigError("configuração GCP diverge do contrato G01") from exc
+        raise GcpConfigError("configuração GCP diverge do contrato versionado") from exc
 
 
 def _validate_relative_locator(locator: str) -> None:

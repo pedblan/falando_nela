@@ -21,6 +21,15 @@ from falando_nela.raw import (
 )
 from falando_nela.sources import SourceObject, pinned_rclone_remote_path
 
+EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e"
+EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+APPROVED_EMPTY_SOURCE_LOCATORS = frozenset(
+    {
+        "camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl",
+        "camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl",
+    }
+)
+
 
 class GcsMigrationError(RuntimeError):
     """A fundação ou a sentinela GCS divergiu do contrato G01."""
@@ -33,15 +42,22 @@ class CatalogEntry:
     destination_locator: str
     size_bytes: int
     provider_hashes: dict[str, str]
+    source: str | None = None
+    dataset: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "category": self.category,
             "source_locator": self.source_locator,
             "destination_locator": self.destination_locator,
             "size_bytes": self.size_bytes,
             "provider_hashes": dict(sorted(self.provider_hashes.items())),
         }
+        if self.source is not None:
+            result["source"] = self.source
+        if self.dataset is not None:
+            result["dataset"] = self.dataset
+        return result
 
 
 class InventorySource(Protocol):
@@ -343,7 +359,23 @@ def load_source_catalog(path: Path, contract: GcpContract) -> list[CatalogEntry]
                     provider_hashes=_normalize_hashes(
                         raw_hashes if isinstance(raw_hashes, dict) else {}
                     ),
+                    source=str(item["source"]) if item.get("source") is not None else None,
+                    dataset=str(item["dataset"]) if item.get("dataset") is not None else None,
                 )
+                if (
+                    entry.source_locator in contract.migration.approved_empty_source_locators
+                    and entry.size_bytes == 0
+                    and entry.provider_hashes == {"md5": EMPTY_MD5}
+                ):
+                    entry = CatalogEntry(
+                        category=entry.category,
+                        source_locator=entry.source_locator,
+                        destination_locator=entry.destination_locator,
+                        size_bytes=entry.size_bytes,
+                        provider_hashes={"md5": EMPTY_MD5, "sha256": EMPTY_SHA256},
+                        source=entry.source,
+                        dataset=entry.dataset,
+                    )
                 _validate_catalog_entry(entry)
                 entries.append(entry)
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
@@ -370,7 +402,7 @@ def reconcile_source_catalog(
     for locator in sorted(set(expected_by_locator) & set(observed_by_locator)):
         wanted = expected_by_locator[locator]
         current = observed_by_locator[locator]
-        hashes = _normalize_hashes(current.provider_hashes)
+        hashes = _normalized_observed_hashes(current)
         if wanted.size_bytes != current.size_bytes or any(
             hashes.get(name) != value for name, value in wanted.provider_hashes.items()
         ):
@@ -748,7 +780,13 @@ def _validate_catalog_entry(entry: CatalogEntry) -> None:
         raise ValueError
     if entry.destination_locator != f"data/raw/v1/{entry.source_locator}":
         raise ValueError
-    if entry.size_bytes <= 0:
+    if entry.size_bytes < 0:
+        raise ValueError
+    if entry.size_bytes == 0 and (
+        entry.source_locator not in APPROVED_EMPTY_SOURCE_LOCATORS
+        or entry.provider_hashes.get("md5") != EMPTY_MD5
+        or entry.provider_hashes.get("sha256") != EMPTY_SHA256
+    ):
         raise ValueError
     if not re.fullmatch(r"[0-9a-f]{32}", entry.provider_hashes.get("md5", "")):
         raise ValueError
@@ -757,11 +795,18 @@ def _validate_catalog_entry(entry: CatalogEntry) -> None:
 
 
 def _normalize_hashes(value: Mapping[str, Any]) -> dict[str, str]:
-    aliases = {"sha-1": "sha1", "sha-256": "sha256"}
+    aliases = {"sha-1": "sha1", "sha-256": "sha256", "crc-32c": "crc32c"}
     return {
         aliases.get(str(key).casefold(), str(key).casefold()): str(item).casefold()
         for key, item in value.items()
     }
+
+
+def _normalized_observed_hashes(value: SourceObject) -> dict[str, str]:
+    hashes = _normalize_hashes(value.provider_hashes)
+    if value.size_bytes == 0 and hashes.get("md5") == EMPTY_MD5:
+        hashes.setdefault("sha256", EMPTY_SHA256)
+    return hashes
 
 
 def _unique_source_objects(objects: Sequence[SourceObject]) -> dict[str, SourceObject]:

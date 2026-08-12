@@ -30,7 +30,7 @@ def test_versioned_contract_freezes_g01_targets_and_sentinel() -> None:
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("schema_version = 1", "schema_version = 2"),
+        ("schema_version = 2", "schema_version = 3"),
         ('project_id = "falando-nela-pedblan"', 'project_id = "eleicoes-2026-504713"'),
         ('region = "southamerica-east1"', 'region = "us-central1"'),
     ],
@@ -102,6 +102,76 @@ def test_gcs_cli_has_safe_defaults_and_explicit_target_arguments() -> None:
     assert args.source_remote == "raw-source-ro"
     assert args.confirm_project_id == "falando-nela-pedblan"
     assert args.operator_account == "operator@example.invalid"
+
+
+def test_g02_contract_freezes_batches_restore_and_pre_cutover_authority() -> None:
+    contract = load_gcp_contract(CONFIG_PATH)
+
+    assert contract.schema_version == 2
+    assert contract.migration.authoritative_raw == "drive"
+    assert contract.migration.batch_count == 38
+    assert contract.migration.batch_max_files == 100
+    assert contract.migration.batch_max_bytes == 512 * 1024 * 1024
+    assert contract.migration.oversized_batch_count == 4
+    assert contract.migration.restore_sample_files == 16
+    assert contract.migration.restore_sample_bytes == 13_966_298
+    assert len(contract.migration.approved_empty_source_locators) == 2
+
+
+def test_full_and_cutover_cli_require_explicit_targets_and_approvals() -> None:
+    full = build_parser().parse_args(
+        [
+            "gcs-migrate",
+            "full",
+            "--operation-id",
+            "g02-test",
+            "--source-catalog",
+            "catalog.jsonl",
+            "--source-batch-plan",
+            "batches.json",
+            "--g01-operation-root",
+            "g01",
+            "--rclone-config",
+            "rclone.conf",
+            "--source-folder-id",
+            "raw",
+            "--confirm-source-folder-id",
+            "raw",
+            "--confirm-project-id",
+            "falando-nela-pedblan",
+            "--confirm-bucket",
+            "falando-nela-pedblan-data",
+            "--operator-account",
+            "operator@example.invalid",
+        ]
+    )
+    cutover = build_parser().parse_args(
+        [
+            "gcs-migrate",
+            "cutover",
+            "--operation-root",
+            "g02",
+            "--confirm-source-folder-id",
+            "raw",
+            "--confirm-project-id",
+            "falando-nela-pedblan",
+            "--confirm-bucket",
+            "falando-nela-pedblan-data",
+            "--operator-account",
+            "operator@example.invalid",
+            "--approve-migration-manifest-sha256",
+            "a" * 64,
+            "--confirm-authoritative-raw",
+            "gcs",
+        ]
+    )
+
+    assert full.through == "preflight"
+    assert full.source_batch_plan == Path("batches.json")
+    assert full.confirm_project_id == "falando-nela-pedblan"
+    assert full.approve_plan_sha256 is None
+    assert cutover.confirm_authoritative_raw == "gcs"
+    assert cutover.approve_migration_manifest_sha256 == "a" * 64
 
 
 def test_iac_never_uses_gcloud_default_or_implicit_project() -> None:

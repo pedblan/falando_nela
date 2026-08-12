@@ -12,26 +12,26 @@
 - [x] Confirmar quatro lotes acima de 512 MiB, cada qual com um único objeto.
 - [x] Confirmar a amostra determinística com 16 objetos e 13.966.298 bytes.
 
-## Validação local da futura implementação
+## Validação local da implementação
 
-- [ ] Confirmar que todo passo acionável deste plano usa checkbox CommonMark.
-- [ ] Recusar G02 quando qualquer gate de G01 estiver incompleto.
-- [ ] Recusar projeto, bucket, prefixo, source remote ou folder ID divergente.
-- [ ] Recusar dependência do projeto ativo do `gcloud` em toda chamada GCP.
-- [ ] Aceitar somente os dois zeros aprovados e normalizar seu SHA-256.
-- [ ] Recusar SHA-256 ausente em objeto não vazio e zero inesperado.
-- [ ] Produzir 38 lotes determinísticos e isolar os quatro objetos grandes.
-- [ ] Testar dry-run exato, faltante, surpresa, diferença, remoção e erro.
-- [ ] Testar cópia parcial, retomada, conflito e resultado remoto ambíguo.
-- [ ] Testar invalidação descendente quando input ou artefato mudar.
-- [ ] Testar reconciliação de bytes, MD5, CRC32C e generations.
-- [ ] Testar reexecução com zero chamada mutável e generations idênticas.
-- [ ] Testar seleção determinística dos 16 objetos de restauração.
-- [ ] Testar `cutover` ausente, não aprovado, repetido e com manifest conflitante.
-- [ ] Confirmar ausência de token, conta pessoal, ADC e config rclone em artefatos.
-- [ ] Confirmar ausência de `sync`, `move`, delete, overwrite e mutação de IaC/IAM.
-- [ ] Executar lock, lint, formatação, testes unitários e integração local relevante.
-- [ ] Revisar diff por caches, credenciais, dados raw e mudanças fora do escopo.
+- [x] Confirmar que todo passo acionável deste plano usa checkbox CommonMark.
+- [x] Recusar G02 quando qualquer gate de G01 estiver incompleto.
+- [x] Recusar projeto, bucket, prefixo, source remote ou folder ID divergente.
+- [x] Recusar dependência do projeto ativo do `gcloud` em toda chamada GCP.
+- [x] Aceitar somente os dois zeros aprovados e normalizar seu SHA-256.
+- [x] Recusar SHA-256 ausente em objeto não vazio e zero inesperado.
+- [x] Produzir 38 lotes determinísticos e isolar os quatro objetos grandes.
+- [x] Testar dry-run exato, faltante, surpresa, diferença, remoção e erro.
+- [x] Testar cópia parcial, retomada, conflito e resultado remoto ambíguo.
+- [x] Testar invalidação descendente quando input ou artefato mudar.
+- [x] Testar reconciliação de bytes, MD5, CRC32C e generations.
+- [x] Testar reexecução com zero chamada mutável e generations idênticas.
+- [x] Testar seleção determinística dos 16 objetos de restauração.
+- [x] Testar `cutover` ausente, não aprovado, repetido e com manifest conflitante.
+- [x] Confirmar ausência de token, conta pessoal, ADC e config rclone em artefatos.
+- [x] Confirmar ausência de `sync`, `move`, delete, overwrite e mutação de IaC/IAM.
+- [x] Executar lock, lint, formatação, testes unitários e integração local relevante.
+- [x] Revisar diff por caches, credenciais, dados raw e mudanças fora do escopo.
 
 ## Readback anterior a qualquer acesso remoto
 
