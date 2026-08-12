@@ -2,11 +2,10 @@
 
 ## Estado e fronteira
 
-As specs foram criadas em `2026-08-12`; a implementação permanece pendente. O
-worktree atual contém o candidato G00–G04 ainda não consolidado, portanto a
-branch própria de G05 só será criada depois de preservar e revisar essa base.
-G05 produz um único resultado: o caminho cloud-first reproduzível integrado em
-`main`.
+As specs foram criadas em `2026-08-12`. O candidato G00–G04 foi revisado e
+consolidado nos commits `a4482b9` e `fa2527a`; a implementação continua na
+branch dedicada `codex/refundacao-g05-cloud-first`. G05 produz um único
+resultado: o caminho cloud-first reproduzível integrado em `main`.
 
 ## Modelo e esforço por tarefa
 
@@ -30,7 +29,7 @@ G05 produz um único resultado: o caminho cloud-first reproduzível integrado em
 ## Acompanhamento
 
 - [x] Criar `requirements.md`, `plan.md` e `validation.md` próprios e sincronizar as specs-raiz.
-- [ ] Consolidar o candidato G00–G04 sem descartar alterações e criar a branch dedicada de G05.
+- [x] Consolidar o candidato G00–G04 sem descartar alterações e criar a branch dedicada de G05.
 - [ ] Auditar entrypoints, defaults, metadata e documentação que ainda descrevem operação local-first.
 - [ ] Tornar GCS o default de produção onde aplicável e manter fixture local explícita, com testes direcionados.
 - [ ] Criar o README canônico e atualizar descrição do pacote, apresentação do núcleo e índice de notebooks.
