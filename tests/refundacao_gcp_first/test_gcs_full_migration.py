@@ -280,6 +280,7 @@ def _fixture(
             "restore_sample_max_object_bytes": 100,
             "restore_sample_files": len(sample),
             "restore_sample_bytes": sum(item.size_bytes for item in sample),
+            "authoritative_raw": "drive",
             "sentinel": sentinel,
         }
     )
@@ -681,7 +682,12 @@ def test_cutover_requires_digest_then_is_resumable_and_create_only(tmp_path: Pat
     contract, _catalog, _batches, _g01, _data, _entries, _source, store = fixture
     operation_root = Path(full["artifact_path"]).parent
     config_path = tmp_path / "gcp.toml"
-    config_path.write_bytes(CONFIG_PATH.read_bytes())
+    config_path.write_text(
+        CONFIG_PATH.read_text(encoding="utf-8").replace(
+            'authoritative_raw = "gcs"', 'authoritative_raw = "drive"'
+        ),
+        encoding="utf-8",
+    )
 
     with pytest.raises(GcsFullMigrationError, match="aprovação humana"):
         execute_gcs_cutover(
@@ -740,7 +746,12 @@ def test_cutover_conflict_preserves_drive_authority(tmp_path: Path) -> None:
     contract, _catalog, _batches, _g01, _data, _entries, _source, store = fixture
     operation_root = Path(full["artifact_path"]).parent
     config_path = tmp_path / "gcp.toml"
-    config_path.write_bytes(CONFIG_PATH.read_bytes())
+    config_path.write_text(
+        CONFIG_PATH.read_text(encoding="utf-8").replace(
+            'authoritative_raw = "gcs"', 'authoritative_raw = "drive"'
+        ),
+        encoding="utf-8",
+    )
     locator = "manifests/migrations/g02/cutover-conflict/cutover.json"
     store.remote_bytes[locator] = b"conflict\n"
 
@@ -808,14 +819,21 @@ def test_gcs_json_api_declares_project_and_create_only_precondition() -> None:
 
     objects = api.list_objects(prefix="data/raw/v1/")
     api.publish_bytes_create_only("manifests/test.json", b"{}\n")
+    api.publish_bytes_create_only(
+        "data/processed/v1/test.parquet",
+        b"PAR1",
+        content_type="application/vnd.apache.parquet",
+    )
 
     assert objects[0].md5 == hashlib.md5(b"x", usedforsecurity=False).hexdigest()
     assert api.descriptor()["project_id"] == "falando-nela-pedblan"
     assert all("userProject" not in request.url.params for request in requests)
     assert all("x-goog-user-project" not in request.headers for request in requests)
-    post = next(request for request in requests if request.method == "POST")
-    assert post.url.params["ifGenerationMatch"] == "0"
-    assert "/b/falando-nela-pedblan-data/o" in post.url.path
+    posts = [request for request in requests if request.method == "POST"]
+    assert all(request.url.params["ifGenerationMatch"] == "0" for request in posts)
+    assert posts[0].headers["content-type"] == "application/json"
+    assert posts[1].headers["content-type"] == "application/vnd.apache.parquet"
+    assert all("/b/falando-nela-pedblan-data/o" in request.url.path for request in posts)
     assert TOKEN not in json.dumps(api.descriptor())
 
 

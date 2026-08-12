@@ -1,4 +1,4 @@
-# Fundação GCP — G01
+# Fundação GCP — G01 e primeiro job G03
 
 Este diretório declara somente a fundação aprovada em G01. O backend e o
 provider fixam o projeto `falando-nela-pedblan`; o projeto ativo do `gcloud`
@@ -83,3 +83,50 @@ operator_principal = user:conta obtida por readback
 
 Nenhuma etapa deste diretório altera `gcloud config configurations`, grava ADC
 ou cria chave JSON de service account.
+
+## G03 — Artifact Registry, build e Cloud Run Job
+
+O estado sem `pipeline_image` declara somente a fundação G03: três APIs,
+repositório Docker regional com tags imutáveis, contas `fn-builder` e
+`fn-pipeline` e IAM condicionado. Informar conjuntamente `pipeline_image`,
+`pipeline_operation_id` e `pipeline_revision` acrescenta o job apontando para
+um digest já existente.
+
+Validação sem rede ou efeito remoto:
+
+```bash
+tofu -chdir=infra/gcp fmt -check -recursive
+tofu -chdir=infra/gcp init -backend=false -input=false
+tofu -chdir=infra/gcp validate
+tofu -chdir=infra/gcp test
+```
+
+O gate humano único de G03 pode autorizar a sequência abaixo, desde que os dois
+planos permaneçam dentro do diff descrito nas specs, haja apenas um build e uma
+execução e a estimativa total permaneça abaixo de US$ 0,10:
+
+1. revisar e aplicar o plano da fundação G03, ainda sem job;
+2. enviar um build com `deploy/g03/cloudbuild.yaml`, pelo comando abaixo;
+3. obter o digest por readback do Artifact Registry;
+4. revisar e aplicar o plano final com a imagem por digest, operation ID e
+   revisão preenchidos em conjunto;
+5. executar `fn-parquet-pilot` uma vez em `southamerica-east1` e comparar o
+   manifest publicado com a validação local.
+
+O build usa a service account `fn-builder` declarada no próprio YAML e envia
+logs apenas ao Cloud Logging. Seu pacote-fonte fica sob o prefixo operacional
+`operations/builds/g03/` do bucket já existente, que `fn-builder` pode somente
+ler. O runtime usa `fn-pipeline`; nenhuma das duas tem chave exportável.
+Documentar esses comandos não autoriza executá-los.
+
+```bash
+REVISION="$(git rev-parse HEAD)"
+IMAGE_URI="southamerica-east1-docker.pkg.dev/falando-nela-pedblan/falando-nela/parquet-pilot"
+
+gcloud builds submit . \
+  --project=falando-nela-pedblan \
+  --region=southamerica-east1 \
+  --config=deploy/g03/cloudbuild.yaml \
+  --gcs-source-staging-dir=gs://falando-nela-pedblan-data/operations/builds/g03/source \
+  --substitutions="_REVISION=${REVISION},_IMAGE_URI=${IMAGE_URI}"
+```

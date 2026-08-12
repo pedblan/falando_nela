@@ -34,6 +34,14 @@ from falando_nela.gcs_migration import (
     execute_gcs_sentinel,
 )
 from falando_nela.operations import OperationError
+from falando_nela.parquet_pipeline import (
+    GcsObjectStore,
+    LocalObjectStore,
+    MetadataServerTokenProvider,
+    ParquetPilotConfig,
+    ParquetPipelineError,
+    execute_parquet_pilot,
+)
 from falando_nela.sample_import import (
     PILOT_PREFIX,
     SampleImportError,
@@ -192,6 +200,35 @@ def build_parser() -> argparse.ArgumentParser:
     gcs_cutover.add_argument("--approve-migration-manifest-sha256", required=True)
     gcs_cutover.add_argument("--confirm-authoritative-raw", required=True)
     gcs_cutover.add_argument("--json", action="store_true", dest="as_json")
+    parquet_pilot = subcommands.add_parser(
+        "parquet-pilot", help="produz o Parquet G03 recuperável dos 30 discursos"
+    )
+    parquet_pilot.add_argument("--operation-id", required=True)
+    parquet_pilot.add_argument("--implementation-revision", required=True)
+    parquet_pilot.add_argument(
+        "--through",
+        choices=("materialize_input", "write_parquet", "validate", "publish"),
+        default="validate",
+    )
+    parquet_pilot.add_argument("--backend", choices=("local", "gcs"), default="local")
+    parquet_pilot.add_argument(
+        "--selection-manifest",
+        type=Path,
+        default=Path("specs/refundacao_gcp_first/g03_parquet_cloud_run/selection.json"),
+    )
+    parquet_pilot.add_argument("--local-input", type=Path)
+    parquet_pilot.add_argument(
+        "--work-root", type=Path, default=Path("data_samples/operations/parquet_pipeline")
+    )
+    parquet_pilot.add_argument(
+        "--publish-root", type=Path, default=Path("data_samples/processed/g03")
+    )
+    parquet_pilot.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    parquet_pilot.add_argument("--confirm-project-id")
+    parquet_pilot.add_argument("--confirm-region")
+    parquet_pilot.add_argument("--confirm-bucket")
+    parquet_pilot.add_argument("--confirm-authoritative-raw")
+    parquet_pilot.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -593,6 +630,67 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_human_gcs_cutover(payload)
         return 0
+    if args.command == "parquet-pilot":
+        try:
+            contract = load_gcp_contract(args.gcp_config)
+            config = ParquetPilotConfig(
+                project_id=contract.project_id,
+                region=contract.region,
+                bucket=contract.data.bucket,
+                processed_prefix=contract.data.processed_prefix,
+                manifests_prefix=contract.data.manifests_prefix,
+            )
+            if args.backend == "gcs":
+                contract.confirm_pipeline_targets(
+                    project_id=args.confirm_project_id,
+                    region=args.confirm_region,
+                    bucket=args.confirm_bucket,
+                    authoritative_raw=args.confirm_authoritative_raw,
+                )
+                token_provider = MetadataServerTokenProvider()
+                store = GcsObjectStore(
+                    GcsJsonApi(
+                        project_id=contract.project_id,
+                        bucket=contract.data.bucket,
+                        access_token=token_provider,
+                    )
+                )
+                source_store = store
+                local_input = None
+                publish_store = store
+            else:
+                if args.local_input is None:
+                    raise ParquetPipelineError("--local-input é obrigatório no backend local")
+                source_store = None
+                local_input = args.local_input
+                publish_store = LocalObjectStore(args.publish_root)
+            payload = execute_parquet_pilot(
+                operation_id=args.operation_id,
+                implementation_revision=args.implementation_revision,
+                selection_manifest_path=args.selection_manifest,
+                operation_root=args.work_root / args.operation_id,
+                publish_store=publish_store,
+                config=config,
+                source_store=source_store,
+                local_input_path=local_input,
+                through=args.through,
+            )
+        except (
+            GcpConfigError,
+            GcsFullMigrationError,
+            OSError,
+            OperationError,
+            ParquetPipelineError,
+            ValidationError,
+            ValueError,
+        ) as exc:
+            print(f"Falha no piloto Parquet G03: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_parquet_pilot(payload)
+        return 0
     return 2
 
 
@@ -672,3 +770,12 @@ def _print_human_gcs_cutover(payload: dict[str, object]) -> None:
     print(f"- operação: {payload['operation_id']}", file=sys.stderr)
     print(f"- autoridade raw: {payload['authoritative_raw']}", file=sys.stderr)
     print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)
+
+
+def _print_human_parquet_pilot(payload: dict[str, object]) -> None:
+    print(f"Parquet G03: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- origem: {payload['source_kind']}", file=sys.stderr)
+    print(f"- registros: {payload['records']}", file=sys.stderr)
+    print(f"- parquet SHA-256: {payload['parquet_sha256']}", file=sys.stderr)
+    print(f"- fingerprint lógico: {payload['logical_sha256']}", file=sys.stderr)

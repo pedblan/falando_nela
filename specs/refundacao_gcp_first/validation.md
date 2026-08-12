@@ -2,8 +2,9 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-11`. G00 e G01 foram concluídos; a fundação GCP
-e os três objetos sentinela existem, enquanto o Drive permanece fonte oficial.
+Contrato aprovado em `2026-08-11`. G00–G02 foram concluídos e o GCS é a fonte
+raw oficial. G03 está implementado e validado localmente, aguardando o único
+gate remoto para fundação, build e execução do piloto.
 
 ## Gates
 
@@ -11,8 +12,8 @@ e os três objetos sentinela existem, enquanto o Drive permanece fonte oficial.
 |---|---|---|---|
 | G00 | contrato coerente | revisão humana e diff restrito | aprovado |
 | G01 | fundação e sentinela | plan IaC, readback, catálogo e reexecução | aprovado |
-| G02 | raw integral no GCS | inventários, hashes, restore e gate humano | pendente |
-| G03 | Parquet em Cloud Run Job | paridade local/cloud, manifest e custo | pendente |
+| G02 | raw integral no GCS | inventários, hashes, restore e gate humano | aprovado |
+| G03 | Parquet em Cloud Run Job | local aprovado; paridade cloud e custo pendentes | em andamento |
 | G04 | Marimo privado | check, script, autenticação e leitura GCS | pendente |
 | G05 | corte cloud-first | clone limpo, docs, testes e remote | pendente |
 
@@ -64,28 +65,41 @@ zero escrita; a estimativa do upload foi `US$ 0,000001`.
 
 ## G02 — migração integral
 
-- [ ] Reconciliar a origem atual contra 2.887 objetos e 14.686.043.352 bytes.
-- [ ] Confirmar relatório de dry-run com exatamente um marcador por destino.
-- [ ] Registrar início, fim e tentativa de cada lote.
-- [ ] Confirmar que todo objeto destino tem uma origem única.
-- [ ] Confirmar zero ausência, surpresa, substituição ou mismatch.
-- [ ] Comparar hash do catálogo fechado da origem e do destino.
-- [ ] Reexecutar e comprovar idempotência.
-- [ ] Restaurar sentinelas e comparar bytes localmente.
-- [ ] Confirmar Drive inalterado por ID, contagem e bytes.
-- [ ] Obter aprovação humana para o corte da fonte oficial.
+- [x] Reconciliar a origem atual contra 2.887 objetos e 14.686.043.352 bytes.
+- [x] Confirmar relatório de dry-run com exatamente um marcador por destino.
+- [x] Registrar início, fim e tentativa de cada lote.
+- [x] Confirmar que todo objeto destino tem uma origem única.
+- [x] Confirmar zero ausência, surpresa, substituição ou mismatch.
+- [x] Comparar hash do catálogo fechado da origem e do destino.
+- [x] Reexecutar e comprovar idempotência.
+- [x] Restaurar a amostra aprovada e comparar bytes localmente.
+- [x] Confirmar Drive inalterado por ID, contagem e bytes.
+- [x] Obter aprovação humana para o corte da fonte oficial.
+
+G02 encerrou pela operação `g02-full-20260811-v1`; o manifesto completo tem
+SHA-256
+`230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`
+e o corte registrou GCS como autoridade raw sem alterar o Drive.
 
 ## G03 — Cloud Run Job
 
-- [ ] Testar leitor e escritor com `.jsonl`, `.jsonl.gz` e fixture inválida.
-- [ ] Validar schema Parquet, compressão, contagem e hashes localmente.
+- [x] Testar leitor e escritor com `.jsonl`, `.jsonl.gz` e fixture inválida.
+- [x] Validar schema Parquet, compressão, contagem e hashes localmente.
 - [ ] Confirmar imagem pelo digest e commit, não apenas por tag mutável.
-- [ ] Confirmar job com project ID, região, service account e limites explícitos.
+- [x] Confirmar job com project ID, região, service account e limites explícitos.
 - [ ] Executar uma tarefa, uma tentativa e sem paralelismo no piloto.
 - [ ] Comparar conteúdo lógico local/cloud registro a registro.
-- [ ] Confirmar que falha não promove output parcial.
+- [x] Confirmar que falha não promove output parcial.
 - [ ] Reexecutar por operation ID e comprovar retomada.
 - [ ] Registrar duração, CPU, memória, bytes e custo observado.
+
+Evidência local de G03 em `2026-08-12`: 30 linhas, Parquet 2.6 Zstandard,
+SHA-256 binário
+`c518b4211d3fb0982469161fc3f2d0d3832ee75e2b37ad990143238b179044a1`
+e fingerprint lógico
+`2fb781b8188ec7b4b8029f5b9e4873cab376be742f52b9cd712fbb4197dc0e71`.
+A imagem não-root reproduziu os hashes; o plano real da fundação indicou
+`15 add / 0 change / 0 destroy`. Apply, build remoto e job não foram executados.
 
 ## G04 — Marimo privado
 

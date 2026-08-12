@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import tomllib
+from decimal import Decimal
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
@@ -18,6 +19,7 @@ EXPECTED_SOURCE_FILES = 2_887
 EXPECTED_SOURCE_BYTES = 14_686_043_352
 EXPECTED_SENTINEL_BYTES = 78_822
 EXPECTED_BATCH_PLAN_FILE_SHA256 = "ef933d8cbe89ff5d1110c5e743fddfd2cb314711b31c9eed7dbb60fc1a56606b"
+EXPECTED_G03_SELECTION_SHA256 = "8e6d879159078db7f6549a5997aded0ae29d2dda1311609b0353493f9525a1dc"
 EXPECTED_EMPTY_SOURCE_LOCATORS = (
     "camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl",
     "camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl",
@@ -53,6 +55,35 @@ class DataConfig(StrictModel):
 
 class MigratorConfig(StrictModel):
     service_account_id: str
+
+
+class PipelineConfig(StrictModel):
+    service_account_id: str
+    artifact_repository_id: str
+    image_name: str
+    job_name: str
+    selection_manifest_sha256: str
+    task_count: int = Field(gt=0)
+    parallelism: int = Field(gt=0)
+    max_retries: int = Field(ge=0)
+    cpu: Literal["1"]
+    memory: Literal["1Gi"]
+    timeout_seconds: int = Field(gt=0)
+    max_cost_usd: Decimal = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_pipeline(self) -> PipelineConfig:
+        identifiers = (
+            self.service_account_id,
+            self.artifact_repository_id,
+            self.image_name,
+            self.job_name,
+        )
+        if any(not re.fullmatch(r"[a-z][a-z0-9-]{2,62}", item) for item in identifiers):
+            raise ValueError("identificador G03 inválido")
+        if not SHA256_PATTERN.fullmatch(self.selection_manifest_sha256):
+            raise ValueError("hash da seleção G03 inválido")
+        return self
 
 
 class BudgetConfig(StrictModel):
@@ -135,13 +166,14 @@ class MigrationConfig(StrictModel):
 
 
 class GcpContract(StrictModel):
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     project_id: str
     project_number: str
     region: str
     state: StateConfig
     data: DataConfig
     migrator: MigratorConfig
+    pipeline: PipelineConfig
     budget: BudgetConfig
     migration: MigrationConfig
 
@@ -176,6 +208,27 @@ class GcpContract(StrictModel):
                 self.migrator.service_account_id,
                 "fn-migrator",
             ),
+            "pipeline.service_account_id": (
+                self.pipeline.service_account_id,
+                "fn-pipeline",
+            ),
+            "pipeline.artifact_repository_id": (
+                self.pipeline.artifact_repository_id,
+                "falando-nela",
+            ),
+            "pipeline.image_name": (self.pipeline.image_name, "parquet-pilot"),
+            "pipeline.job_name": (self.pipeline.job_name, "fn-parquet-pilot"),
+            "pipeline.selection_manifest_sha256": (
+                self.pipeline.selection_manifest_sha256,
+                EXPECTED_G03_SELECTION_SHA256,
+            ),
+            "pipeline.task_count": (self.pipeline.task_count, 1),
+            "pipeline.parallelism": (self.pipeline.parallelism, 1),
+            "pipeline.max_retries": (self.pipeline.max_retries, 0),
+            "pipeline.cpu": (self.pipeline.cpu, "1"),
+            "pipeline.memory": (self.pipeline.memory, "1Gi"),
+            "pipeline.timeout_seconds": (self.pipeline.timeout_seconds, 600),
+            "pipeline.max_cost_usd": (self.pipeline.max_cost_usd, Decimal("0.10")),
             "budget.display_name": (self.budget.display_name, "falando-nela-gcp-first"),
             "budget.currency_code": (self.budget.currency_code, "BRL"),
             "budget.amount": (self.budget.amount, 25),
@@ -206,6 +259,10 @@ class GcpContract(StrictModel):
     def migrator_email(self) -> str:
         return f"{self.migrator.service_account_id}@{self.project_id}.iam.gserviceaccount.com"
 
+    @property
+    def pipeline_email(self) -> str:
+        return f"{self.pipeline.service_account_id}@{self.project_id}.iam.gserviceaccount.com"
+
     def confirm_targets(
         self,
         *,
@@ -219,6 +276,23 @@ class GcpContract(StrictModel):
             raise GcpConfigError("confirmação literal do bucket diverge")
         if source_raw_folder_id != self.migration.source_raw_folder_id:
             raise GcpConfigError("confirmação literal da pasta raw diverge")
+
+    def confirm_pipeline_targets(
+        self,
+        *,
+        project_id: str,
+        region: str,
+        bucket: str,
+        authoritative_raw: str,
+    ) -> None:
+        if project_id != self.project_id:
+            raise GcpConfigError("confirmação literal do project ID diverge")
+        if region != self.region:
+            raise GcpConfigError("confirmação literal da região diverge")
+        if bucket != self.data.bucket:
+            raise GcpConfigError("confirmação literal do bucket diverge")
+        if authoritative_raw != "gcs" or self.migration.authoritative_raw != "gcs":
+            raise GcpConfigError("GCS ainda não foi confirmado como autoridade raw")
 
 
 def load_gcp_contract(path: Path) -> GcpContract:

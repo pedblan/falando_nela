@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.pytest_cache
+.ruff_cache
+.terraform
+.venv
+arquivo
+data
+data_samples
+notebooks
+**/__pycache__
+*.pyc
+*.sqlite*
+*.tfplan
+*.tfstate*

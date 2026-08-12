@@ -1,4 +1,4 @@
-schema_version = 4
+schema_version = 5
 project_id = "falando-nela-pedblan"
 project_number = "818569314985"
 region = "southamerica-east1"
@@ -20,6 +20,20 @@ versioning = false
 
 [migrator]
 service_account_id = "fn-migrator"
+
+[pipeline]
+service_account_id = "fn-pipeline"
+artifact_repository_id = "falando-nela"
+image_name = "parquet-pilot"
+job_name = "fn-parquet-pilot"
+selection_manifest_sha256 = "8e6d879159078db7f6549a5997aded0ae29d2dda1311609b0353493f9525a1dc"
+task_count = 1
+parallelism = 1
+max_retries = 0
+cpu = "1"
+memory = "1Gi"
+timeout_seconds = 600
+max_cost_usd = "0.10"
 
 [budget]
 display_name = "falando-nela-gcp-first"

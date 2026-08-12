@@ -69,11 +69,11 @@ preservado como rollback.
 
 ## G03 — primeiro Parquet em Cloud Run Job
 
-- [ ] Criar spec operacional do recorte R03 de 30 discursos.
-- [ ] Implementar leitor GCS e escritor Parquet fora do caderno.
-- [ ] Criar imagem OCI reproduzível e validá-la localmente com fixture.
-- [ ] Declarar Artifact Registry, Cloud Build, service account e job em OpenTofu.
-- [ ] Executar e revisar `tofu plan` antes de aplicar.
+- [x] Criar spec operacional do recorte R03 de 30 discursos.
+- [x] Implementar leitor GCS e escritor Parquet fora do caderno.
+- [x] Criar imagem OCI reproduzível e validá-la localmente com fixture.
+- [x] Declarar Artifact Registry, Cloud Build, service account e job em OpenTofu.
+- [x] Executar e revisar `tofu plan` antes de aplicar.
 - [ ] Publicar a imagem marcada por commit.
 - [ ] Executar uma única tarefa Cloud Run com uma tentativa.
 - [ ] Publicar Parquet e manifest em prefixo imutável.

@@ -27,12 +27,13 @@ def test_versioned_contract_freezes_g01_targets_and_sentinel() -> None:
     assert contract.data.soft_delete_retention_seconds == 604_800
     assert len(contract.migration.sentinel) == 3
     assert sum(item.size_bytes for item in contract.migration.sentinel) == 78_822
+    assert contract.pipeline_email == ("fn-pipeline@falando-nela-pedblan.iam.gserviceaccount.com")
 
 
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("schema_version = 4", "schema_version = 5"),
+        ("schema_version = 5", "schema_version = 6"),
         ('project_id = "falando-nela-pedblan"', 'project_id = "eleicoes-2026-504713"'),
         ('region = "southamerica-east1"', 'region = "us-central1"'),
     ],
@@ -106,14 +107,14 @@ def test_gcs_cli_has_safe_defaults_and_explicit_target_arguments() -> None:
     assert args.operator_account == "operator@example.invalid"
 
 
-def test_g02_contract_keeps_current_defaults_and_pre_cutover_authority() -> None:
+def test_g02_cutover_and_g03_pipeline_contract_are_frozen() -> None:
     contract = load_gcp_contract(CONFIG_PATH)
 
-    assert contract.schema_version == 4
+    assert contract.schema_version == 5
     assert contract.budget.currency_code == "BRL"
     assert contract.budget.amount == 25
     assert contract.budget.reference_ceiling_usd == 5
-    assert contract.migration.authoritative_raw == "drive"
+    assert contract.migration.authoritative_raw == "gcs"
     assert contract.migration.batch_count == 38
     assert contract.migration.batch_max_files == 100
     assert contract.migration.batch_max_bytes == 512 * 1024 * 1024
@@ -121,6 +122,35 @@ def test_g02_contract_keeps_current_defaults_and_pre_cutover_authority() -> None
     assert contract.migration.restore_sample_files == 16
     assert contract.migration.restore_sample_bytes == 13_966_298
     assert len(contract.migration.approved_empty_source_locators) == 2
+    assert contract.pipeline.service_account_id == "fn-pipeline"
+    assert contract.pipeline.artifact_repository_id == "falando-nela"
+    assert contract.pipeline.image_name == "parquet-pilot"
+    assert contract.pipeline.job_name == "fn-parquet-pilot"
+    assert contract.pipeline.task_count == 1
+    assert contract.pipeline.parallelism == 1
+    assert contract.pipeline.max_retries == 0
+    assert contract.pipeline.cpu == "1"
+    assert contract.pipeline.memory == "1Gi"
+    assert contract.pipeline.timeout_seconds == 600
+    assert str(contract.pipeline.max_cost_usd) == "0.10"
+
+
+def test_pipeline_confirmation_requires_literal_g03_targets() -> None:
+    contract = load_gcp_contract(CONFIG_PATH)
+
+    contract.confirm_pipeline_targets(
+        project_id="falando-nela-pedblan",
+        region="southamerica-east1",
+        bucket="falando-nela-pedblan-data",
+        authoritative_raw="gcs",
+    )
+    with pytest.raises(GcpConfigError, match="região"):
+        contract.confirm_pipeline_targets(
+            project_id="falando-nela-pedblan",
+            region="us-central1",
+            bucket="falando-nela-pedblan-data",
+            authoritative_raw="gcs",
+        )
 
 
 def test_g02_contract_accepts_safe_operational_adjustments(tmp_path: Path) -> None:

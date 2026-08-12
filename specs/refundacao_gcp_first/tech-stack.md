@@ -2,8 +2,10 @@
 
 ## Estado
 
-Escolhas aprovadas em `2026-08-11`; efeitos remotos continuam bloqueados pelos
-gates do plano. O executável atual permanece local-first até G05.
+Escolhas aprovadas em `2026-08-11`; G02 tornou o GCS a fonte raw oficial. O
+recorte G03 já possui código, imagem local e IaC validados, mas seus efeitos
+remotos continuam bloqueados pelo gate único. O executável geral permanece
+local-first até G05.
 
 ## Topologia fixada
 
@@ -20,9 +22,9 @@ gates do plano. O executável atual permanece local-first até G05.
 | Cadernos publicados | serviço Cloud Run privado com `marimo run` |
 | Catálogo analítico remoto | BigQuery adiado |
 
-Os nomes de bucket estavam sem recurso visível em `2026-08-11`, mas a
-disponibilidade global será revalidada no momento imediatamente anterior ao
-bootstrap.
+Os buckets de state e dados existem em `southamerica-east1`; o raw integral foi
+reconciliado no bucket de dados. Artifact Registry, contas do pipeline e Cloud
+Run Job ainda não existem antes do gate G03.
 
 ## Infraestrutura como código
 
@@ -65,9 +67,11 @@ Mac fonte de dados nem ambiente do pipeline após o corte.
 
 - Python 3.13 e dependências resolvidas por `uv.lock` com `--locked`;
 - imagem OCI Linux reproduzível, marcada por commit;
+- bases da imagem fixadas por digest e runtime não-root (UID 10001);
 - Artifact Registry regional `falando-nela`;
 - Cloud Build para builds remotos depois de API e orçamento aprovados;
-- service account `fn-pipeline` para Cloud Run Jobs, sem chave exportável;
+- pacote-fonte de build isolado em `operations/builds/g03/` no bucket de dados;
+- service accounts `fn-builder` e `fn-pipeline`, ambas sem chave exportável;
 - logs estruturados em Cloud Logging e resultados persistidos somente no GCS.
 
 Cloud Run Jobs será usado antes de Google Cloud Batch porque o recorte inicial é

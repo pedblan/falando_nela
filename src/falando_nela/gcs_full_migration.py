@@ -194,7 +194,13 @@ class GcsJsonApi:
         self._require_success(response, "restauração de objeto GCS")
         atomic_write_bytes(destination, response.content)
 
-    def publish_bytes_create_only(self, locator: str, content: bytes) -> dict[str, Any]:
+    def publish_bytes_create_only(
+        self,
+        locator: str,
+        content: bytes,
+        *,
+        content_type: str = "application/json",
+    ) -> dict[str, Any]:
         try:
             response = self._request(
                 "POST",
@@ -208,7 +214,7 @@ class GcsJsonApi:
                     "ifGenerationMatch": "0",
                 },
                 content=content,
-                extra_headers={"Content-Type": "application/json"},
+                extra_headers={"Content-Type": content_type},
             )
         except httpx.HTTPError as exc:
             return self._reconcile_create(locator, content, cause=exc)

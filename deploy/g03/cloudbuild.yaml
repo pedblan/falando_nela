@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=deploy/g03/Dockerfile
+      - --platform=linux/amd64
+      - --tag=${_IMAGE_URI}:${_REVISION}
+      - --label=org.opencontainers.image.revision=${_REVISION}
+      - .
+images:
+  - ${_IMAGE_URI}:${_REVISION}
+serviceAccount: projects/falando-nela-pedblan/serviceAccounts/fn-builder@falando-nela-pedblan.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
