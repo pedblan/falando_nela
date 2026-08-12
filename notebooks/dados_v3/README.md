@@ -1,4 +1,8 @@
-# Cadernos do pipeline de dados v3
+# Cadernos do pipeline de dados v3 — consulta legada
+
+> **Status desde R09:** estes notebooks permanecem disponíveis apenas para
+> consulta histórica. Seus comandos Colab não constituem o fluxo operacional
+> local-first.
 
 Estes cadernos reconstruirão a linha pós-coleta usando somente
 `/content/drive/MyDrive/falando_nela/data/raw` como entrada imutável.

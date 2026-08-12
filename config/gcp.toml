@@ -1,0 +1,76 @@
+schema_version = 2
+project_id = "falando-nela-pedblan"
+project_number = "818569314985"
+region = "southamerica-east1"
+
+[state]
+bucket = "falando-nela-pedblan-tfstate"
+prefix = "opentofu/g01"
+soft_delete_retention_seconds = 604800
+versioning = true
+
+[data]
+bucket = "falando-nela-pedblan-data"
+raw_prefix = "data/raw/v1"
+processed_prefix = "data/processed/v1"
+manifests_prefix = "manifests"
+operations_prefix = "operations"
+soft_delete_retention_seconds = 604800
+versioning = false
+
+[migrator]
+service_account_id = "fn-migrator"
+
+[budget]
+display_name = "falando-nela-gcp-first"
+amount_usd = 5
+current_spend_thresholds = [0.5, 0.9, 1.0]
+forecasted_spend_thresholds = [1.0]
+default_iam_recipients = true
+project_level_recipients = true
+
+[migration]
+source_operational_root_folder_id = "17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq"
+source_raw_folder_id = "1n0FTylozV_HRSGcWHyJhpZAuHOcnZ3f9"
+source_files = 2887
+source_bytes = 14686043352
+source_catalog_sha256 = "6a8395a9fb60a999a97562b7f0c791ac766f161e01664ea549ad52bf36bb0930"
+source_catalog_file_sha256 = "cabe9aae5071d25bdae6459b99064d2ed37110ffaed0c30b95867dd798d22319"
+source_batch_plan_file_sha256 = "ef933d8cbe89ff5d1110c5e743fddfd2cb314711b31c9eed7dbb60fc1a56606b"
+authoritative_raw = "drive"
+approved_empty_source_locators = [
+  "camara/plenario_discursos/ano=1954/mes=12/prod-historico-camara-plenario.jsonl",
+  "camara/plenario_discursos/ano=1956/mes=06/prod-historico-camara-plenario.jsonl",
+]
+batch_count = 38
+batch_max_files = 100
+batch_max_bytes = 536870912
+oversized_batch_count = 4
+restore_sample_max_object_bytes = 16777216
+restore_sample_files = 16
+restore_sample_bytes = 13966298
+max_cost_usd = 1
+
+[[migration.sentinel]]
+category = "metadata"
+source_locator = "senado/pareceres_pec/metadata/validacao-senado-pareceres-pec-20260530T002409Z.jsonl"
+destination_locator = "data/raw/v1/senado/pareceres_pec/metadata/validacao-senado-pareceres-pec-20260530T002409Z.jsonl"
+size_bytes = 868
+md5 = "0888ccf9c9ba9f2952d106fad049247b"
+sha256 = "7020492564083d1fea1a7f8532e30676fa4d54d8667e71da547d31abc7954cb0"
+
+[[migration.sentinel]]
+category = "monthly_text"
+source_locator = "camara/plenario_discursos/ano=1970/mes=01/prod-historico-camara-plenario.jsonl"
+destination_locator = "data/raw/v1/camara/plenario_discursos/ano=1970/mes=01/prod-historico-camara-plenario.jsonl"
+size_bytes = 2694
+md5 = "974e6c38be1103bfb555b5957df67b3b"
+sha256 = "d352c0bfef547e31c1e13124809e8d5c6a9e7c3fa239966cb9e2a145a9adde84"
+
+[[migration.sentinel]]
+category = "transcription_queue"
+source_locator = "senado/plenario_discursos/transcription_queue/prod-senado-plenario-20260518T194535Z.jsonl"
+destination_locator = "data/raw/v1/senado/plenario_discursos/transcription_queue/prod-senado-plenario-20260518T194535Z.jsonl"
+size_bytes = 75260
+md5 = "b9d4d20b6a8f1ed65f01bfe9b8b8ef1a"
+sha256 = "7b6ba3ae0fbde07c35aa47f6816678195f385e59a01ae6d8c62db07cd6658ffb"

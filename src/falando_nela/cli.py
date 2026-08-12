@@ -6,7 +6,40 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import ValidationError
+
+from falando_nela.config import ConfigurationError, Settings
 from falando_nela.doctor import run_doctor
+from falando_nela.drive_organizer import (
+    CopyConflict,
+    LayoutError,
+    RcloneCopyTransport,
+    execute_drive_copy,
+    execute_drive_dry_run,
+    plan_drive_organization,
+    reconcile_drive_inventory,
+)
+from falando_nela.gcp_config import GcpConfigError, load_gcp_contract
+from falando_nela.gcs_full_migration import (
+    GcsFullMigrationError,
+    GcsJsonApi,
+    RcloneG02Transport,
+    execute_gcs_cutover,
+    execute_gcs_full,
+)
+from falando_nela.gcs_migration import (
+    GcloudImpersonatedTokenProvider,
+    GcsMigrationError,
+    RcloneGcsTransport,
+    execute_gcs_sentinel,
+)
+from falando_nela.operations import OperationError
+from falando_nela.sample_import import (
+    PILOT_PREFIX,
+    SampleImportError,
+    execute_pilot_sample,
+)
+from falando_nela.sources import RcloneRawSource, SourceError, inspect_rclone_config
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -17,6 +50,143 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--data-root", type=Path)
     doctor.add_argument("--repo-root", type=Path, default=Path.cwd())
     doctor.add_argument("--allow-full", action="store_true", default=None)
+    drive_organize = subcommands.add_parser(
+        "drive-organize", help="prepara a organização copy-first do raw no Drive"
+    )
+    drive_commands = drive_organize.add_subparsers(dest="drive_command", required=True)
+    drive_plan = drive_commands.add_parser(
+        "plan", help="reconcilia inventário e congela o mapa sem copiar arquivos"
+    )
+    drive_plan.add_argument("--operation-id", required=True)
+    drive_plan.add_argument("--baseline-csv", type=Path, required=True)
+    drive_plan.add_argument("--rclone-config", type=Path, required=True)
+    drive_plan.add_argument("--source-remote", default="raw-source-ro")
+    drive_plan.add_argument("--source-folder-id", required=True)
+    drive_plan.add_argument("--destination-remote", default="raw-destination-rw")
+    drive_plan.add_argument("--destination-folder-id", required=True)
+    drive_plan.add_argument("--data-root", type=Path)
+    drive_plan.add_argument("--repo-root", type=Path, default=Path.cwd())
+    drive_plan.add_argument("--json", action="store_true", dest="as_json")
+    drive_reconcile = drive_commands.add_parser(
+        "reconcile", help="reconcilia G01 e identidades do Drive sem copiar arquivos"
+    )
+    drive_reconcile.add_argument("--operation-id", required=True)
+    drive_reconcile.add_argument("--baseline-csv", type=Path, required=True)
+    drive_reconcile.add_argument("--provider-identity-map", type=Path, required=True)
+    drive_reconcile.add_argument("--rclone-config", type=Path, required=True)
+    drive_reconcile.add_argument("--source-remote", default="raw-source-ro")
+    drive_reconcile.add_argument("--source-folder-id", required=True)
+    drive_reconcile.add_argument("--data-root", type=Path)
+    drive_reconcile.add_argument("--repo-root", type=Path, default=Path.cwd())
+    drive_reconcile.add_argument("--json", action="store_true", dest="as_json")
+    drive_dry_run = drive_commands.add_parser(
+        "dry-run", help="ensaia o plano integral sem criar objetos no Drive"
+    )
+    drive_dry_run.add_argument("--operation-id", required=True)
+    drive_dry_run.add_argument("--reconciliation-manifest", type=Path, required=True)
+    drive_dry_run.add_argument("--source-inventory", type=Path, required=True)
+    drive_dry_run.add_argument("--source-reconciliation", type=Path, required=True)
+    drive_dry_run.add_argument("--provider-identity-map", type=Path, required=True)
+    drive_dry_run.add_argument("--rclone-config", type=Path, required=True)
+    drive_dry_run.add_argument("--source-remote", default="raw-source-ro")
+    drive_dry_run.add_argument("--source-folder-id", required=True)
+    drive_dry_run.add_argument("--destination-remote", default="raw-destination-rw")
+    drive_dry_run.add_argument("--destination-folder-id", required=True)
+    drive_dry_run.add_argument("--data-root", type=Path)
+    drive_dry_run.add_argument("--repo-root", type=Path, default=Path.cwd())
+    drive_dry_run.add_argument("--json", action="store_true", dest="as_json")
+    drive_copy = drive_commands.add_parser(
+        "copy", help="copia e reconcilia o sentinela ou toda a árvore canônica"
+    )
+    drive_copy.add_argument("--operation-id", required=True)
+    drive_copy.add_argument("--source-inventory", type=Path, required=True)
+    drive_copy.add_argument("--dry-run-operation-root", type=Path, required=True)
+    drive_copy.add_argument("--rclone-config", type=Path, required=True)
+    drive_copy.add_argument("--source-remote", default="raw-source-ro")
+    drive_copy.add_argument("--source-folder-id", required=True)
+    drive_copy.add_argument("--destination-remote", default="raw-destination-rw")
+    drive_copy.add_argument("--destination-folder-id", required=True)
+    drive_copy.add_argument("--through", choices=("sentinel", "all"), default="sentinel")
+    drive_copy.add_argument("--batch-max-files", type=int, default=100)
+    drive_copy.add_argument("--batch-max-bytes", type=int, default=512 * 1024 * 1024)
+    drive_copy.add_argument("--sentinel-max-bytes", type=int, default=10 * 1024 * 1024)
+    drive_copy.add_argument("--data-root", type=Path)
+    drive_copy.add_argument("--repo-root", type=Path, default=Path.cwd())
+    drive_copy.add_argument("--json", action="store_true", dest="as_json")
+    sample = subcommands.add_parser("sample", help="materializa amostras raw aprovadas")
+    sample_commands = sample.add_subparsers(dest="sample_command", required=True)
+    sample_pilot = sample_commands.add_parser(
+        "pilot", help="publica o piloto determinístico do Plenário do Senado em 2010"
+    )
+    sample_pilot.add_argument("--operation-id", required=True)
+    sample_pilot.add_argument("--copy-catalog-summary", type=Path, required=True)
+    sample_pilot.add_argument("--rclone-config", type=Path, required=True)
+    sample_pilot.add_argument("--source-remote", default="raw-source-ro")
+    sample_pilot.add_argument("--source-folder-id", required=True)
+    sample_pilot.add_argument("--confirm-source-folder-id", required=True)
+    sample_pilot.add_argument("--data-root", type=Path)
+    sample_pilot.add_argument("--repo-root", type=Path, default=Path.cwd())
+    sample_pilot.add_argument("--json", action="store_true", dest="as_json")
+    gcs_migrate = subcommands.add_parser(
+        "gcs-migrate", help="prepara a migração imutável e recuperável para GCS"
+    )
+    gcs_commands = gcs_migrate.add_subparsers(dest="gcs_command", required=True)
+    gcs_sentinel = gcs_commands.add_parser(
+        "sentinel", help="reconcilia, ensaia ou copia a sentinela G01"
+    )
+    gcs_sentinel.add_argument(
+        "--through", choices=("preflight", "dry-run", "copy"), default="preflight"
+    )
+    gcs_sentinel.add_argument("--operation-id", required=True)
+    gcs_sentinel.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    gcs_sentinel.add_argument("--source-catalog", type=Path, required=True)
+    gcs_sentinel.add_argument("--rclone-config", type=Path, required=True)
+    gcs_sentinel.add_argument("--source-remote", default="raw-source-ro")
+    gcs_sentinel.add_argument("--source-folder-id", required=True)
+    gcs_sentinel.add_argument("--confirm-source-folder-id", required=True)
+    gcs_sentinel.add_argument("--confirm-project-id", required=True)
+    gcs_sentinel.add_argument("--confirm-bucket", required=True)
+    gcs_sentinel.add_argument("--operator-account", required=True)
+    gcs_sentinel.add_argument("--data-root", type=Path)
+    gcs_sentinel.add_argument("--repo-root", type=Path, default=Path.cwd())
+    gcs_sentinel.add_argument("--json", action="store_true", dest="as_json")
+    gcs_full = gcs_commands.add_parser("full", help="executa a migração integral recuperável G02")
+    gcs_full.add_argument(
+        "--through",
+        choices=("preflight", "dry-run", "copy", "verify", "idempotency", "restore"),
+        default="preflight",
+    )
+    gcs_full.add_argument("--operation-id", required=True)
+    gcs_full.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    gcs_full.add_argument("--source-catalog", type=Path, required=True)
+    gcs_full.add_argument("--source-batch-plan", type=Path, required=True)
+    gcs_full.add_argument("--g01-operation-root", type=Path, required=True)
+    gcs_full.add_argument("--rclone-config", type=Path, required=True)
+    gcs_full.add_argument("--source-remote", default="raw-source-ro")
+    gcs_full.add_argument("--source-folder-id", required=True)
+    gcs_full.add_argument("--confirm-source-folder-id", required=True)
+    gcs_full.add_argument("--confirm-project-id", required=True)
+    gcs_full.add_argument("--confirm-bucket", required=True)
+    gcs_full.add_argument("--operator-account", required=True)
+    gcs_full.add_argument("--approve-plan-sha256")
+    gcs_full.add_argument("--approve-max-cost-usd")
+    gcs_full.add_argument("--batch-max-files", type=int, default=100)
+    gcs_full.add_argument("--batch-max-bytes", type=int, default=512 * 1024 * 1024)
+    gcs_full.add_argument("--data-root", type=Path)
+    gcs_full.add_argument("--repo-root", type=Path, default=Path.cwd())
+    gcs_full.add_argument("--json", action="store_true", dest="as_json")
+    gcs_cutover = gcs_commands.add_parser(
+        "cutover", help="declara GCS como autoridade raw após aprovação G02"
+    )
+    gcs_cutover.add_argument("--gcp-config", type=Path, default=Path("config/gcp.toml"))
+    gcs_cutover.add_argument("--operation-root", type=Path, required=True)
+    gcs_cutover.add_argument("--confirm-source-folder-id", required=True)
+    gcs_cutover.add_argument("--confirm-project-id", required=True)
+    gcs_cutover.add_argument("--confirm-bucket", required=True)
+    gcs_cutover.add_argument("--operator-account", required=True)
+    gcs_cutover.add_argument("--approve-migration-manifest-sha256", required=True)
+    gcs_cutover.add_argument("--confirm-authoritative-raw", required=True)
+    gcs_cutover.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -33,7 +203,387 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_human_doctor(payload)
         return return_code
+    if args.command == "drive-organize" and args.drive_command == "plan":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            transport = RcloneCopyTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                destination_remote=args.destination_remote,
+                destination_folder_id=args.destination_folder_id,
+                config_snapshot=config_snapshot,
+            )
+            payload = plan_drive_organization(
+                source=source,
+                transport=transport,
+                baseline_csv=args.baseline_csv,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                source_folder_id=args.source_folder_id,
+                destination_folder_id=args.destination_folder_id,
+            )
+        except (
+            ConfigurationError,
+            LayoutError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha ao planejar organização do Drive: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_drive_plan(payload)
+        return 0
+    if args.command == "drive-organize" and args.drive_command == "reconcile":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            payload = reconcile_drive_inventory(
+                source=source,
+                baseline_csv=args.baseline_csv,
+                provider_identity_map_path=args.provider_identity_map,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                source_folder_id=args.source_folder_id,
+            )
+        except (
+            ConfigurationError,
+            LayoutError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha ao reconciliar inventário do Drive: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_drive_reconciliation(payload)
+        return 0
+    if args.command == "drive-organize" and args.drive_command == "dry-run":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            transport = RcloneCopyTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                destination_remote=args.destination_remote,
+                destination_folder_id=args.destination_folder_id,
+                config_snapshot=config_snapshot,
+            )
+            payload = execute_drive_dry_run(
+                transport=transport,
+                reconciliation_manifest_path=args.reconciliation_manifest,
+                source_inventory_path=args.source_inventory,
+                source_reconciliation_path=args.source_reconciliation,
+                provider_identity_map_path=args.provider_identity_map,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                source_folder_id=args.source_folder_id,
+                destination_folder_id=args.destination_folder_id,
+            )
+        except (
+            ConfigurationError,
+            CopyConflict,
+            LayoutError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha no dry-run da organização do Drive: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_drive_dry_run(payload)
+        return 0
+    if args.command == "drive-organize" and args.drive_command == "copy":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            transport = RcloneCopyTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                destination_remote=args.destination_remote,
+                destination_folder_id=args.destination_folder_id,
+                config_snapshot=config_snapshot,
+            )
+            payload = execute_drive_copy(
+                transport=transport,
+                source=source,
+                source_inventory_path=args.source_inventory,
+                dry_run_operation_root=args.dry_run_operation_root,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                source_folder_id=args.source_folder_id,
+                destination_folder_id=args.destination_folder_id,
+                through=args.through,
+                batch_max_files=args.batch_max_files,
+                batch_max_bytes=args.batch_max_bytes,
+                sentinel_max_bytes=args.sentinel_max_bytes,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            CopyConflict,
+            LayoutError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha na cópia da organização do Drive: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_drive_copy(payload)
+        return 0
+    if args.command == "sample" and args.sample_command == "pilot":
+        try:
+            if args.confirm_source_folder_id != args.source_folder_id:
+                raise SampleImportError("confirmação literal do ID canônico diverge")
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix=PILOT_PREFIX,
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+            )
+            payload = execute_pilot_sample(
+                source=source,
+                copy_catalog_summary_path=args.copy_catalog_summary,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                sample_seed=settings.sample_seed,
+                quota_bytes=settings.sample_local_quota_bytes,
+                minimum_free_bytes=settings.minimum_free_bytes,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            OSError,
+            OperationError,
+            SampleImportError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha ao materializar piloto amostral: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_sample_pilot(payload)
+        return 0
+    if args.command == "gcs-migrate" and args.gcs_command == "sentinel":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            contract = load_gcp_contract(args.gcp_config)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            access_token = GcloudImpersonatedTokenProvider(
+                project_id=contract.project_id,
+                service_account=contract.migrator_email,
+                operator_account=args.operator_account,
+            )
+            transport = RcloneGcsTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                project_id=contract.project_id,
+                project_number=contract.project_number,
+                region=contract.region,
+                bucket=contract.data.bucket,
+                raw_prefix=contract.data.raw_prefix,
+                access_token=access_token,
+            )
+            payload = execute_gcs_sentinel(
+                source=source,
+                transport=transport,
+                contract=contract,
+                source_catalog_path=args.source_catalog,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                confirmed_project_id=args.confirm_project_id,
+                confirmed_bucket=args.confirm_bucket,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                through=args.through,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            GcpConfigError,
+            GcsMigrationError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha na sentinela GCS: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_gcs_sentinel(payload)
+        return 0
+    if args.command == "gcs-migrate" and args.gcs_command == "full":
+        try:
+            settings = Settings.from_env(repo_root=args.repo_root, data_root=args.data_root)
+            contract = load_gcp_contract(args.gcp_config)
+            config_snapshot = inspect_rclone_config(args.rclone_config)
+            source = RcloneRawSource(
+                remote=args.source_remote,
+                config_path=args.rclone_config,
+                prefix="",
+                expected_folder_id=args.source_folder_id,
+                config_snapshot=config_snapshot,
+                include_all_files=True,
+            )
+            access_token = GcloudImpersonatedTokenProvider(
+                project_id=contract.project_id,
+                service_account=contract.migrator_email,
+                operator_account=args.operator_account,
+            )
+            copy_transport = RcloneGcsTransport(
+                config_path=args.rclone_config,
+                source_remote=args.source_remote,
+                source_folder_id=args.source_folder_id,
+                project_id=contract.project_id,
+                project_number=contract.project_number,
+                region=contract.region,
+                bucket=contract.data.bucket,
+                raw_prefix=contract.data.raw_prefix,
+                access_token=access_token,
+            )
+            object_store = GcsJsonApi(
+                project_id=contract.project_id,
+                bucket=contract.data.bucket,
+                access_token=access_token,
+            )
+            payload = execute_gcs_full(
+                source=source,
+                transport=RcloneG02Transport(
+                    copy_transport=copy_transport, object_store=object_store
+                ),
+                contract=contract,
+                source_catalog_path=args.source_catalog,
+                source_batch_plan_path=args.source_batch_plan,
+                g01_operation_root=args.g01_operation_root,
+                data_root=settings.data_root,
+                operation_id=args.operation_id,
+                confirmed_project_id=args.confirm_project_id,
+                confirmed_bucket=args.confirm_bucket,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                through=args.through,
+                approved_plan_sha256=args.approve_plan_sha256,
+                approved_max_cost_usd=args.approve_max_cost_usd,
+                batch_max_files=args.batch_max_files,
+                batch_max_bytes=args.batch_max_bytes,
+                progress_callback=_print_progress,
+            )
+        except (
+            ConfigurationError,
+            GcpConfigError,
+            GcsMigrationError,
+            OSError,
+            OperationError,
+            SourceError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha na migração integral GCS: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_gcs_full(payload)
+        return 0
+    if args.command == "gcs-migrate" and args.gcs_command == "cutover":
+        try:
+            contract = load_gcp_contract(args.gcp_config)
+            access_token = GcloudImpersonatedTokenProvider(
+                project_id=contract.project_id,
+                service_account=contract.migrator_email,
+                operator_account=args.operator_account,
+            )
+            store = GcsJsonApi(
+                project_id=contract.project_id,
+                bucket=contract.data.bucket,
+                access_token=access_token,
+            )
+            payload = execute_gcs_cutover(
+                store=store,
+                contract=contract,
+                gcp_config_path=args.gcp_config,
+                operation_root=args.operation_root,
+                confirmed_project_id=args.confirm_project_id,
+                confirmed_bucket=args.confirm_bucket,
+                confirmed_source_folder_id=args.confirm_source_folder_id,
+                approved_migration_manifest_sha256=(args.approve_migration_manifest_sha256),
+                confirmed_authoritative_raw=args.confirm_authoritative_raw,
+            )
+        except (
+            GcpConfigError,
+            GcsFullMigrationError,
+            GcsMigrationError,
+            OSError,
+            OperationError,
+            ValidationError,
+        ) as exc:
+            print(f"Falha no corte G02: {exc}", file=sys.stderr)
+            return 2
+        if args.as_json:
+            print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _print_human_gcs_cutover(payload)
+        return 0
     return 2
+
+
+def _print_progress(event: dict[str, object]) -> None:
+    print(json.dumps(event, ensure_ascii=False, sort_keys=True), file=sys.stderr, flush=True)
 
 
 def _print_human_doctor(payload: dict[str, object]) -> None:
@@ -41,3 +591,70 @@ def _print_human_doctor(payload: dict[str, object]) -> None:
     for check in payload["checks"]:
         assert isinstance(check, dict)
         print(f"- {check['id']}: {check['status']} — {check['detail']}", file=sys.stderr)
+
+
+def _print_human_drive_plan(payload: dict[str, object]) -> None:
+    print(f"Plano do Drive: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- arquivos: {payload['files']}", file=sys.stderr)
+    print(f"- bytes: {payload['bytes']}", file=sys.stderr)
+    print(f"- plano: {payload['copy_plan_path']}", file=sys.stderr)
+
+
+def _print_human_drive_reconciliation(payload: dict[str, object]) -> None:
+    print(f"Reconciliação do Drive: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- arquivos: {payload['files']}", file=sys.stderr)
+    print(f"- bytes: {payload['bytes']}", file=sys.stderr)
+    print(f"- relatório: {payload['reconciliation_path']}", file=sys.stderr)
+
+
+def _print_human_drive_dry_run(payload: dict[str, object]) -> None:
+    print(f"Dry-run do Drive: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- candidatos: {payload['files']}", file=sys.stderr)
+    print(f"- bytes: {payload['bytes']}", file=sys.stderr)
+    print(f"- excluídos: {payload['excluded_files']}", file=sys.stderr)
+    print(f"- relatório: {payload['dry_run_summary_path']}", file=sys.stderr)
+
+
+def _print_human_drive_copy(payload: dict[str, object]) -> None:
+    print(f"Cópia do Drive: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- limite executado: {payload['through']}", file=sys.stderr)
+    print(f"- sentinelas: {payload['sentinel_files']}", file=sys.stderr)
+    print(f"- bytes sentinela: {payload['sentinel_bytes']}", file=sys.stderr)
+    if payload["catalog_summary_path"] is not None:
+        print(f"- catálogo: {payload['catalog_summary_path']}", file=sys.stderr)
+
+
+def _print_human_sample_pilot(payload: dict[str, object]) -> None:
+    print(f"Amostra piloto: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- sample_id: {payload['sample_id']}", file=sys.stderr)
+    print(f"- população: {payload['population']}", file=sys.stderr)
+    print(f"- selecionados: {payload['selected_count']}", file=sys.stderr)
+    print(f"- manifesto: {payload['sample_manifest_path']}", file=sys.stderr)
+
+
+def _print_human_gcs_sentinel(payload: dict[str, object]) -> None:
+    print(f"Sentinela GCS: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- limite executado: {payload['through']}", file=sys.stderr)
+    print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)
+    print(f"- artefato: {payload['artifact_path']}", file=sys.stderr)
+
+
+def _print_human_gcs_full(payload: dict[str, object]) -> None:
+    print(f"Migração integral GCS: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- limite executado: {payload['through']}", file=sys.stderr)
+    print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)
+    print(f"- artefato: {payload['artifact_path']}", file=sys.stderr)
+
+
+def _print_human_gcs_cutover(payload: dict[str, object]) -> None:
+    print(f"Corte G02: {payload['status']}", file=sys.stderr)
+    print(f"- operação: {payload['operation_id']}", file=sys.stderr)
+    print(f"- autoridade raw: {payload['authoritative_raw']}", file=sys.stderr)
+    print(f"- manifesto: {payload['manifest_path']}", file=sys.stderr)

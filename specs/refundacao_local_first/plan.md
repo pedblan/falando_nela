@@ -2,11 +2,12 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-03`; R01 e R02 foram concluídos e R02 foi
-integrado localmente em `main` a partir da branch
-`codex/refundacao-r02-foundation`. As etapas seguintes continuarão em branches
-e worktrees próprias. Nenhuma migração real, remoção ou operação paga foi
-autorizada por essa aprovação.
+Contrato histórico aprovado em `2026-08-03`. R00–R03 e R09 permanecem
+concluídos e preservados como base e evidência. Em `2026-08-11`, as etapas ainda
+não iniciadas R04–R08 foram substituídas pelo contrato
+`../refundacao_gcp_first/`; seus checkboxes pendentes não devem ser executados.
+Nenhuma evidência histórica ou autorização já encerrada é ampliada por essa
+substituição.
 
 ## Resultado principal
 
@@ -75,25 +76,79 @@ integrado passou em lockfile, Ruff, formatação, 189 testes e diagnóstico.
 
 ## R03 — piloto da amostra anual de 1% no Drive
 
-- [ ] Criar spec própria para inventário, amostragem anual e materialização do raw existente.
-- [ ] Confirmar humanamente a pasta raw de origem pelo ID `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
-- [ ] Configurar um remote `rclone` exclusivo com escopo `drive.readonly`.
-- [ ] Comparar a listagem atual do Drive com o inventário G01 aprovado.
-- [ ] Gerar inventário somente leitura do corpus de origem sem chamar APIs parlamentares.
-- [ ] Definir a população ativa por data substantiva a partir de `2010-01-01`.
-- [ ] Escolher o primeiro ano não vazio do estrato `senado × plenario_discursos × discurso`.
-- [ ] Contar a população `N` do estrato e persistir identidades, chaves e locators.
-- [ ] Calcular `k=max(1, ceil(N × 0.01))` e congelar as `k` menores chaves.
-- [ ] Materializar somente os registros selecionados sem alterar a origem.
-- [ ] Compactar a amostra fechada como gzip determinístico.
-- [ ] Reconciliar população, selecionados, identidades, hashes, bytes e rejeições.
-- [ ] Encerrar a operação após publicar raw e metadados técnicos, sem produzir Parquet, DuckDB ou análise.
-- [ ] Reexecutar a mesma operação e comprovar idempotência.
-- [ ] Injetar interrupção entre cada etapa e comprovar retomada sem repetir etapa concluída.
+- [x] Criar spec própria para inventário, amostragem anual e materialização do raw existente.
+- [x] Aprovar a organização copy-first do raw em nova árvore canônica no Drive.
+- [x] Criar spec operacional própria para a organização canônica do Drive.
+- [x] Implementar e testar localmente inventário, preflight de destino vazio e mapa canônico retomável.
+- [x] Renomear a raiz antiga para `falando_nela_arquivo`, preservando o ID `15QW3SAIFIw_bzRhlI7m2sVMTL9UKjnzB` e todo o conteúdo.
+- [x] Confirmar que `falando_nela_refundacao`, ID `1zt4au5VQxXj3W1QHCzMD_eg2M2De66nH`, permanece reserva e não será usada pela operação.
+- [x] Implementar inspeção segura de configuração rclone cifrada e redigida, sem token em texto puro ou prompt.
+- [x] Instalar rclone `>=1.64` e configurar a senha cifrada no Chaves do macOS.
+- [x] Configurar remotes separados de origem read-only e destino gravável dedicado.
+- [x] Criar pelo remote `drive.file` uma nova raiz operacional `falando_nela`, confirmar vazia e congelar seu ID por readback.
+- [x] Congelar o mapeamento de plenários e comissões sem alterar conteúdo nem periodicidade.
+- [x] Executar e revisar dry-run integral da cópia imutável.
+- [x] Copiar e reconciliar um lote sentinela antes de ampliar.
+- [x] Copiar em lotes retomáveis e validar a árvore canônica `data/raw/v1/`.
+- [x] Expor a árvore canônica validada por remote read-only para a amostragem.
+- [x] Confirmar humanamente a pasta raw de origem pelo ID `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
+- [x] Configurar um remote `rclone` exclusivo com escopo `drive.readonly`.
+- [x] Comparar a listagem atual do Drive com o inventário G01 aprovado.
+- [x] Reconciliar pelo ID do provedor os dois arquivos acidentais que o rclone lista com o mesmo caminho `camara/plenario_discursos/ano=1900/Untitled`.
+- [x] Gerar inventário somente leitura do corpus de origem sem chamar APIs parlamentares.
+- [x] Definir a população ativa do piloto por data substantiva em 2010.
+- [x] Escolher o primeiro ano não vazio do estrato `senado × plenario_discursos × pronunciamento_texto`.
+- [x] Contar a população `N` do estrato e persistir identidades, chaves e locators.
+- [x] Calcular `k=max(1, ceil(N × 0.01))` e congelar as `k` menores chaves.
+- [x] Materializar somente os registros selecionados sem alterar a origem.
+- [x] Compactar a amostra fechada como gzip determinístico.
+- [x] Reconciliar população, selecionados, identidades, hashes, bytes e rejeições.
+- [x] Encerrar a operação após publicar raw e metadados técnicos, sem produzir Parquet, DuckDB ou análise.
+- [x] Reexecutar a mesma operação e comprovar idempotência.
+- [x] Injetar interrupção entre cada etapa e comprovar retomada sem repetir etapa concluída.
 
-**Gate R03:** raw e manifest do estrato piloto aprovados, quota exata da meta
-anual de 1% segundo o contrato, zero chamada de coleta, origem intacta e
-retomada demonstrada.
+**Gate R03:** árvore canônica copy-first reconciliada sem alterar a origem; raw
+e manifest do estrato piloto aprovados; quota exata da meta anual de 1%; zero
+chamada de coleta; periodicidade preservada e retomada demonstrada.
+
+Evidência de bootstrap de `2026-08-03`: o projeto Google Cloud
+`falando-nela-pedblan` tem Drive API, app OAuth externo em teste e cliente
+desktop próprio. O rclone 1.75.0 usa configuração cifrada fora do clone,
+desbloqueada pelo Chaves do macOS, com os remotes `raw-source-ro`
+(`drive.readonly`, raiz `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`) e
+`raw-destination-rw` (`drive.file`, raiz
+`17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq`). O primeiro listou `camara/` e
+`senado/`; o segundo criou `falando_nela`, registrou seu ID por readback e
+confirmou zero entrada dentro da nova raiz. A listagem integral da origem
+reproduziu a manchete G01 de 2.891 arquivos e 14.686.044.612 bytes. A operação
+recuperável `r03-g01-reconcile-20260803` autenticou localmente o CSV G01 pelo
+SHA-256 `1ab73d3173454b4f556eff02cd202d0dd76740dd7d42d8e24093785dd0cc21a6`
+e confirmou zero ausência, acréscimo ou alteração. Os 2.887 JSONL formam o raw
+elegível; os dois notebooks e os dois arquivos sem extensão receberam exclusão
+explícita. Como a baseline não contém IDs, os dois `Untitled` de mesmo caminho,
+tamanho e hash foram preservados como um grupo de equivalência com dois IDs do
+Drive ligado ao par G01 `Untitled`/`Untitled (1)`, sem atribuição heurística
+individual. A reexecução reutilizou as duas etapas concluídas, cada uma com uma
+única tentativa. A operação `r03-drive-dry-run-20260803` congelou e ensaiou
+2.887 destinos, 14.686.043.352 bytes, com 70 arquivos metadata, 2.811 de corpus
+mensal e seis de fila de transcrição. Os quatro itens não raw, 1.260 bytes,
+foram excluídos pelo ID. O relatório combinado contém exatamente 2.887
+marcadores `+`, nenhum outro marcador, e o readback posterior confirmou o
+destino vazio. A preparação bloqueou uma vez ao encontrar os dez JSONL
+metadata-only de `camara/parlamentares` e `senado/parlamentares`; eles foram
+incluídos explicitamente pelo contrato raw transversal e a segunda tentativa
+concluiu. A etapa remota de dry-run concluiu na primeira tentativa e a
+reexecução não a repetiu. Nenhum arquivo raw foi copiado.
+
+Evidência posterior de conclusão em `2026-08-03`: o sentinela validou três
+arquivos e 78.822 bytes. A operação `r03-drive-copy-batched-20260803` executou
+38 lotes, reconciliou 2.887 arquivos e 14.686.043.352 bytes, publicou catálogo
+final e relistou a origem com 2.891 arquivos e 14.686.044.612 bytes
+inalterados. A operação `r03-sample-pilot-2010-20260803` confirmou 11 arquivos,
+89.253.442 bytes, `N=2.996` e `k=30`; publicou somente os 30 registros
+selecionados em gzip determinístico e foi reexecutada com zero nova leitura e
+zero duplicação. Google Cloud Batch, Marimo e a ampliação para outros estratos
+permanecem fora de R03.
 
 ## R04 — primeiro recorte vertical amostral em marimo
 
@@ -171,8 +226,8 @@ bloqueia o uso local nem autoriza ampliar o job.
 - [ ] Publicar `main` e verificar o remote `pedblan/falando_nela`.
 - [ ] Atualizar o checkout canônico `falando_nela` por fast-forward até a `main` publicada.
 - [ ] Confirmar que `falando_nela` e `origin/main` apontam para o mesmo commit e passam na validação final.
-- [ ] Confirmar que a worktree `falando_nela_refundacao` não contém alterações ou commits exclusivos.
-- [ ] Remover `falando_nela_refundacao` com `git worktree remove` e verificar o registro de worktrees.
+- [x] Confirmar que a worktree `falando_nela_refundacao` não contém alterações ou commits exclusivos.
+- [x] Remover `falando_nela_refundacao` com `git worktree remove` e verificar o registro de worktrees.
 
 **Gate R08:** `main` local-first verificável, com mesmo nome e histórico do
 repositório, checkout canônico atualizado, worktree temporária removida com
@@ -180,16 +235,18 @@ segurança e caminho documentado até o legado etiquetado.
 
 ## R09 — remoções posteriores e independentes
 
-- [ ] Abrir tarefa própria para caracterizar e remover notebooks e geradores Colab substituídos.
-- [ ] Abrir tarefa própria para inventariar e copiar o universo anterior a 2010 para arquivo imutável.
-- [ ] Restaurar e reconciliar o arquivo anterior a 2010 em diretório vazio.
-- [ ] Abrir tarefa própria para retirar cópias locais anteriores a 2010 após restore e aprovação humana.
-- [ ] Procurar referências restantes antes de cada remoção.
-- [ ] Atualizar specs, testes, documentação e empacotamento no mesmo ciclo de cada remoção.
+- [x] Abrir tarefa própria para caracterizar o legado local e manter os notebooks rastreados somente para consulta.
+- [x] Inventariar as cópias locais antigas e as dez raízes antigas autorizadas no Drive.
+- [x] Preservar e reconciliar os 106 notebooks do Drive em biblioteca de consulta.
+- [x] Retirar as duas árvores de dados locais para a Lixeira do macOS após catálogo completo.
+- [x] Enviar as dez raízes antigas do Drive à Lixeira, inclusive `falando_nela_arquivo`, sem esvaziá-la.
+- [x] Procurar referências restantes e revalidar a árvore raw canônica depois da limpeza.
+- [x] Atualizar specs e documentação no mesmo ciclo; nenhum notebook rastreado foi removido.
 
-R09 não faz parte do critério de conclusão da refundação. Ideias adicionais,
-novas bases, correções de coleta, mudança de schema, análise científica e
-publicação permanecem fora do escopo.
+R09 foi executado em tarefas próprias de limpeza local e remota. Os contratos e
+evidências estão em `r09_limpeza_local/` e `r09_limpeza_drive/`. Ideias
+adicionais, novas bases, correções de coleta, mudança de schema, análise
+científica e publicação permanecem fora do escopo.
 
 ## Fronteiras de custo e interrupção
 

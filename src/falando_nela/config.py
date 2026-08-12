@@ -48,6 +48,13 @@ def _resolved(path: Path) -> Path:
     return path.expanduser().resolve(strict=False)
 
 
+def _containing_git_checkout(path: Path) -> Path | None:
+    for candidate in (path, *path.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -71,13 +78,31 @@ class Settings(BaseModel):
         data_root = _resolved(self.data_root)
         repo_root = _resolved(self.repo_root)
         temp_root = _resolved(self.temp_root)
+        containing_checkout = _containing_git_checkout(data_root)
         if not self.data_root.expanduser().is_absolute():
             raise ValueError("FALANDO_NELA_DATA_ROOT deve ser um caminho absoluto.")
         if data_root in {_resolved(Path("/")), _resolved(Path.home())}:
             raise ValueError(
                 "FALANDO_NELA_DATA_ROOT não pode ser a raiz do volume nem a pasta pessoal."
             )
-        if data_root == repo_root or data_root.is_relative_to(repo_root):
+        allowed_repository_sample_root = (
+            data_root
+            in {
+                repo_root / "data_samples",
+                (
+                    containing_checkout / "data_samples"
+                    if containing_checkout is not None
+                    else repo_root / "__no_containing_checkout__"
+                ),
+            }
+            and self.profile == "local"
+            and self.data_profile == "sample_annual_1pct"
+        )
+        if (
+            data_root == repo_root
+            or data_root.is_relative_to(repo_root)
+            or containing_checkout is not None
+        ) and not allowed_repository_sample_root:
             raise ValueError("FALANDO_NELA_DATA_ROOT não pode ficar dentro do clone Git.")
         if data_root.exists() and not data_root.is_dir():
             raise ValueError("FALANDO_NELA_DATA_ROOT existente deve ser um diretório.")

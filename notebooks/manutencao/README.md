@@ -1,4 +1,7 @@
-# Cadernos de manutenção
+# Cadernos de manutenção — consulta legada
+
+> **Status desde R09:** este notebook é preservado para consulta e não autoriza
+> manutenção, movimentação ou exclusão de dados no Drive.
 
 Esta pasta contém operações excepcionais sobre a organização do Drive. Não são
 cadernos de coleta, normalização ou análise.

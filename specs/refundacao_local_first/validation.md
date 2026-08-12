@@ -2,8 +2,10 @@
 
 ## Estado
 
-Contrato de validação aprovado pelo usuário em `2026-08-03`. V00, V01 e V02
-estão aprovados; comandos, migrações e gates seguintes exigem evidência própria.
+Contrato histórico aprovado em `2026-08-03`. Evidências concluídas de R00–R03
+e R09 permanecem válidas. Gates prospectivos associados a R04–R08 foram
+substituídos em `2026-08-11` por `../refundacao_gcp_first/` e não devem ser
+executados nem marcados como concluídos.
 
 ## Princípios
 
@@ -82,28 +84,56 @@ criada.
 
 ## V03 — amostragem piloto do Drive e compressão
 
-- [ ] Confirmar o ID da pasta raw como `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
-- [ ] Confirmar que o remote de origem tem escopo efetivo somente leitura.
-- [ ] Reconciliar 2.891 arquivos e 13,68 GiB da baseline ou bloquear diante da divergência.
-- [ ] Confirmar que nenhum comando usa `sync`, `move`, `delete` ou upload no remote de origem.
-- [ ] Executar inventário read-only da origem com rede de coleta desabilitada.
-- [ ] Selecionar o primeiro ano não vazio de `senado × plenario_discursos × discurso`.
-- [ ] Confirmar a identidade estável de todo registro da população piloto.
-- [ ] Verificar que a primeira passagem produz `N`, chaves e locators sem materializar o raw integral.
-- [ ] Calcular `k=max(1, ceil(N × 0.01))` e selecionar exatamente as `k` menores chaves.
-- [ ] Recalcular a seleção com ordem de leitura diferente e obter as mesmas identidades.
-- [ ] Congelar o manifest antes de iniciar a segunda passagem.
-- [ ] Materializar somente os registros listados no manifest congelado.
-- [ ] Confirmar que a operação publica somente raw e metadados técnicos, sem Parquet, DuckDB, normalização ou análise.
-- [ ] Confirmar que ledger SQLite e manifests JSON contêm apenas estado operacional, identidades, locators, contagens e hashes.
-- [ ] Criar `.jsonl.gz` determinístico em caminho temporário e promovê-lo atomicamente após validação.
-- [ ] Descompactar em streaming e comparar cada registro e `sha256_uncompressed` com a origem.
-- [ ] Verificar `sha256_stored_object`, tamanho comprimido e integridade gzip.
-- [ ] Comparar população, selecionados, válidos, vazios e rejeitados antes e depois da compressão.
-- [ ] Reexecutar com o mesmo `operation_id` e confirmar zero arquivo duplicado ou substituído.
-- [ ] Confirmar que nenhum timestamp variável do cabeçalho gzip altera a saída entre execuções.
-- [ ] Injetar falha antes e depois de cada etapa e confirmar retomada pelo último artefato validado.
+- [x] Registrar a aprovação humana da estratégia copy-first em `2026-08-03`.
+- [x] Confirmar por readback que a raiz antiga foi renomeada para `falando_nela_arquivo`, preservando o ID `15QW3SAIFIw_bzRhlI7m2sVMTL9UKjnzB`.
+- [x] Confirmar por readback que `falando_nela_refundacao`, ID `1zt4au5VQxXj3W1QHCzMD_eg2M2De66nH`, permanece reserva.
+- [x] Criar a nova raiz operacional `falando_nela` pelo remote `drive.file`, confirmar que começa vazia e registrar o ID `17gLzQZSTmM59KTDhErPXEUi8QsBiMBWq`.
+- [x] Confirmar remotes e credenciais distintos para origem e destino.
+- [x] Confirmar localmente que token sentinela não aparece em comando, erro ou manifest.
+- [x] Confirmar localmente cifra obrigatória, permissões privadas, inspeção redigida e ausência de prompt na configuração rclone.
+- [x] Confirmar que toda referência rclone fixa o `root_folder_id` aprovado mesmo quando a projeção redigida o mascara como `XXX`.
+- [x] Classificar com fixtures todo dataset declarado de plenário e comissão sem heurística ambígua.
+- [x] Preservar no mapa o caminho relativo exato sob `data/raw/v1/`.
+- [x] Confirmar por contrato e fixtures corpus textual em `ano=YYYY/mes=MM/` e metadata fora do corpus mensal.
+- [x] Confirmar que comandos construídos não contêm `sync`, `move`, `delete`, `purge`, substituição ou cópia server-side forçada.
+- [x] Revisar o dry-run integral e confirmar correspondência exata com o plano congelado.
+- [x] Aprovar o lote sentinela.
+- [x] Reconciliar sentinela por caminho, tamanho e hash antes do lote seguinte.
+- [x] Adulterar artefato local e retomar apenas inventário e mapa dependente.
+- [x] Reconciliar integralmente origem e árvore canônica antes da amostragem.
+- [x] Confirmar o ID da pasta raw como `1R_AYPVmVEKYK0cQ4qTRzNeGZ1zcSJq_W`.
+- [x] Confirmar que o remote de origem tem escopo efetivo somente leitura.
+- [x] Reproduzir por listagem read-only 2.891 arquivos e 14.686.044.612 bytes, distinguindo 2.887 JSONL dos quatro itens não raw.
+- [x] Reconciliar pelo ID do Drive os dois itens exibidos pelo rclone com o mesmo caminho e a distinção `Untitled`/`Untitled (1)` da baseline G01.
+- [x] Reconciliar 2.891 arquivos e 13,68 GiB da baseline ou bloquear diante da divergência.
+- [x] Confirmar que nenhum comando usa `sync`, `move`, `delete` ou upload no remote de origem.
+- [x] Executar inventário read-only da origem sem chamar rede de coleta parlamentar.
+- [x] Selecionar o primeiro ano não vazio de `senado × plenario_discursos × pronunciamento_texto`.
+- [x] Confirmar a identidade estável de todo registro da população piloto.
+- [x] Verificar que a primeira passagem produz `N`, chaves e locators sem materializar o raw integral.
+- [x] Calcular `k=max(1, ceil(N × 0.01))` e selecionar exatamente as `k` menores chaves.
+- [x] Recalcular a seleção com ordem de leitura diferente e obter as mesmas identidades.
+- [x] Congelar o manifest antes de iniciar a segunda passagem.
+- [x] Materializar somente os registros listados no manifest congelado.
+- [x] Confirmar que a operação publica somente raw e metadados técnicos, sem Parquet, DuckDB, normalização ou análise.
+- [x] Confirmar que ledger SQLite e manifests JSON contêm apenas estado operacional, identidades, locators, contagens e hashes.
+- [x] Criar `.jsonl.gz` determinístico em caminho temporário e promovê-lo atomicamente após validação.
+- [x] Descompactar em streaming e comparar cada registro e `sha256_uncompressed` com a origem.
+- [x] Verificar `sha256_stored_object`, tamanho comprimido e integridade gzip.
+- [x] Comparar população, selecionados, válidos, vazios e rejeitados antes e depois da compressão.
+- [x] Reexecutar com o mesmo `operation_id` e confirmar zero arquivo duplicado ou substituído.
+- [x] Confirmar que nenhum timestamp variável do cabeçalho gzip altera a saída entre execuções.
+- [x] Injetar falha antes e depois de cada etapa e confirmar retomada pelo último artefato validado.
 - [ ] Confirmar que uma etapa cloud já confirmada é reconciliada por `remote_id` e não repetida.
+
+Evidência de fechamento de R03 em `2026-08-03`: 38 lotes concluídos com zero
+ausência e zero retorno de transporte não zero; destino com 2.887 arquivos e
+14.686.043.352 bytes; origem inalterada com 2.891 arquivos e 14.686.044.612
+bytes. O piloto publicou 30 de 2.996 registros em gzip de 169.507 bytes, com
+`mtime=0`, sem nome no header e SHA-256 armazenado
+`09ce1293e61ca8d8ef8691b35d87319c957e89bbc3bd109b239ae7623ed9b0cc`.
+A reexecução fez zero stream e preservou o mesmo hash. O item cloud permanece
+fora de R03.
 
 ## V04 — corte temporal, estratificação e proveniência
 
@@ -193,10 +223,20 @@ uv run python notebooks/primeiro_recorte_discursos.py
 - [ ] Aceitar referências apenas em arquivo histórico ou documentação explícita de legado.
 - [ ] Confirmar que nenhuma branch, tag, issue ou commit foi reescrito ou removido.
 - [ ] Confirmar que `falando_nela` é o checkout canônico e aponta para o mesmo commit de `origin/main`.
-- [ ] Confirmar que `falando_nela_refundacao` não contém diff nem commit exclusivo antes de sua remoção.
-- [ ] Remover a worktree temporária com `git worktree remove`, sem exclusão direta da pasta.
-- [ ] Confirmar que `git worktree list` não registra mais `falando_nela_refundacao` e preserva `falando_nela`.
-- [ ] Confirmar que a tag `legacy-colab-final`, os dados e os backups permanecem acessíveis após a remoção da worktree.
+- [x] Confirmar que `falando_nela_refundacao` não contém diff nem commit exclusivo antes de sua remoção.
+- [x] Remover a worktree temporária com `git worktree remove`, sem exclusão direta da pasta.
+- [x] Confirmar que `git worktree list` não registra mais `falando_nela_refundacao` e preserva `falando_nela`.
+- [x] Confirmar que a tag `legacy-colab-final`, os dados e os backups permanecem acessíveis após a remoção da worktree.
+
+## V09A — limpeza recuperável do legado
+
+- [x] Catalogar e reconciliar os dois alvos locais antes de movê-los para a Lixeira do macOS.
+- [x] Confirmar que os 52 notebooks rastreados permanecem no Git e estão marcados como consulta legada.
+- [x] Preservar 106 notebooks do Drive, validar JSON, caminhos, tamanhos e SHA-256.
+- [x] Enviar somente os dez IDs autorizados à Lixeira do Drive, sem esvaziá-la.
+- [x] Confirmar que a raiz canônica permanece disponível e que o raw conserva 2.887 objetos e 14.686.043.352 bytes.
+- [x] Confirmar que o hash da amostra R03 permanece `09ce1293e61ca8d8ef8691b35d87319c957e89bbc3bd109b239ae7623ed9b0cc`.
+- [x] Confirmar o fast-forward do checkout canônico e a remoção registrada da worktree temporária.
 
 ## Bloqueios
 

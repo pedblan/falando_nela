@@ -42,7 +42,7 @@ def test_fixture_contains_only_the_approved_vertical_slice() -> None:
     assert len(records) == 3
     assert {record["source"] for record in records} == {"senado"}
     assert {record["dataset"] for record in records} == {"plenario_discursos"}
-    assert {record["record_type"] for record in records} == {"discurso"}
+    assert {record["record_type"] for record in records} == {"pronunciamento_texto"}
     assert all(record["periodo"]["data_inicio"].startswith("2010-") for record in records)
 
 
