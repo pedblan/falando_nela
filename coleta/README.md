@@ -1,4 +1,10 @@
-# Modulo de coleta
+# Modulo de coleta — compatibilidade histórica
+
+> **Status desde G05:** este diretório preserva coletores, contratos e modos de
+> retomada da linha anterior. Ele não é um entrypoint de produção atual. As
+> instruções de Colab e Drive abaixo documentam execuções históricas e não
+> autorizam novas coletas. Qualquer atualização futura exige uma tarefa
+> cloud-first própria, com destino GCS explícito e sem montar o Drive.
 
 Este modulo organiza coletas independentes dos portais oficiais de dados abertos do Senado Federal, Congresso Nacional e Camara dos Deputados.
 

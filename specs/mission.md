@@ -33,7 +33,9 @@ devem ser marcados como historicos e de menor confianca.
 - Prioridade textual: sempre que disponivel, a coleta deve transferir o texto integral dos discursos, debates, sessoes ou reunioes, deixando metadados e resumos como contexto, nao como corpus analitico principal.
 - Separacao entre metadados e corpus: respostas de lista, descoberta e contexto devem ser preservadas em area propria de `metadata`, sem inflar os arquivos mensais de registros textuais.
 - Versionamento por specs: mudancas relevantes de escopo, metodo, dados e tecnologia devem ser registradas em especificacoes antes da implementacao.
-- Execucao adequada ao ambiente: testes locais devem ser leves e usar apenas uma parcela estratificada dos dados; coletas longas devem ser preparadas para execucao confiavel no Google Colab.
+- Execucao adequada ao ambiente: testes locais devem ser leves e usar apenas
+  fixtures pequenas; dados oficiais e execucoes longas devem permanecer no
+  ambiente GCP contratado, sem exigir copia integral do corpus no computador.
 - Specs sempre atualizadas: novos notebooks operacionais, mudancas de janela
   historica, criterios de qualidade e regras de limpeza textual devem atualizar
   as specs correspondentes no mesmo ciclo de trabalho.

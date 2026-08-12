@@ -2,7 +2,7 @@
 
 > **Status desde R09:** estes notebooks permanecem disponíveis apenas para
 > consulta histórica. Seus comandos Colab não constituem o fluxo operacional
-> local-first.
+> cloud-first.
 
 Estes cadernos reconstruirão a linha pós-coleta usando somente
 `/content/drive/MyDrive/falando_nela/data/raw` como entrada imutável.

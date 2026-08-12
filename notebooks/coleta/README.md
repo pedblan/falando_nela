@@ -3,7 +3,7 @@
 > **Status desde R09:** estes notebooks permanecem disponíveis apenas para
 > consulta histórica. Não são entrypoints operacionais e não devem ser
 > executados contra o Drive ou fontes parlamentares sem tarefa própria. O
-> caminho oficial local-first está descrito em `notebooks/README.md`.
+> caminho oficial cloud-first está descrito em `notebooks/README.md`.
 
 Esta pasta guarda notebooks operacionais para execucao de coletores, especialmente no Google Colab com Drive montado.
 

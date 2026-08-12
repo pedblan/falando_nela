@@ -1,4 +1,8 @@
-# Tech Stack
+# Tech Stack histórica — linha Colab
+
+> **Status desde G05:** esta stack está preservada para proveniência. A stack
+> vigente é `specs/refundacao_gcp_first/tech-stack.md`; referências a Colab,
+> Drive e Jupyter abaixo não são escolhas operacionais atuais.
 
 O projeto sera construido de forma incremental, com prioridade para ferramentas abertas, reprodutiveis e adequadas a pesquisa empirica com dados parlamentares.
 

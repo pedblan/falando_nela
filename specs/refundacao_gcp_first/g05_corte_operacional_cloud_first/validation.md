@@ -2,34 +2,75 @@
 
 ## Contrato e documentação
 
-- [ ] Confirmar missão cloud-first em `README.md`, `pyproject.toml` e apresentação do pacote.
-- [ ] Confirmar documentação de arquitetura, início local, produção, deploy, autenticação, rollback, custo e diagnóstico.
-- [ ] Confirmar que exemplos de produção usam projeto/região explícitos e GCS como fonte.
-- [ ] Confirmar que exemplos locais usam fixtures/testes e identificam quando ADC é necessário.
-- [ ] Confirmar que Colab e Drive aparecem apenas como arquivo, manutenção ou rollback, não como caminho oficial.
-- [ ] Confirmar referência acessível à tag `legacy-colab-final` e às specs históricas.
+- [x] Confirmar missão cloud-first em `README.md`, `pyproject.toml` e apresentação do pacote.
+- [x] Confirmar documentação de arquitetura, início local, produção, deploy, autenticação, rollback, custo e diagnóstico.
+- [x] Confirmar que exemplos de produção usam projeto/região explícitos e GCS como fonte.
+- [x] Confirmar que exemplos locais usam fixtures/testes e identificam quando ADC é necessário.
+- [x] Confirmar que Colab e Drive aparecem apenas como arquivo, manutenção ou rollback, não como caminho oficial.
+- [x] Confirmar referência acessível à tag `legacy-colab-final` e às specs históricas.
+
+Evidência de P05 em `2026-08-12`: `README.md`, metadata do pacote, docstring do
+núcleo, missão e índice de notebooks apresentam o caminho cloud-first e mantêm
+o corpus volumoso na nuvem. Links locais foram conferidos; `uv lock --check`,
+Ruff, `doctor --json` com `data_samples/` absoluto e os 40 testes direcionados
+passaram. A documentação operacional completa permanece em P06 e a auditoria
+integral de Colab/Drive, em P07.
+
+Evidência de P06 em `2026-08-12`: `docs/operacao_cloud_first.md` registra o
+contrato implantado, separa rotina de novos gates e cobre validação local,
+readback, proxy autenticado, job, deploy por digest/OpenTofu, rollback sem
+exclusão, budget e diagnóstico. Todo comando GCP fixa projeto e região quando
+aplicável; nenhuma chamada remota foi executada para produzir o guia.
+
+Evidência de P07 em `2026-08-12`: a busca inicial classificou 237 arquivos;
+avisos canônicos separam operação atual, compatibilidade e arquivo sem
+reescrever o legado. A tag `legacy-colab-final` foi confirmada no commit
+`17a84c674472205e7c13ce1c3a74230fbd462722`. Nenhum Drive, GCP ou notebook foi
+executado ou alterado.
 
 ## Defaults e testes direcionados
 
-- [ ] Confirmar `authoritative_raw = "gcs"` no contrato versionado.
-- [ ] Confirmar GCS como default de produção onde houver escolha de backend.
-- [ ] Confirmar fixture Marimo explícita e ausência de fallback para GCS/Drive.
-- [ ] Confirmar recusa de projeto, região, bucket e autoridade divergentes antes de efeito remoto.
-- [ ] Executar testes direcionados GCP-first com rede externa bloqueada.
+- [x] Confirmar `authoritative_raw = "gcs"` no contrato versionado.
+- [x] Confirmar GCS como default de produção onde houver escolha de backend.
+- [x] Confirmar fixture Marimo explícita e ausência de fallback para GCS/Drive.
+- [x] Confirmar recusa de projeto, região, bucket e autoridade divergentes antes de efeito remoto.
+- [x] Executar testes direcionados GCP-first com rede externa bloqueada.
+
+Evidência de P04 em `2026-08-12`: o parser assume `backend=gcs`; sem as quatro
+confirmações literais, a CLI encerra antes de obter credenciais ou construir o
+cliente remoto. `backend=local` continua exigindo `--local-input`. Ruff e 40
+testes direcionados de configuração, pipeline e Marimo passaram sem chamadas
+externas; o bloqueio formal de rede permanece reservado a P08.
+
+Evidência de P08 em `2026-08-12`: a suíte direcionada bloqueia criação e conexão
+de sockets (`create_connection`, `connect` e `connect_ex`), inclui uma prova
+positiva do bloqueio e executa o caderno em subprocesso igualmente offline, com
+HOME isolado e variáveis ADC/projeto removidas. Defaults, fixture explícita e
+recusa de projeto, região, bucket e autoridade divergentes passaram: 46 provas
+do recorte e 81 testes da suíte GCP-first. A tarefa previa GPT-5.6-Codex em
+esforço médio; foi executada com GPT-5 em esforço médio, a alternativa
+disponível mais próxima, sem impacto material no escopo de testes.
+
+Evidência de P09 em `2026-08-12`: `auditoria_p09_diff_scopo_state.md` revisou
+diff, segredos, estado e artefatos. Não houve achados bloqueantes.
 
 ## Clone limpo
 
-- [ ] Criar clone local limpo a partir do commit candidato e registrar o SHA-1 do commit.
+- [x] Criar clone local limpo a partir do commit candidato e registrar o SHA-1 do commit.
 - [ ] Executar instalação congelada, Ruff, formatação e suíte completa.
 - [ ] Executar `falando-nela doctor --json` sem erro.
 - [ ] Executar `marimo check` e o teste do caderno com fixture sem ADC.
 - [ ] Executar `tofu fmt -check`, `init -backend=false`, `validate` e `test` sem apply.
 - [ ] Confirmar que nenhum teste acessou GCP, Drive ou fonte parlamentar.
 
+Evidência de P10 em `2026-08-12`: o clone local foi criado sem rede a partir do
+commit candidato exato. O SHA-1 e o caminho efêmero são registrados no handoff;
+as verificações dentro do clone permanecem pendentes para P11.
+
 ## Revisão e integração
 
-- [ ] Revisar o diff por escopo, segredos, state, planos, caches e arquivos acidentais.
-- [ ] Confirmar que o Drive não foi alterado e que nenhum recurso GCP foi criado, alterado ou removido.
+- [x] Revisar o diff por escopo, segredos, state, planos, caches e arquivos acidentais.
+- [x] Confirmar que o Drive não foi alterado e que nenhum recurso GCP foi criado, alterado ou removido.
 - [ ] Obter aprovação humana do commit candidato e da integração em `main`.
 - [ ] Integrar sem reescrever histórico e publicar `main` sem force-push.
 - [ ] Confirmar que `main` local e `origin/main` apontam para o mesmo commit.

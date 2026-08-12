@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import socket
 from pathlib import Path
 
 import pytest
@@ -107,6 +108,15 @@ def test_gcs_cli_has_safe_defaults_and_explicit_target_arguments() -> None:
     assert args.operator_account == "operator@example.invalid"
 
 
+def test_cli_labels_drive_dependent_entrypoints_as_legacy_or_migration() -> None:
+    help_text = build_parser().format_help()
+
+    assert "drive-organize" in help_text
+    assert "legado/manutenção" in help_text
+    assert "legado/compatibilidade" in help_text
+    assert "migração/recuperação histórica" in help_text
+
+
 def test_g02_cutover_and_g03_pipeline_contract_are_frozen() -> None:
     contract = load_gcp_contract(CONFIG_PATH)
 
@@ -139,7 +149,58 @@ def test_g02_cutover_and_g03_pipeline_contract_are_frozen() -> None:
     assert contract.marimo.parquet_locator.endswith("/part-00000.parquet")
 
 
-def test_pipeline_confirmation_requires_literal_g03_targets() -> None:
+@pytest.mark.parametrize(
+    ("project_id", "region", "bucket", "authoritative_raw", "message"),
+    [
+        (
+            "outro-projeto",
+            "southamerica-east1",
+            "falando-nela-pedblan-data",
+            "gcs",
+            "project ID",
+        ),
+        (
+            "falando-nela-pedblan",
+            "us-central1",
+            "falando-nela-pedblan-data",
+            "gcs",
+            "região",
+        ),
+        (
+            "falando-nela-pedblan",
+            "southamerica-east1",
+            "outro-bucket",
+            "gcs",
+            "bucket",
+        ),
+        (
+            "falando-nela-pedblan",
+            "southamerica-east1",
+            "falando-nela-pedblan-data",
+            "drive",
+            "autoridade raw",
+        ),
+    ],
+)
+def test_pipeline_confirmation_requires_literal_g03_targets(
+    project_id: str,
+    region: str,
+    bucket: str,
+    authoritative_raw: str,
+    message: str,
+) -> None:
+    contract = load_gcp_contract(CONFIG_PATH)
+
+    with pytest.raises(GcpConfigError, match=message):
+        contract.confirm_pipeline_targets(
+            project_id=project_id,
+            region=region,
+            bucket=bucket,
+            authoritative_raw=authoritative_raw,
+        )
+
+
+def test_pipeline_confirmation_accepts_exact_g03_targets() -> None:
     contract = load_gcp_contract(CONFIG_PATH)
 
     contract.confirm_pipeline_targets(
@@ -148,13 +209,11 @@ def test_pipeline_confirmation_requires_literal_g03_targets() -> None:
         bucket="falando-nela-pedblan-data",
         authoritative_raw="gcs",
     )
-    with pytest.raises(GcpConfigError, match="região"):
-        contract.confirm_pipeline_targets(
-            project_id="falando-nela-pedblan",
-            region="us-central1",
-            bucket="falando-nela-pedblan-data",
-            authoritative_raw="gcs",
-        )
+
+
+def test_external_network_is_formally_blocked() -> None:
+    with pytest.raises(AssertionError, match="rede externa"):
+        socket.create_connection(("example.invalid", 443))
 
 
 def test_g02_contract_accepts_safe_operational_adjustments(tmp_path: Path) -> None:

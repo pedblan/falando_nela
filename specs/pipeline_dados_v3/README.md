@@ -1,5 +1,10 @@
 # Pipeline de dados v3
 
+> **Status desde G05:** linha Colab congelada e não aplicada. Estes contratos,
+> evidências e gates permanecem consultáveis, mas não constituem o pipeline de
+> produção nem autorizam novas chamadas, montagem do Drive ou aplicação do
+> schema. Qualquer retomada exige tarefa própria compatível com GCS.
+
 ## Estado
 
 Contrato geral aprovado. `01_inventario_metadados_raw` foi concluído e a

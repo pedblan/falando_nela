@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "falando-nela"
 version = "0.1.0"
-description = "Pipeline local-first para o corpus parlamentar Falando Nela"
+description = "Pipeline cloud-first para pesquisa auditável do corpus parlamentar Falando Nela"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "httpx>=0.28,<1",

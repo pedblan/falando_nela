@@ -1,4 +1,4 @@
-"""Núcleo local-first do Falando Nela."""
+"""Núcleo cloud-first do corpus parlamentar Falando Nela."""
 
 from falando_nela.config import Settings
 

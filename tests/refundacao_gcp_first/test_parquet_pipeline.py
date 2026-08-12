@@ -9,7 +9,7 @@ import httpx
 import pyarrow.parquet as pq
 import pytest
 
-from falando_nela.cli import build_parser
+from falando_nela.cli import build_parser, main
 from falando_nela.operations import OperationError
 from falando_nela.parquet_pipeline import (
     LocalObjectStore,
@@ -430,7 +430,7 @@ def test_same_operation_id_rejects_changed_input(tmp_path: Path) -> None:
         )
 
 
-def test_parquet_cli_defaults_to_local_validation_and_requires_explicit_gcs_targets() -> None:
+def test_parquet_cli_defaults_to_gcs_validation_and_requires_explicit_targets() -> None:
     args = build_parser().parse_args(
         [
             "parquet-pilot",
@@ -441,12 +441,67 @@ def test_parquet_cli_defaults_to_local_validation_and_requires_explicit_gcs_targ
         ]
     )
 
-    assert args.backend == "local"
+    assert args.backend == "gcs"
     assert args.through == "validate"
     assert args.confirm_project_id is None
     assert args.confirm_region is None
     assert args.confirm_bucket is None
     assert args.confirm_authoritative_raw is None
+
+
+def test_parquet_cli_local_backend_and_input_are_explicit() -> None:
+    args = build_parser().parse_args(
+        [
+            "parquet-pilot",
+            "--operation-id",
+            "g03-local",
+            "--implementation-revision",
+            "abc123",
+            "--backend",
+            "local",
+            "--local-input",
+            "fixture.jsonl.gz",
+        ]
+    )
+
+    assert args.backend == "local"
+    assert args.local_input == Path("fixture.jsonl.gz")
+
+
+def test_parquet_cli_default_gcs_stops_before_remote_access_without_confirmations(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = main(
+        [
+            "parquet-pilot",
+            "--operation-id",
+            "g03-safe-default",
+            "--implementation-revision",
+            "abc123",
+        ]
+    )
+
+    assert result == 2
+    assert "project ID diverge" in capsys.readouterr().err
+
+
+def test_parquet_cli_local_backend_rejects_missing_input(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = main(
+        [
+            "parquet-pilot",
+            "--operation-id",
+            "g03-local",
+            "--implementation-revision",
+            "abc123",
+            "--backend",
+            "local",
+        ]
+    )
+
+    assert result == 2
+    assert "--local-input é obrigatório" in capsys.readouterr().err
 
 
 def test_metadata_token_provider_requires_google_header_and_caches_token() -> None:

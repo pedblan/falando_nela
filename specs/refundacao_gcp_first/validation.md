@@ -136,12 +136,12 @@ registros, filtros reativos e plano OpenTofu posterior sem drift.
 
 - [x] Criar requirements, plano e validação próprios para G05.
 - [ ] Executar lockfile, Ruff, formatação e suíte completa em clone limpo.
-- [ ] Executar testes e caderno com fixtures sem ADC ou rede.
-- [ ] Confirmar que produção recusa projeto, região ou bucket divergentes.
-- [ ] Confirmar documentação de deploy, execução, custo e rollback.
-- [ ] Procurar dependências operacionais restantes de Colab e Drive montado.
-- [ ] Confirmar que specs históricas continuam acessíveis e rotuladas.
-- [ ] Revisar diff por segredos, state, outputs, caches e mudanças alheias.
+- [x] Executar testes e caderno com fixtures sem ADC ou rede.
+- [x] Confirmar que produção recusa projeto, região ou bucket divergentes.
+- [x] Confirmar documentação de deploy, execução, custo e rollback.
+- [x] Procurar dependências operacionais restantes de Colab e Drive montado.
+- [x] Confirmar que specs históricas continuam acessíveis e rotuladas.
+- [x] Revisar diff por segredos, state, outputs, caches e mudanças alheias.
 
 ## Custos e interrupção
 

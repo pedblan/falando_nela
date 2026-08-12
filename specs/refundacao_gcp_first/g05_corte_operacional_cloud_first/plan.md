@@ -30,14 +30,14 @@ resultado: o caminho cloud-first reproduzível integrado em `main`.
 
 - [x] Criar `requirements.md`, `plan.md` e `validation.md` próprios e sincronizar as specs-raiz.
 - [x] Consolidar o candidato G00–G04 sem descartar alterações e criar a branch dedicada de G05.
-- [ ] Auditar entrypoints, defaults, metadata e documentação que ainda descrevem operação local-first.
-- [ ] Tornar GCS o default de produção onde aplicável e manter fixture local explícita, com testes direcionados.
-- [ ] Criar o README canônico e atualizar descrição do pacote, apresentação do núcleo e índice de notebooks.
-- [ ] Documentar execução, deploy existente, acesso ao Marimo, rollback, custo e diagnóstico.
-- [ ] Auditar referências a Colab/Drive e preservar somente usos históricos ou de manutenção claramente rotulados.
-- [ ] Executar testes direcionados de defaults, divergências de alvo e fixture sem credenciais.
-- [ ] Revisar o diff por escopo, segredos, state, caches e artefatos acidentais.
-- [ ] Commitar o candidato e criar clone limpo local a partir do commit exato.
+- [x] Auditar entrypoints, defaults, metadata e documentação que ainda descrevem operação local-first (evidência em `auditoria_p03_entrypoints_defaults_metadata.md`).
+- [x] Tornar GCS o default de produção onde aplicável e manter fixture local explícita, com testes direcionados.
+- [x] Criar o README canônico e atualizar descrição do pacote, apresentação do núcleo e índice de notebooks.
+- [x] Documentar execução, deploy existente, acesso ao Marimo, rollback, custo e diagnóstico.
+- [x] Auditar referências a Colab/Drive e preservar somente usos históricos ou de manutenção claramente rotulados (evidência em `auditoria_p07_colab_drive.md`).
+- [x] Executar testes direcionados de defaults, divergências de alvo e fixture sem credenciais.
+- [x] Revisar o diff por escopo, segredos, state, caches e artefatos acidentais.
+- [x] Commitar o candidato e criar clone limpo local a partir do commit exato.
 - [ ] Executar instalação, Ruff, pytest, doctor, Marimo e OpenTofu no clone limpo.
 - [ ] Apresentar evidências e obter o gate humano único para integrar e publicar `main`.
 - [ ] Integrar o candidato aprovado em `main` sem reescrever histórico e publicar no GitHub.
@@ -46,6 +46,12 @@ resultado: o caminho cloud-first reproduzível integrado em `main`.
 `[x]` exige evidência no repositório ou na execução; `[ ]` permanece pendente
 até que o critério literal seja cumprido. Checkboxes não autorizam push, merge
 ou qualquer efeito remoto.
+
+Evidência de P10 em `2026-08-12`: o candidato foi consolidado em um commit da
+branch dedicada e clonado localmente a partir do SHA-1 exato; o SHA-1 e o
+caminho efêmero do clone são registrados no handoff da tarefa. P10 previa
+GPT-5.6-Codex em esforço alto e foi executada com GPT-5 em esforço alto, a
+alternativa disponível mais próxima, sem impacto material na operação Git.
 
 ## Sequência de execução
 

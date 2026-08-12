@@ -59,7 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--repo-root", type=Path, default=Path.cwd())
     doctor.add_argument("--allow-full", action="store_true", default=None)
     drive_organize = subcommands.add_parser(
-        "drive-organize", help="prepara a organização copy-first do raw no Drive"
+        "drive-organize",
+        help="legado/manutenção: reconcilia a organização histórica no Drive",
     )
     drive_commands = drive_organize.add_subparsers(dest="drive_command", required=True)
     drive_plan = drive_commands.add_parser(
@@ -121,7 +122,9 @@ def build_parser() -> argparse.ArgumentParser:
     drive_copy.add_argument("--data-root", type=Path)
     drive_copy.add_argument("--repo-root", type=Path, default=Path.cwd())
     drive_copy.add_argument("--json", action="store_true", dest="as_json")
-    sample = subcommands.add_parser("sample", help="materializa amostras raw aprovadas")
+    sample = subcommands.add_parser(
+        "sample", help="legado/compatibilidade: materializa amostras raw aprovadas"
+    )
     sample_commands = sample.add_subparsers(dest="sample_command", required=True)
     sample_pilot = sample_commands.add_parser(
         "pilot", help="publica o piloto determinístico do Plenário do Senado em 2010"
@@ -136,7 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     sample_pilot.add_argument("--repo-root", type=Path, default=Path.cwd())
     sample_pilot.add_argument("--json", action="store_true", dest="as_json")
     gcs_migrate = subcommands.add_parser(
-        "gcs-migrate", help="prepara a migração imutável e recuperável para GCS"
+        "gcs-migrate", help="migração/recuperação histórica: reconcilia Drive e GCS"
     )
     gcs_commands = gcs_migrate.add_subparsers(dest="gcs_command", required=True)
     gcs_sentinel = gcs_commands.add_parser(
@@ -210,7 +213,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("materialize_input", "write_parquet", "validate", "publish"),
         default="validate",
     )
-    parquet_pilot.add_argument("--backend", choices=("local", "gcs"), default="local")
+    parquet_pilot.add_argument(
+        "--backend",
+        choices=("local", "gcs"),
+        default="gcs",
+        help="fonte e destino da execução (padrão de produção: gcs)",
+    )
     parquet_pilot.add_argument(
         "--selection-manifest",
         type=Path,

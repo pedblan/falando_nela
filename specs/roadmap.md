@@ -1,4 +1,9 @@
-# Roadmap
+# Roadmap histórico — linha Colab
+
+> **Status desde G05:** este roadmap está congelado como registro da linha
+> anterior. O plano operacional atual é
+> `specs/refundacao_gcp_first/plan.md`. Checkboxes e instruções Colab abaixo
+> não autorizam execução nem definem o próximo passo do projeto.
 
 Este roadmap organiza o projeto em fases pequenas, com specs orientando as decisoes antes da implementacao.
 

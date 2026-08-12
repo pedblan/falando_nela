@@ -5,7 +5,8 @@
 Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`. G00–G04 estão
 concluídos: o GCS é a fonte raw oficial, o primeiro Parquet foi produzido pelo
 Cloud Run Job e o app Marimo privado foi publicado e validado. O Drive permanece
-intacto como rollback. G05 está especificado e ainda não foi implementado.
+intacto como rollback. G05 está em execução; P01–P06 já concluíram specs,
+consolidação, defaults, apresentação e documentação operacional.
 
 ## Direção aprovada
 
@@ -27,8 +28,9 @@ Este contrato substitui somente as etapas ainda não iniciadas R04–R08 de
 incluindo a organização canônica do Drive, o piloto amostral e a limpeza
 recuperável, continuam válidas e constituem a entrada desta refundação.
 
-O executável atual continua local-first até o corte G05. A existência destas
-specs não autoriza tratá-lo antecipadamente como cloud-first.
+O corte G05 está em andamento. O executável e o caderno operacional já usam o
+caminho cloud-first por padrão; documentação operacional, auditoria do legado e
+regressão em clone limpo permanecem pendentes até o gate final.
 
 ## Documentos
 

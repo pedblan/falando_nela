@@ -3,9 +3,9 @@
 ## Estado
 
 Escolhas aprovadas em `2026-08-11`; G02 tornou o GCS a fonte raw oficial. O
-recorte G03 já possui código, imagem local e IaC validados, mas seus efeitos
-remotos continuam bloqueados pelo gate único. O executável geral permanece
-local-first até G05.
+recorte G03 e o app G04 foram validados na GCP. Durante G05, o executável e o
+caderno operacional passaram a usar o caminho cloud-first por padrão; a
+regressão final e a integração em `main` permanecem pendentes.
 
 ## Topologia fixada
 

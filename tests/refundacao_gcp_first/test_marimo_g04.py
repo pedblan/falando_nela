@@ -26,6 +26,7 @@ from falando_nela.parquet_pipeline import g03_arrow_schema
 REPO_ROOT = Path(__file__).parents[2]
 CONFIG_PATH = REPO_ROOT / "config" / "gcp.toml"
 NOTEBOOK_PATH = REPO_ROOT / "notebooks" / "primeiro_recorte_discursos.py"
+OFFLINE_RUNNER_PATH = REPO_ROOT / "tests" / "refundacao_gcp_first" / "offline_runner.py"
 
 
 def _write_parquet(
@@ -153,14 +154,25 @@ def test_fixture_rejects_incompatible_contract(
 
 def test_notebook_executes_as_script_with_explicit_fixture(tmp_path: Path) -> None:
     fixture = _write_parquet(tmp_path / "script.parquet")
+    isolated_home = tmp_path / "home"
+    isolated_home.mkdir()
     environment = {
         **os.environ,
         SOURCE_ENV: "fixture",
         FIXTURE_ENV: str(fixture),
+        "HOME": str(isolated_home),
+        "CLOUDSDK_CONFIG": str(isolated_home / "gcloud"),
     }
+    for key in (
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GOOGLE_CLOUD_PROJECT",
+        "GCLOUD_PROJECT",
+        "CLOUDSDK_CORE_PROJECT",
+    ):
+        environment.pop(key, None)
 
     result = subprocess.run(
-        [sys.executable, str(NOTEBOOK_PATH)],
+        [sys.executable, str(OFFLINE_RUNNER_PATH), str(NOTEBOOK_PATH)],
         cwd=REPO_ROOT,
         env=environment,
         capture_output=True,

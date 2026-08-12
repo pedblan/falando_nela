@@ -1,8 +1,9 @@
-# Fundação GCP — G01 e primeiro job G03
+# Infraestrutura GCP — G01 a G04
 
-Este diretório declara somente a fundação aprovada em G01. O backend e o
-provider fixam o projeto `falando-nela-pedblan`; o projeto ativo do `gcloud`
-não participa da escolha do alvo.
+Este diretório declara a fundação aprovada em G01, o job G03 e o serviço Marimo
+G04. O backend e o provider fixam o projeto `falando-nela-pedblan`; o projeto
+ativo do `gcloud` não participa da escolha do alvo. O uso cotidiano, acesso,
+rollback, custo e diagnóstico estão em `docs/operacao_cloud_first.md`.
 
 ## Validação local
 

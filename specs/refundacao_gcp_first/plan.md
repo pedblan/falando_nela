@@ -101,11 +101,11 @@ persistente nem permissão pública.
 ## G05 — corte operacional cloud-first
 
 - [x] Criar spec operacional própria com modelo e esforço por tarefa.
-- [ ] Atualizar missão, README, descrição do pacote e documentação operacional.
-- [ ] Tornar GCS a fonte padrão de produção mantendo fixtures locais.
-- [ ] Documentar deploy, execução, rollback, custos e diagnóstico.
-- [ ] Confirmar que nenhuma operação oficial exige Colab ou Drive montado.
-- [ ] Preservar referência às specs e à tag do legado.
+- [x] Atualizar missão, README, descrição do pacote e documentação operacional.
+- [x] Tornar GCS a fonte padrão de produção mantendo fixtures locais.
+- [x] Documentar deploy, execução, rollback, custos e diagnóstico.
+- [x] Confirmar que nenhuma operação oficial exige Colab ou Drive montado.
+- [x] Preservar referência às specs e à tag do legado.
 - [ ] Executar instalação limpa, lint, testes, IaC e caderno com fixtures.
 - [ ] Integrar a linha aprovada em `main` sem reescrever histórico.
 - [ ] Publicar e verificar `origin/main` no mesmo commit.

@@ -1,5 +1,9 @@
 # Inventário da última linha Colab — 2026-08-03
 
+> **Status desde G05:** inventário histórico congelado. Os “pontos de entrada”
+> citados abaixo são fontes de código e proveniência para consulta, não
+> entrypoints operacionais do caminho cloud-first atual.
+
 ## Finalidade
 
 Este inventário identifica as fontes recuperáveis da arquitetura centrada em
