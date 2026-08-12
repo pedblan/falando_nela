@@ -2,9 +2,10 @@
 
 ## Estado
 
-Contrato aprovado pelo usuário em `2026-08-03` para implementação incremental.
-A aprovação não autoriza chamadas às fontes oficiais, recursos pagos, exclusões
-ou troca da branch principal; esses efeitos conservam seus gates próprios.
+Contrato histórico aprovado em `2026-08-03`. Os requisitos que sustentam as
+etapas concluídas R00–R03 e R09 continuam válidos como evidência. Os requisitos
+prospectivos local-first foram substituídos em `2026-08-11` por
+`../refundacao_gcp_first/` e não autorizam nova implementação.
 
 ## Objetivo
 

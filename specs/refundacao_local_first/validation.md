@@ -2,8 +2,10 @@
 
 ## Estado
 
-Contrato de validação aprovado pelo usuário em `2026-08-03`. V00, V01 e V02
-estão aprovados; comandos, migrações e gates seguintes exigem evidência própria.
+Contrato histórico aprovado em `2026-08-03`. Evidências concluídas de R00–R03
+e R09 permanecem válidas. Gates prospectivos associados a R04–R08 foram
+substituídos em `2026-08-11` por `../refundacao_gcp_first/` e não devem ser
+executados nem marcados como concluídos.
 
 ## Princípios
 

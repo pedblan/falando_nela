@@ -2,9 +2,10 @@
 
 ## Estado
 
-Contrato aprovado pelo usuário em `2026-08-03` para implementação incremental.
-As versões exatas serão registradas em `uv.lock` conforme cada dependência
-entrar numa etapa aprovada.
+Contrato histórico aprovado em `2026-08-03`. Esta stack descreve a fundação e
+as operações concluídas R00–R03 e R09. As escolhas prospectivas para R04–R08
+foram substituídas em `2026-08-11` por `../refundacao_gcp_first/` e não devem
+orientar novos recursos.
 
 ## Ambiente Python
 

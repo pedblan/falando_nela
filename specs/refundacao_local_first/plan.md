@@ -2,12 +2,12 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-03`; R01 e R02 foram concluídos e R02 foi
-integrado localmente em `main` a partir da branch
-`codex/refundacao-r02-foundation`. As etapas seguintes continuarão em branches
-e worktrees próprias. Autorizações posteriores ficam limitadas às tarefas que
-as registram; em R09, isso inclui a limpeza recuperável local e no Drive
-aprovada em `2026-08-03`. Nenhuma operação paga foi autorizada.
+Contrato histórico aprovado em `2026-08-03`. R00–R03 e R09 permanecem
+concluídos e preservados como base e evidência. Em `2026-08-11`, as etapas ainda
+não iniciadas R04–R08 foram substituídas pelo contrato
+`../refundacao_gcp_first/`; seus checkboxes pendentes não devem ser executados.
+Nenhuma evidência histórica ou autorização já encerrada é ampliada por essa
+substituição.
 
 ## Resultado principal
 
