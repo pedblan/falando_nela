@@ -19,7 +19,7 @@ from falando_nela.raw import (
     canonical_json_bytes,
     sha256_file,
 )
-from falando_nela.sources import SourceObject, pinned_rclone_remote_path
+from falando_nela.sources import SourceError, SourceObject, pinned_rclone_remote_path
 
 EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e"
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -139,6 +139,7 @@ class RcloneGcsTransport:
         config_path: Path,
         source_remote: str,
         source_folder_id: str,
+        source_prefix: str,
         project_id: str,
         project_number: str,
         region: str,
@@ -152,6 +153,7 @@ class RcloneGcsTransport:
         self.config_path = config_path.expanduser().resolve(strict=True)
         self.source_remote = source_remote
         self.source_folder_id = source_folder_id
+        self.source_prefix = source_prefix.strip("/")
         self.project_id = project_id
         if not re.fullmatch(r"[1-9][0-9]{5,20}", project_number):
             raise GcsMigrationError("número do projeto GCP inválido")
@@ -163,7 +165,7 @@ class RcloneGcsTransport:
         self.executable = executable
         if shutil.which(executable) is None:
             raise GcsMigrationError("rclone não está instalado ou não está no PATH")
-        pinned_rclone_remote_path(source_remote, source_folder_id)
+        pinned_rclone_remote_path(source_remote, source_folder_id, self.source_prefix)
 
     def descriptor(self) -> dict[str, str]:
         return {
@@ -175,6 +177,7 @@ class RcloneGcsTransport:
             "raw_prefix": self.raw_prefix,
             "source_remote": self.source_remote,
             "source_folder_id": self.source_folder_id,
+            "source_prefix": self.source_prefix,
             "authentication": "short_lived_impersonated_token",
         }
 
@@ -228,7 +231,9 @@ class RcloneGcsTransport:
         command = [
             self.executable,
             "copy",
-            pinned_rclone_remote_path(self.source_remote, self.source_folder_id),
+            pinned_rclone_remote_path(
+                self.source_remote, self.source_folder_id, self.source_prefix
+            ),
             self._destination_root(),
             "--files-from0",
             str(files_from_path),
@@ -617,7 +622,7 @@ def execute_gcs_sentinel(
             )
             operation.complete("preflight", artifact=artifact_metadata(preflight_path))
             _emit(progress_callback, operation_id, "preflight", "completed")
-        except (GcsMigrationError, OSError) as exc:
+        except (GcsMigrationError, OSError, SourceError) as exc:
             operation.fail(
                 "preflight", error_type=type(exc).__name__, message=str(exc), blocked=True
             )
@@ -658,7 +663,7 @@ def execute_gcs_sentinel(
             )
             operation.complete("dry_run", artifact=artifact_metadata(dry_run_path))
             _emit(progress_callback, operation_id, "dry_run", "completed")
-        except (GcsMigrationError, OSError) as exc:
+        except (GcsMigrationError, OSError, SourceError) as exc:
             operation.fail("dry_run", error_type=type(exc).__name__, message=str(exc), blocked=True)
             raise
     if through == "dry-run":
@@ -690,7 +695,7 @@ def execute_gcs_sentinel(
                 estimated_cost_usd="0.000001",
             )
             _emit(progress_callback, operation_id, "copy", "completed")
-        except (GcsMigrationError, OSError) as exc:
+        except (GcsMigrationError, OSError, SourceError) as exc:
             try:
                 reconciled = verify_destination(sentinel, transport)
             except GcsMigrationError as reconciliation_error:
@@ -722,7 +727,7 @@ def execute_gcs_sentinel(
             atomic_write_json(verification_path, verification)
             operation.complete("verify", artifact=artifact_metadata(verification_path))
             _emit(progress_callback, operation_id, "verify", "completed")
-        except (GcsMigrationError, OSError) as exc:
+        except (GcsMigrationError, OSError, SourceError) as exc:
             operation.fail("verify", error_type=type(exc).__name__, message=str(exc), blocked=True)
             raise
 
@@ -757,7 +762,7 @@ def execute_gcs_sentinel(
                 usage={"objects_written": 0, "bytes_written": 0},
             )
             _emit(progress_callback, operation_id, "idempotency", "completed")
-        except (GcsMigrationError, OSError) as exc:
+        except (GcsMigrationError, OSError, SourceError) as exc:
             operation.fail(
                 "idempotency", error_type=type(exc).__name__, message=str(exc), blocked=True
             )

@@ -47,6 +47,23 @@ importado. As quatro variáveis públicas devem coincidir com `config/gcp.toml`;
 
 ## Gate G01-C — plano e apply
 
+Cloud Resource Manager é uma dependência circular do provider: ela precisa
+estar habilitada para que o provider consiga ler o projeto enquanto gerencia
+`google_project_service`. Portanto, antes do plano de G01-C, ela é habilitada
+por um único comando explícito e imediatamente importada no state:
+
+```bash
+gcloud services enable cloudresourcemanager.googleapis.com \
+  --project=falando-nela-pedblan
+
+tofu -chdir=infra/gcp import \
+  'google_project_service.required["cloudresourcemanager.googleapis.com"]' \
+  falando-nela-pedblan/cloudresourcemanager.googleapis.com
+```
+
+Esse bootstrap não autoriza nenhuma outra API ou recurso e deve produzir um
+plano posterior sem recriação da API importada.
+
 O plano deve usar token curto da conta operadora, variáveis explícitas e o
 state remoto já importado. O arquivo `*.tfplan` é local e ignorado. Antes do
 apply, o JSON do plano deve ser revisado e aprovado humanamente; o apply recebe

@@ -30,14 +30,15 @@ remoto executado.
 - [x] Registrar `config/gcp.toml` com projeto, região, buckets e prefixos.
 - [x] Adicionar `infra/gcp/`, versões, lockfile e ignores de estado.
 - [x] Revalidar disponibilidade dos dois nomes globais de bucket.
-- [ ] Estimar custo e aprovar o bootstrap do bucket de estado.
-- [ ] Criar e verificar o bucket de estado por comando explícito e único.
-- [ ] Executar `tofu init`, `fmt`, `validate` e `plan` sem apply implícito.
-- [ ] Aprovar humanamente o plano exato e o limite de US$ 5,00.
-- [ ] Aplicar bucket de dados, IAM mínimo e alerta de orçamento.
-- [ ] Reconciliar novamente o inventário canônico do Drive.
-- [ ] Executar dry-run e copiar somente o lote sentinela congelado.
-- [ ] Comparar paths, bytes e hashes e repetir sem nova cópia.
+- [x] Estimar custo e aprovar o bootstrap do bucket de estado.
+- [x] Criar e verificar o bucket de estado por comando explícito e único.
+- [x] Executar `tofu init`, `fmt`, `validate` e `plan` sem apply implícito.
+- [x] Aprovar humanamente o plano exato e o budget de R$ 25,00, mantendo
+  US$ 5,00 como referência conservadora.
+- [x] Aplicar bucket de dados, IAM mínimo e alerta de orçamento.
+- [x] Reconciliar novamente o inventário canônico do Drive.
+- [x] Executar dry-run e copiar somente o lote sentinela congelado.
+- [x] Comparar paths, bytes e hashes e repetir sem nova cópia.
 
 **Gate G01:** infraestrutura mínima declarativa, sentinela íntegro e retomável,
 default do `gcloud` inalterado e custo dentro do limite.

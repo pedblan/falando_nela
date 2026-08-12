@@ -56,11 +56,12 @@ run "g01_contract" {
     condition = toset(keys(google_project_service.required)) == toset([
       "billingbudgets.googleapis.com",
       "cloudbilling.googleapis.com",
+      "cloudresourcemanager.googleapis.com",
       "iam.googleapis.com",
       "iamcredentials.googleapis.com",
       "storage.googleapis.com",
     ])
-    error_message = "G01 deve habilitar somente as cinco APIs aprovadas"
+    error_message = "G01 deve habilitar somente as seis APIs aprovadas"
   }
 
   assert {
@@ -79,8 +80,11 @@ run "g01_contract" {
   }
 
   assert {
-    condition     = google_billing_budget.monthly.amount[0].specified_amount[0].units == "5"
-    error_message = "budget mensal deve permanecer em US$ 5"
+    condition = (
+      google_billing_budget.monthly.amount[0].specified_amount[0].currency_code == "BRL" &&
+      google_billing_budget.monthly.amount[0].specified_amount[0].units == "25"
+    )
+    error_message = "budget mensal deve permanecer em R$ 25"
   }
 
   assert {
