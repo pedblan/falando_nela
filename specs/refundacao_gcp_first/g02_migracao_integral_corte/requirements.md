@@ -98,6 +98,22 @@ para G03 e fases seguintes; o Drive permanece arquivo de rollback.
   sendo a fonte oficial. Depois do corte, permanece arquivo read-only; o
   comportamento geral do executável só muda em G05.
 
+## Acompanhamento
+
+- [x] Baseline e destino (`G02-DATA-01` a `G02-DATA-06`) comprovados pela
+  operação `g02-full-20260811-v1`.
+- [x] Segurança e preservação (`G02-SAFE-01` a `G02-SAFE-05`) comprovadas sem
+  overwrite, escrita no Drive ou credencial persistente.
+- [x] Execução recuperável (`G02-OPS-01` a `G02-OPS-06`) comprovada por
+  progresso persistido, reconciliação e manifesto selado.
+- [x] Integridade e restauração (`G02-VER-01` a `G02-VER-06`) comprovadas pelo
+  manifesto SHA-256
+  `230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
+- [x] Aprovação da cópia integral (`G02-GATE-01`) vinculada ao plano e ao teto
+  de custo aceitos.
+- [ ] Corte de autoridade (`G02-GATE-02` a `G02-GATE-04`) pendente de aprovação
+  humana explícita, execução separada e readback.
+
 ## Margem operacional
 
 Sem alterar esta spec, o operador pode mudar:

@@ -2,10 +2,11 @@
 
 ## Estado
 
-Spec pronta para execução. G01 está concluído, e a implementação local de
-migração já existe. Nenhum item deste documento autoriza por si só upload ou
-corte remoto: G02 conserva apenas duas decisões humanas obrigatórias, uma antes
-da cópia integral e outra antes da mudança de autoridade para o GCS.
+A cópia integral, a reconciliação, a prova de idempotência e a restauração
+amostral estão concluídas. O Drive permanece como autoridade raw até a segunda
+decisão humana, ainda pendente. G02 conserva apenas duas decisões humanas
+obrigatórias: a primeira autorizou a cópia; a segunda autorizará ou não a
+mudança de autoridade para o GCS.
 
 ## Resultado
 
@@ -38,7 +39,7 @@ oficial desse raw. O Drive permanece intacto como arquivo de rollback.
 - [x] Inventariar o destino e classificar objetos iguais, ausentes e conflitantes.
 - [x] Produzir um plano de cópia em lotes adequados aos arquivos e ao ambiente.
 - [x] Registrar estimativa de custo, comando ou procedimento e condição de parada.
-- [ ] Obter aprovação humana para a cópia integral.
+- [x] Obter aprovação humana para a cópia integral.
 
 **Decisão 1:** autorizar a cópia quando origem e destino estiverem identificados,
 não houver conflito ou surpresa sem explicação e o custo couber no orçamento.
@@ -49,34 +50,47 @@ sentinelas iguais no destino, 2.884 criações previstas, 38 lotes correntes e
 zero conflito, remoção ou erro. A estimativa conservadora é US$ 0,30 e o digest
 submetido à aprovação é
 `7c536e2ee91e79cf312891b40a726bcb1da663e852dbe810019409a718871e41`.
+A cópia foi aprovada explicitamente com esse digest e teto de US$ 1,00.
 
 ## G02-B — copiar e retomar
 
-- [ ] Copiar somente objetos ausentes, sem transformar paths ou conteúdo.
-- [ ] Registrar progresso suficiente para retomar sem repetir lotes já íntegros.
-- [ ] Em falha ou resultado ambíguo, consultar o destino e continuar do estado
-  observado.
-- [ ] Ajustar lotes, concorrência ou retries quando necessário, sem nova
-  aprovação, desde que os requisitos e o limite de custo continuem atendidos.
-- [ ] Encerrar a cópia com todos os objetos esperados presentes e nenhum
+- [x] Copiar somente objetos ausentes, sem transformar paths ou conteúdo.
+- [x] Registrar progresso suficiente para retomar sem repetir lotes já íntegros.
+- [x] Reconciliar cada lote com o destino e, em falha ou resultado ambíguo,
+  continuar somente do estado observado.
+- [x] Avaliar durante a execução se lotes, concorrência ou retries precisavam de
+  ajuste, sem criar aprovações por lote dentro dos limites já aceitos.
+- [x] Encerrar a cópia com todos os objetos esperados presentes e nenhum
   conflito, overwrite ou mutação do Drive.
+
+A execução criou 2.884 objetos ausentes em 38 lotes persistidos, todos na
+primeira tentativa, e preservou os três sentinelas. Não houve falha, resultado
+ambíguo ou motivo para alterar concorrência e retries; as rotas de retomada e
+reconciliação permaneceram disponíveis sem impor novas aprovações por lote.
 
 ## G02-C — provar integridade e restauração
 
-- [ ] Reconciliar inventários completos de origem e destino por locator e bytes.
-- [ ] Comparar checksums disponíveis e investigar toda divergência.
-- [ ] Demonstrar idempotência por nova verificação ou reexecução sem escrita.
-- [ ] Restaurar em diretório vazio uma amostra representativa, incluindo casos
+- [x] Reconciliar inventários completos de origem e destino por locator e bytes.
+- [x] Comparar checksums disponíveis e investigar toda divergência.
+- [x] Demonstrar idempotência por nova verificação ou reexecução sem escrita.
+- [x] Restaurar em diretório vazio uma amostra representativa, incluindo casos
   pequenos, grandes, vazios e categorias distintas da baseline.
-- [ ] Comparar tamanho e hash do conteúdo restaurado com a origem esperada.
-- [ ] Confirmar novamente que o Drive e as configurações locais permaneceram
+- [x] Comparar tamanho e hash do conteúdo restaurado com a origem esperada.
+- [x] Confirmar novamente que o Drive e as configurações locais permaneceram
   inalterados.
-- [ ] Consolidar evidências, incidentes resolvidos e custo observado em um
+- [x] Consolidar evidências, incidentes resolvidos e custo observado em um
   relatório curto de conclusão da migração.
+
+O GCS foi reconciliado com 2.887 objetos e 14.686.043.352 bytes. A segunda
+passagem classificou os 2.887 objetos como inalterados e escreveu zero objetos
+e zero bytes. A restauração verificou por conteúdo 17 objetos e 30.335.827
+bytes, cobrindo sentinelas, vazios conhecidos, fontes e datasets distintos e
+extremos de tamanho elegíveis. O Drive foi relistado como inalterado; não houve
+incidente, e a estimativa registrada permaneceu em US$ 0,30.
 
 ## G02-D — aprovar e executar o corte
 
-- [ ] Apresentar o relatório de integridade, restauração, idempotência e custo.
+- [x] Apresentar o relatório de integridade, restauração, idempotência e custo.
 - [ ] Obter aprovação humana explícita para tornar o GCS a autoridade raw.
 - [ ] Executar o corte separadamente da cópia e registrar sua proveniência.
 - [ ] Atualizar `authoritative_raw = "gcs"` na configuração versionada.
@@ -88,6 +102,10 @@ submetido à aprovação é
 **Decisão 2:** autorizar o corte somente depois das provas de integridade e
 restauração. A aprovação vale para o corte desta baseline e não para mudanças
 posteriores no corpus.
+
+O candidato ao corte é a operação `g02-full-20260811-v1`. Seu manifesto local
+e o objeto create-only relido no GCS têm SHA-256
+`230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
 
 ## Limites de esforço e custo
 

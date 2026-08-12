@@ -46,16 +46,20 @@ default do `gcloud` inalterado e custo dentro do limite.
 ## G02 — migração integral e corte de armazenamento
 
 - [x] Criar spec operacional própria para a cópia integral.
-- [ ] Congelar inventários de origem e destino sob novo `operation_id`.
-- [ ] Confirmar origem com 2.887 objetos e 14.686.043.352 bytes.
-- [ ] Preparar lotes limitados e relatório combinado de dry-run.
-- [ ] Aprovar humanamente contagem, bytes, custo e comando de cópia.
-- [ ] Copiar em lotes imutáveis e retomáveis, sem alterar o Drive.
-- [ ] Relistar GCS e reconciliar locator, tamanho e hashes de todos os objetos.
-- [ ] Reexecutar a operação e comprovar zero duplicação ou substituição.
-- [ ] Restaurar uma amostra do GCS em diretório vazio e validar seus hashes.
+- [x] Congelar inventários de origem e destino sob novo `operation_id`.
+- [x] Confirmar origem com 2.887 objetos e 14.686.043.352 bytes.
+- [x] Preparar lotes limitados e relatório combinado de dry-run.
+- [x] Aprovar humanamente contagem, bytes, custo e comando de cópia.
+- [x] Copiar em lotes imutáveis e retomáveis, sem alterar o Drive.
+- [x] Relistar GCS e reconciliar locator, tamanho e hashes de todos os objetos.
+- [x] Reexecutar a operação e comprovar zero duplicação ou substituição.
+- [x] Restaurar uma amostra do GCS em diretório vazio e validar seus hashes.
 - [ ] Aprovar humanamente GCS como fonte oficial.
 - [ ] Confirmar o remote Drive como arquivo read-only de rollback, sem alterá-lo.
+
+Evidência parcial: operação `g02-full-20260811-v1`, manifesto de migração
+SHA-256 `230e40d4dfa2a57dd27659724f07b2cba3279e8b1e7f9e9f911bec5ee958a5e7`.
+O corte e a confirmação final do Drive como rollback continuam pendentes.
 
 **Gate G02:** raw integral reconciliado e restaurável no GCS; Drive intacto e
 preservado como rollback.
