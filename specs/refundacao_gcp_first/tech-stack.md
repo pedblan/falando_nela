@@ -3,9 +3,9 @@
 ## Estado
 
 Escolhas aprovadas em `2026-08-11`; G02 tornou o GCS a fonte raw oficial. O
-recorte G03 e o app G04 foram validados na GCP. Durante G05, o executável e o
-caderno operacional passaram a usar o caminho cloud-first por padrão; a
-regressão final e a integração em `main` permanecem pendentes.
+recorte G03 e o app G04 foram validados na GCP. O executável e o caderno
+operacional já usam o caminho cloud-first por padrão, a regressão final foi
+validada e a integração em `main` foi publicada.
 
 ## Topologia fixada
 
