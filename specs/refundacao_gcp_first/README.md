@@ -2,7 +2,7 @@
 
 ## Estado
 
-Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`. G00–G05 estão
+Contrato GCP-first aprovado pelo pesquisador em `2026-08-11`. G00–G06 estão
 concluídos: o GCS é a fonte raw oficial, o primeiro Parquet foi produzido pelo
 Cloud Run Job e o app Marimo privado foi publicado e validado. O Drive permanece
 intacto como rollback e a integração em `main` foi publicada.
@@ -47,6 +47,8 @@ regressão em clone limpo foram validadas e encerradas no gate final.
   privado lendo o Parquet oficial.
 - `g05_corte_operacional_cloud_first/`: contrato do corte documental,
   reprodutível e Git para tornar cloud-first o caminho padrão.
+- `g06_experimento_escala_marimo/`: verificação leve de cold start e duas abas
+  para o uso individual do pesquisador.
 
 ## Baseline observada
 
@@ -55,5 +57,6 @@ ou contas de serviço; os dois nomes planejados retornavam `404`. Depois de G01,
 existem os dois buckets previstos, a service account migradora sem chave, IAM
 mínimo, budget e APIs gerenciadas. Depois de G02, o bucket de dados contém os
 2.887 objetos raw reconciliados e manifests de migração/corte. G03 acrescentou
-o job e o Parquet piloto; G04 acrescentou o serviço privado `fn-marimo`. Não há
-dataset BigQuery, e G05 não criará recursos GCP.
+o job e o Parquet piloto; G04 acrescentou o serviço privado `fn-marimo`. Em G06,
+o pesquisador aprovou manter sua escala `0–1`, sem criar recursos novos. Não há
+dataset BigQuery.

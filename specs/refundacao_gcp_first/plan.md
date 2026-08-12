@@ -116,6 +116,17 @@ como arquivo e desenvolvimento local sem dependência de credenciais.
 Modelo, esforço, fronteiras e gate único de cada tarefa estão definidos em
 `g05_corte_operacional_cloud_first/`.
 
+## G06 — experimento de escala do Marimo
+
+- [x] Medir cold start do app `fn-marimo` e consolidar latência de primeiro acesso.
+- [x] Validar duas abas autenticadas com WebSockets independentes.
+- [x] Registrar recomendação de manter `0–1` e critérios simples de reavaliação.
+- [x] Atualizar a documentação com os resultados do experimento leve.
+- [x] Aprovar humanamente o encerramento de G06 mantendo a escala atual.
+
+**Gate G06:** aprovado em `2026-08-12`; manter escala `0–1` e reavaliar somente
+se o uso real justificar, sem alteração de infraestrutura nesta etapa.
+
 ## Limites globais
 
 - Nenhuma chamada a fontes parlamentares durante G00–G04.

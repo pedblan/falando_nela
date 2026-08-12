@@ -2,7 +2,7 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-11`. G00–G05 foram concluídos; o GCS é a fonte
+Contrato aprovado em `2026-08-11`. G00–G06 foram concluídos; o GCS é a fonte
 raw oficial e o primeiro app Marimo privado foi validado em `2026-08-12`.
 
 ## Gates
@@ -15,6 +15,7 @@ raw oficial e o primeiro app Marimo privado foi validado em `2026-08-12`.
 | G03 | Parquet em Cloud Run Job | imagem/digest, manifesto e rerun sem rewrite | aprovado |
 | G04 | Marimo privado | imagem por digest, IAM privado e smoke GCS com 30 registros | aprovado |
 | G05 | corte cloud-first | clone limpo, docs, testes e remote | aprovado |
+| G06 | capacidade individual | cold start e duas abas autenticadas | aprovado |
 
 ## G00 — contrato
 
@@ -145,6 +146,17 @@ registros, filtros reativos e plano OpenTofu posterior sem drift.
 Evidência de conclusão em `2026-08-12`: aprovação humana em `main`, merge
 `--ff-only`, push e sincronização entre `main` local e remota em
 `0eb5412778710a6d0a1148ec16073f1232524e39`.
+
+## G06 — experimento de escala
+
+- [x] Medir cold start do app `fn-marimo` em estado frio e registrar latência de
+  primeira resposta.
+- [x] Validar duas abas autenticadas com WebSockets distintos e sem erro funcional.
+- [x] Consolidar evidência curta e recomendar manter a escala `0–1`.
+- [x] Aprovar humanamente o encerramento de G06 com a escala atual.
+
+Evidência de conclusão em `2026-08-12`: aprovação explícita do pesquisador para
+manter a escala `0–1`, sem mudança de infraestrutura.
 
 ## Custos e interrupção
 
