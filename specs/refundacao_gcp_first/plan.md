@@ -74,32 +74,33 @@ preservado como rollback.
 - [x] Criar imagem OCI reproduzível e validá-la localmente com fixture.
 - [x] Declarar Artifact Registry, Cloud Build, service account e job em OpenTofu.
 - [x] Executar e revisar `tofu plan` antes de aplicar.
-- [ ] Publicar a imagem marcada por commit.
-- [ ] Executar uma única tarefa Cloud Run com uma tentativa.
-- [ ] Publicar Parquet e manifest em prefixo imutável.
-- [ ] Comparar registros e hashes com a execução local.
-- [ ] Reexecutar por operation ID e comprovar retomada.
+- [x] Publicar a imagem marcada por commit.
+- [x] Executar uma única tarefa Cloud Run com uma tentativa.
+- [x] Publicar Parquet e manifest em prefixo imutável.
+- [x] Comparar registros e hashes com a execução local.
+- [x] Reexecutar por operation ID e comprovar retomada.
 
 **Gate G03:** o mesmo input produz Parquet equivalente localmente e na GCP,
 com proveniência e custo observados.
 
 ## G04 — primeiro app Marimo privado
 
-- [ ] Criar spec operacional do app do recorte piloto.
-- [ ] Criar caderno fino que consulta somente o Parquet aprovado.
-- [ ] Validar `marimo check`, execução como script e revisão humana local.
-- [ ] Declarar service account read-only e serviço Cloud Run privado.
-- [ ] Fixar zero instâncias mínimas e máximo de uma instância.
-- [ ] Construir e publicar a imagem marcada por commit.
-- [ ] Verificar autenticação, WebSocket, health check e leitura do GCS.
-- [ ] Confirmar que reiniciar a instância não perde estado necessário.
-- [ ] Confirmar que usuário anônimo não acessa o app.
+- [x] Criar spec operacional do app do recorte piloto.
+- [x] Criar caderno fino que consulta somente o Parquet aprovado.
+- [x] Validar `marimo check`, execução como script e revisão humana local.
+- [x] Declarar service account read-only e serviço Cloud Run privado.
+- [x] Fixar zero instâncias mínimas e máximo de uma instância.
+- [x] Construir e publicar a imagem marcada por commit.
+- [x] Verificar autenticação, WebSocket, health check e leitura do GCS.
+- [x] Confirmar em cold start que a instância não depende de estado local.
+- [x] Confirmar que usuário anônimo não acessa o app.
 
 **Gate G04:** app privado reproduz o resultado aprovado sem armazenamento local
 persistente nem permissão pública.
 
 ## G05 — corte operacional cloud-first
 
+- [x] Criar spec operacional própria com modelo e esforço por tarefa.
 - [ ] Atualizar missão, README, descrição do pacote e documentação operacional.
 - [ ] Tornar GCS a fonte padrão de produção mantendo fixtures locais.
 - [ ] Documentar deploy, execução, rollback, custos e diagnóstico.
@@ -111,6 +112,9 @@ persistente nem permissão pública.
 
 **Gate G05:** caminho cloud-first documentado e reproduzível, com Drive apenas
 como arquivo e desenvolvimento local sem dependência de credenciais.
+
+Modelo, esforço, fronteiras e gate único de cada tarefa estão definidos em
+`g05_corte_operacional_cloud_first/`.
 
 ## Limites globais
 

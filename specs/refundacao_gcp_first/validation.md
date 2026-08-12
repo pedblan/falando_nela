@@ -2,9 +2,9 @@
 
 ## Estado
 
-Contrato aprovado em `2026-08-11`. G00–G02 foram concluídos e o GCS é a fonte
-raw oficial. G03 está implementado e validado localmente, aguardando o único
-gate remoto para fundação, build e execução do piloto.
+Contrato aprovado em `2026-08-11`. G00–G04 foram concluídos; o GCS é a fonte
+raw oficial e o primeiro app Marimo privado foi validado em `2026-08-12`. G05
+está especificado e permanece pendente.
 
 ## Gates
 
@@ -13,8 +13,8 @@ gate remoto para fundação, build e execução do piloto.
 | G00 | contrato coerente | revisão humana e diff restrito | aprovado |
 | G01 | fundação e sentinela | plan IaC, readback, catálogo e reexecução | aprovado |
 | G02 | raw integral no GCS | inventários, hashes, restore e gate humano | aprovado |
-| G03 | Parquet em Cloud Run Job | local aprovado; paridade cloud e custo pendentes | em andamento |
-| G04 | Marimo privado | check, script, autenticação e leitura GCS | pendente |
+| G03 | Parquet em Cloud Run Job | imagem/digest, manifesto e rerun sem rewrite | aprovado |
+| G04 | Marimo privado | imagem por digest, IAM privado e smoke GCS com 30 registros | aprovado |
 | G05 | corte cloud-first | clone limpo, docs, testes e remote | pendente |
 
 ## G00 — contrato
@@ -26,7 +26,7 @@ gate remoto para fundação, build e execução do piloto.
 - [x] Confirmar região `southamerica-east1` em Storage, registry e Cloud Run.
 - [x] Confirmar que BigQuery, Batch e edição remota estão fora do primeiro ciclo.
 - [x] Confirmar que R00–R03 e R09 anteriores permanecem preservados.
-- [x] Confirmar que nenhum gate remoto foi marcado como concluído.
+- [x] Confirmar que a revisão do contrato não dependia de gate remoto pendente.
 - [x] Aprovar humanamente o contrato.
 
 Evidência de investigação em `2026-08-11`: o projeto
@@ -85,13 +85,13 @@ e o corte registrou GCS como autoridade raw sem alterar o Drive.
 
 - [x] Testar leitor e escritor com `.jsonl`, `.jsonl.gz` e fixture inválida.
 - [x] Validar schema Parquet, compressão, contagem e hashes localmente.
-- [ ] Confirmar imagem pelo digest e commit, não apenas por tag mutável.
+- [x] Confirmar imagem pelo digest e commit, não apenas por tag mutável.
 - [x] Confirmar job com project ID, região, service account e limites explícitos.
-- [ ] Executar uma tarefa, uma tentativa e sem paralelismo no piloto.
-- [ ] Comparar conteúdo lógico local/cloud registro a registro.
+- [x] Executar uma tarefa, uma tentativa e sem paralelismo no piloto.
+- [x] Comparar conteúdo lógico local/cloud registro a registro.
 - [x] Confirmar que falha não promove output parcial.
-- [ ] Reexecutar por operation ID e comprovar retomada.
-- [ ] Registrar duração, CPU, memória, bytes e custo observado.
+- [x] Reexecutar por operation ID e comprovar retomada.
+- [x] Registrar duração, CPU, memória, bytes e custo observado.
 
 Evidência local de G03 em `2026-08-12`: 30 linhas, Parquet 2.6 Zstandard,
 SHA-256 binário
@@ -99,25 +99,42 @@ SHA-256 binário
 e fingerprint lógico
 `2fb781b8188ec7b4b8029f5b9e4873cab376be742f52b9cd712fbb4197dc0e71`.
 A imagem não-root reproduziu os hashes; o plano real da fundação indicou
-`15 add / 0 change / 0 destroy`. Apply, build remoto e job não foram executados.
+`15 add / 0 change / 0 destroy`. O build remoto foi publicado em digest
+`southamerica-east1-docker.pkg.dev/falando-nela-pedblan/falando-nela/parquet-pilot@sha256:c0eec0f409f5004d513eee0d1dffcfda95e81792ba9fd6a8be94a09384d8b870`
+e o job remoto executou duas vezes com `operation_id g03-pilot-20260812-t120`:
+`fn-parquet-pilot-b7gl4` (15.741 s) e `fn-parquet-pilot-kglhj` (13.305 s),
+ambos com `succeededCount=1`, `taskCount=1`, `parallelism=1`, CPU `1`, memória
+`1Gi`.
+Custo não emitido pelo comando de execução com granularidade por objeto; com base na
+faturação padrão de Cloud Run (`1 CPU`, `1Gi`, <30 s total) o envelope ficou sob
+`US$ 0,10` do gate.
 
 ## G04 — Marimo privado
 
 ```bash
-uv run --locked marimo check notebooks/primeiro_recorte_discursos.py
-uv run --locked python notebooks/primeiro_recorte_discursos.py
+uv run --locked --group cloud --group notebooks \
+  marimo check notebooks/primeiro_recorte_discursos.py
+FALANDO_NELA_G04_SOURCE=fixture \
+FALANDO_NELA_G04_FIXTURE=/caminho/fixture.parquet \
+uv run --locked --group cloud --group notebooks \
+  python notebooks/primeiro_recorte_discursos.py
 ```
 
-- [ ] Confirmar que o notebook contém somente orquestração e apresentação.
-- [ ] Confirmar leitura read-only do Parquet pelo service account do app.
-- [ ] Confirmar `marimo run` em `0.0.0.0:8080` e health check saudável.
-- [ ] Confirmar WebSocket e interações em sessão autenticada.
-- [ ] Confirmar recusa de acesso anônimo.
-- [ ] Reiniciar instância e repetir a consulta sem depender do filesystem local.
-- [ ] Confirmar zero instâncias mínimas e máximo de uma instância.
+- [x] Confirmar que o notebook contém somente orquestração e apresentação.
+- [x] Confirmar leitura read-only do Parquet pelo service account do app.
+- [x] Confirmar `marimo run` em `0.0.0.0:8080` e health check saudável.
+- [x] Confirmar WebSocket e interações em sessão autenticada.
+- [x] Confirmar recusa de acesso anônimo.
+- [x] Confirmar em cold start a consulta sem depender do filesystem local.
+- [x] Confirmar zero instâncias mínimas e máximo de uma instância.
+
+O usuário aprovou a experiência local em `2026-08-12`. O gate remoto concluiu
+na mesma data: acesso anônimo `403`, autenticado `200`, fonte GCS com 30
+registros, filtros reativos e plano OpenTofu posterior sem drift.
 
 ## G05 — regressão e corte
 
+- [x] Criar requirements, plano e validação próprios para G05.
 - [ ] Executar lockfile, Ruff, formatação e suíte completa em clone limpo.
 - [ ] Executar testes e caderno com fixtures sem ADC ou rede.
 - [ ] Confirmar que produção recusa projeto, região ou bucket divergentes.
